@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>aemtti — 작품들</title>
+<meta name="description" content="코드로 만든 작은 작품들. 폰에서 바로 열어 보세요.">
+<meta property="og:title" content="aemtti — 작품들">
+<meta property="og:description" content="코드로 만든 작은 작품들. 폰에서 바로 열어 보세요.">
+<meta property="og:image" content="https://aemtti.github.io/lodestone/preview.png">
+<meta property="og:url" content="https://aemtti.github.io/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f3efe6">
+<style>
+:root{--bg:#f3efe6;--card:#fffdf8;--ink:#23201c;--sub:#6d665c;--line:#e2dccf;--accent:#8a5a2b;--shadow:rgba(40,30,20,.10)}
+@media (prefers-color-scheme: dark){:root{--bg:#161412;--card:#201d1a;--ink:#eee8dd;--sub:#a79f93;--line:#34302a;--accent:#d9a066;--shadow:rgba(0,0,0,.35)}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;line-height:1.55}
+main{max-width:880px;margin:0 auto;padding:calc(44px + env(safe-area-inset-top,0px)) 16px calc(48px + env(safe-area-inset-bottom,0px))}
+header h1{font-size:28px;margin:0 0 6px;letter-spacing:-.01em}
+header p{margin:0;color:var(--sub)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:30px}
+a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;color:inherit;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease}
+a.card:hover,a.card:focus-visible{transform:translateY(-2px);box-shadow:0 10px 26px var(--shadow)}
+a.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.thumb{aspect-ratio:1200/630;background:var(--line) center/cover no-repeat}
+.body{padding:14px 16px 16px}
+.body h2{font-size:17px;margin:0 0 4px}
+.body p{margin:0 0 10px;color:var(--sub);font-size:14px}
+.body .url{font-size:12px;color:var(--accent);word-break:break-all}
+footer{margin-top:38px;color:var(--sub);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>aemtti</h1>
+    <p>코드로 만든 작은 작품들. 폰에서 바로 열어 보세요.</p>
+  </header>
+  <section class="grid" id="grid" aria-label="작품 목록"></section>
+  <footer>새로 공개한 작품은 이 목록에 자동으로 나타나요.</footer>
+</main>
+<script>
+(() => {
+  'use strict';
+  // hand-written descriptions for the works we know; anything else published later shows up from GitHub automatically
+  const KNOWN = {
+    'lodestone': { title: 'Lodestone', desc: '종이 위의 쇳가루. 손가락이 자석이 되고, 폰을 기울이고 두드리면 쇳가루가 움직여요.' },
+    'zombie-survival-mobile': { title: 'Harrow Creek', desc: '좀비로 가득한 밤의 마을에서 10분을 버티고 헬기까지 가는 생존 게임. 폰을 가로로 들고 해요.' }
+  };
+  const ORDER = ['lodestone', 'zombie-survival-mobile'];
+  const grid = document.getElementById('grid');
+  const shown = new Set();
+  function card(name, title, desc) {
+    if (shown.has(name)) return;
+    shown.add(name);
+    const url = 'https://aemtti.github.io/' + name + '/';
+    const a = document.createElement('a'); a.className = 'card'; a.href = url;
+    const th = document.createElement('div'); th.className = 'thumb';
+    const img = new Image();
+    img.onload = () => { th.style.backgroundImage = 'url("' + img.src + '")'; };
+    img.src = url + 'preview.png';
+    const b = document.createElement('div'); b.className = 'body';
+    const h = document.createElement('h2'); h.textContent = title;
+    const p = document.createElement('p'); p.textContent = desc || '';
+    const u = document.createElement('div'); u.className = 'url'; u.textContent = url.replace('https://', '');
+    b.append(h, p, u); a.append(th, b); grid.append(a);
+  }
+  for (const n of ORDER) card(n, KNOWN[n].title, KNOWN[n].desc);
+  fetch('https://api.github.com/users/aemtti/repos?per_page=100&sort=updated')
+    .then(r => (r.ok ? r.json() : []))
+    .then(list => {
+      for (const r of list) {
+        if (!r.has_pages || r.fork || r.private || r.name === 'aemtti.github.io') continue;
+        const k = KNOWN[r.name] || {};
+        card(r.name, k.title || r.name, k.desc || r.description);
+      }
+    })
+    .catch(() => {});
+})();
+</script>
+</body>
+</html>
