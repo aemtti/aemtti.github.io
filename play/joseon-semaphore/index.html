@@ -1,0 +1,2294 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>조선 신호간 통신망</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;700;900&display=swap">
+<style>
+:root {
+  --paper: #E8ECE6; --panel: #F6F7F3; --panel-2: #EDF0EA; --ink: #1B2226; --ink-2: #4A545A; --ink-3: #78838A; --rule: #CAD1CB;
+  --sea: #C9D9D8; --land: #F4F0E3; --land-edge: #5E5A4F; --nb-land: #DCDFD7; --nb-edge: #A8ADA3; --do-line: #A0977F; --river: #7EA2B0;
+  --gold: #A9730E; --gold-ink: #7A5307; --gold-soft: rgba(169,115,14,.16); --gold-line: #C08A22;
+  --fire: #C0402A; --fire-ink: #9E2F1E; --fire-soft: rgba(192,64,42,.14);
+  --indigo: #264567; --indigo-soft: rgba(38,69,103,.09);
+  --good: #2D7550; --warn: #A2660F; --crit: #B0322A;
+  --fog: #FFFFFF; --night: #0A1424; --rain: #3C5A70;
+  --st-idle: #9AA39B;
+  --shadow: 0 1px 0 rgba(20,30,30,.04), 0 10px 28px -18px rgba(20,34,40,.45);
+  --serif: "Noto Serif KR", "Nanum Myeongjo", "Batang", "AppleMyungjo", serif;
+  --sans: "IBM Plex Sans KR", "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Consolas", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #10161A; --panel: #172026; --panel-2: #1C262D; --ink: #E5E1D5; --ink-2: #A9B1B3; --ink-3: #79858B; --rule: #2A363D;
+    --sea: #0D1A21; --land: #27302B; --land-edge: #8D907F; --nb-land: #182020; --nb-edge: #36403C; --do-line: #6D6853; --river: #3E6878;
+    --gold: #E0B35A; --gold-ink: #EBC67C; --gold-soft: rgba(224,179,90,.16); --gold-line: #D9A94A;
+    --fire: #EE7552; --fire-ink: #F39478; --fire-soft: rgba(238,117,82,.16);
+    --indigo: #95B5DA; --indigo-soft: rgba(149,181,218,.10);
+    --good: #5DBB8A; --warn: #E1A646; --crit: #EF6D60;
+    --fog: #CCD6D9; --night: #000812; --rain: #8FB0C6; --st-idle: #5B665F;
+    --shadow: 0 1px 0 rgba(0,0,0,.2), 0 12px 30px -18px rgba(0,0,0,.8);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #10161A; --panel: #172026; --panel-2: #1C262D; --ink: #E5E1D5; --ink-2: #A9B1B3; --ink-3: #79858B; --rule: #2A363D;
+  --sea: #0D1A21; --land: #27302B; --land-edge: #8D907F; --nb-land: #182020; --nb-edge: #36403C; --do-line: #6D6853; --river: #3E6878;
+  --gold: #E0B35A; --gold-ink: #EBC67C; --gold-soft: rgba(224,179,90,.16); --gold-line: #D9A94A;
+  --fire: #EE7552; --fire-ink: #F39478; --fire-soft: rgba(238,117,82,.16);
+  --indigo: #95B5DA; --indigo-soft: rgba(149,181,218,.10);
+  --good: #5DBB8A; --warn: #E1A646; --crit: #EF6D60;
+  --fog: #CCD6D9; --night: #000812; --rain: #8FB0C6; --st-idle: #5B665F;
+  --shadow: 0 1px 0 rgba(0,0,0,.2), 0 12px 30px -18px rgba(0,0,0,.8);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { background: var(--paper); }
+body { margin: 0; color: var(--ink); font: 15px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1560px; margin: 0 auto; padding-inline: max(20px, env(safe-area-inset-left, 0px)) max(20px, env(safe-area-inset-right, 0px)); padding-block: 18px max(48px, env(safe-area-inset-bottom, 0px)); }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.hanja { font-family: var(--serif); }
+
+/* ---------- 머리 ---------- */
+.mast { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; padding-block: 6px 18px; border-bottom: 1px solid var(--rule); margin-bottom: 18px; }
+.seal { width: 58px; height: 58px; border: 2.5px solid var(--fire); color: var(--fire); display: grid; place-items: center; font: 900 30px/1 var(--serif); border-radius: 6px; transform: rotate(-3deg); margin-top: 4px; }
+.eyebrow { margin: 0; font-size: 12.5px; letter-spacing: .08em; color: var(--ink-3); }
+.mast h1 { margin: 2px 0 4px; font: 900 clamp(26px, 3.4vw, 40px)/1.15 var(--serif); letter-spacing: -.01em; text-wrap: balance; }
+.mast h1 .hanja { font-weight: 500; font-size: .5em; color: var(--ink-3); letter-spacing: .12em; margin-left: .4em; white-space: nowrap; }
+.lede { margin: 0; max-width: 74ch; color: var(--ink-2); }
+.lede b { color: var(--ink); font-weight: 600; }
+@media (max-width: 560px) {
+  .mast { gap: 12px; } .seal { width: 42px; height: 42px; font-size: 22px; } .lede { font-size: 14px; }
+  .mast h1 { word-break: keep-all; }   /* ‘통신망’이 ‘통 / 신망’으로 쪼개지지 않게 */
+  .wrap { padding-inline: max(14px, env(safe-area-inset-left, 0px)) max(14px, env(safe-area-inset-right, 0px)); }
+}
+
+/* ---------- 배치 ---------- */
+.layout { display: grid; grid-template-columns: minmax(340px, 560px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.mapcol { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.inst { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+@media (max-width: 980px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .mapcol { position: static; }
+}
+
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+.panel h2 { margin: 0 0 2px; font: 700 18px/1.3 var(--serif); letter-spacing: -.005em; }
+.panel .sub { margin: 0 0 12px; color: var(--ink-3); font-size: 13px; }
+.ph { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* ---------- 지도 ---------- */
+.mapcard { position: relative; background: var(--sea); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+#map { display: block; width: 100%; height: min(calc(100vh - 84px), 940px); min-height: 520px; touch-action: manipulation; }
+@media (max-width: 980px) { #map { height: auto; aspect-ratio: 3 / 4; min-height: 0; max-height: calc(100vh - 24px); max-height: calc(100svh - 24px); } }
+.rainfx { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: repeating-linear-gradient(104deg, transparent 0 11px, var(--rain) 11px 12.2px, transparent 12.2px 26px); -webkit-mask-image: repeating-linear-gradient(14deg, #000 0 9px, transparent 9px 31px); mask-image: repeating-linear-gradient(14deg, #000 0 9px, transparent 9px 31px); mix-blend-mode: multiply; }
+:root[data-theme="dark"] .rainfx { mix-blend-mode: screen; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rainfx { mix-blend-mode: screen; } }
+.hud { position: absolute; left: 10px; top: 10px; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--rule); border-radius: 8px; padding: 7px 10px 6px; backdrop-filter: blur(4px); pointer-events: none; }
+.hud .t1 { display: flex; align-items: baseline; gap: 8px; }
+.hud .sj { font: 700 20px/1 var(--serif); }
+.hud .hm { font: 500 15px/1 var(--mono); color: var(--ink-2); }
+.hud .t2 { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
+.hud .t3 { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--ink); max-width: 240px; }
+.hud .t3 svg { flex: none; color: var(--gold-ink); }
+.hud .t3 small { display: block; color: var(--ink-3); font-size: 11.5px; }
+.viewsw { position: absolute; right: 10px; top: 10px; display: flex; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.viewsw button { border: 0; background: none; padding: 6px 11px; font-size: 13px; cursor: pointer; color: var(--ink-2); }
+.viewsw button[aria-pressed="true"] { background: var(--indigo); color: var(--panel); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 8px 4px 0; font-size: 12px; }
+.legend span { display: flex; align-items: center; gap: 7px; color: var(--ink-2); }
+.lg-line { width: 22px; height: 0; border-top: 2.5px solid var(--gold-line); }
+.lg-bong { width: 22px; height: 0; border-top: 2px dashed var(--fire); }
+.lg-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); margin-inline: 7px; }
+.lg-fog { width: 16px; height: 10px; border-radius: 6px; background: var(--fog); box-shadow: 0 0 6px var(--fog); margin-inline: 3px; opacity: .9; border: 1px solid var(--rule); }
+
+#map .sea { fill: var(--sea); }
+#map .nb path { fill: var(--nb-land); stroke: var(--nb-edge); stroke-width: .7; }
+#map .land path { fill: var(--land); stroke: var(--land-edge); stroke-width: .8; stroke-linejoin: round; }
+#map .do path { fill: none; stroke: var(--do-line); stroke-width: .8; stroke-dasharray: 3 3; }
+#map .riv path { fill: none; stroke: var(--river); stroke-width: 1; stroke-linecap: round; }
+#map .net path { fill: none; stroke: var(--gold-line); stroke-width: 1.3; opacity: .55; }
+#map .net circle { fill: var(--gold-line); opacity: .55; }
+#map .bongline { fill: none; stroke: var(--fire); stroke-width: 1.4; stroke-dasharray: 4 3; opacity: .75; }
+#map .bongst { fill: var(--panel); stroke: var(--fire); stroke-width: .9; }
+#map .bongst.lit { fill: var(--fire); }
+#map .mainline { fill: none; stroke: var(--gold-line); stroke-width: 2.2; }
+#map .msgseg { fill: none; stroke: var(--gold); stroke-width: 6; stroke-linecap: round; opacity: .35; }
+#map .donepath { fill: none; stroke: var(--gold); stroke-width: 3.2; stroke-linecap: round; }
+#map .bongdone { fill: none; stroke: var(--fire); stroke-width: 3; stroke-linecap: round; opacity: .8; }
+#map .st { fill: var(--panel); stroke: var(--gold); stroke-width: 1; }
+#map .st.on { fill: var(--gold); }
+#map .st.done { fill: var(--gold-ink); stroke: var(--gold-ink); }
+#map .st.bad { stroke: var(--crit); stroke-width: 1.6; }
+#map .st.fogw { fill: var(--st-idle); stroke: var(--ink-3); }
+#map .st.night { fill: var(--indigo); stroke: var(--indigo); }
+#map .city circle { fill: var(--ink); }
+#map .city circle.capital { fill: var(--fire); stroke: var(--panel); stroke-width: 1.2; }
+#map text { font-family: var(--sans); fill: var(--ink); paint-order: stroke; stroke: var(--land); stroke-width: 3px; stroke-linejoin: round; }
+#map text.sea-t { fill: var(--ink-3); stroke: none; font-family: var(--serif); letter-spacing: .3em; }
+#map text.nb-t { fill: var(--ink-3); stroke: none; font-family: var(--serif); letter-spacing: .15em; }
+#map text.do-t { fill: var(--do-line); stroke: none; font-family: var(--serif); letter-spacing: .25em; font-weight: 700; }
+#map text.cap-t { font-weight: 700; }
+#map .head { fill: var(--gold); stroke: var(--panel); stroke-width: 1.5; }
+#map .headring { fill: none; stroke: var(--gold); stroke-width: 1.5; }
+#map .bhead { fill: var(--fire); }
+#map .runner { fill: var(--ink); stroke: var(--panel); stroke-width: 1.2; }
+#map .fogpuff { fill: url(#fogGrad); pointer-events: none; }
+#map .nightov { fill: var(--night); pointer-events: none; }
+#map .hazeov { fill: var(--fog); pointer-events: none; }
+#map .rainov { fill: url(#rainPat); pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) { #map .headring { animation: pulse 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; } }
+@keyframes pulse { from { opacity: .9; transform: scale(.6); } to { opacity: 0; transform: scale(2.2); } }
+
+/* ---------- 조작 ---------- */
+.playrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--rule); background: var(--panel-2); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 14px; line-height: 1.3; }
+@media (hover: hover) { .btn:hover { border-color: var(--ink-3); } }   /* 터치 화면에서는 탭한 뒤 hover가 남지 않게 */
+.btn.primary { background: var(--indigo); color: var(--panel); border-color: var(--indigo); font-weight: 600; min-width: 122px; }
+@media (hover: hover) { .btn.primary:hover { filter: brightness(1.08); } }
+.btn.ghost { background: none; }
+.speed { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); margin-left: auto; }
+.speed select { border: 1px solid var(--rule); background: var(--panel-2); border-radius: 7px; padding: 5px 6px; }
+.scrub { margin-top: 12px; }
+.scrub input { width: 100%; }
+.scrub .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-3); }
+.sliders { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; margin-top: 14px; }
+@media (max-width: 620px) { .sliders { grid-template-columns: minmax(0, 1fr); } }
+.sl { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0 10px; }
+.sl label { font-weight: 600; font-size: 14px; }
+.sl output { font: 500 13px var(--mono); color: var(--indigo); text-align: right; }
+.sl input[type=range] { grid-column: 1 / -1; width: 100%; margin: 4px 0 2px; accent-color: var(--indigo); }
+.sl .note { grid-column: 1 / -1; margin: 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.45; }
+details.adv { margin-top: 14px; border-top: 1px dashed var(--rule); padding-top: 10px; }
+details.adv summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); font-weight: 600; }
+.adv .sliders { margin-top: 10px; }
+.tog { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; cursor: pointer; }
+.tog input { margin-top: 4px; accent-color: var(--indigo); }
+.tog small { display: block; color: var(--ink-3); font-size: 12.5px; }
+
+/* ---------- 전송 현황 ---------- */
+.stat-row { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin: 4px 0 10px; }
+.sys { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.sys b { font-weight: 700; }
+.sys .sw { width: 10px; height: 10px; border-radius: 2px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; line-height: 1.5; white-space: nowrap; }
+.chip.idle { color: var(--ink-3); }
+.chip.go { color: var(--gold-ink); background: var(--gold-soft); }
+.chip.wait { color: var(--ink-2); background: var(--panel-2); }
+.chip.run { color: var(--indigo); background: var(--indigo-soft); }
+.chip.ok { color: var(--good); }
+.chip.bad { color: var(--crit); }
+.stripbox { overflow-x: auto; margin-inline: -4px; }
+#strip { display: block; width: 100%; min-width: 600px; height: auto; }
+#strip text { font-family: var(--sans); fill: var(--ink-2); font-size: 11.5px; }
+#strip .lane-t { font: 700 13px var(--serif); fill: var(--ink); }
+#strip .lane-s { font-size: 11px; fill: var(--ink-3); }
+#strip .base { stroke: var(--rule); stroke-width: 1; }
+#strip .tick { fill: var(--st-idle); }
+#strip .tick.on { fill: var(--gold); }
+#strip .tick.done { fill: var(--gold-ink); }
+#strip .tick.fogw { fill: var(--ink-3); }
+#strip .tick.night { fill: var(--indigo); }
+#strip .tick.gap { fill: var(--warn); }
+#strip .lg { fill: var(--gold); opacity: .85; }
+#strip .lb { fill: var(--crit); }
+#strip .vis { fill: var(--ink-3); }
+#strip .bt { fill: none; stroke: var(--fire); stroke-width: 1; }
+#strip .bt.lit { fill: var(--fire); }
+#strip .bt.obs { fill: var(--fire-soft); }
+#strip .nightband { fill: var(--night); opacity: .08; }
+#strip .rn { fill: var(--ink); }
+#strip .mark { fill: var(--ink-3); font-size: 11px; }
+#strip .axis { stroke: var(--rule); }
+.counters { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-top: 10px; }
+.cnt { background: var(--panel-2); border-radius: 8px; padding: 7px 10px; }
+.cnt .k { font-size: 12px; color: var(--ink-3); }
+.cnt .v { font: 600 19px/1.2 var(--mono); }
+.cnt .v small { font-size: 12px; font-weight: 400; color: var(--ink-3); margin-left: 3px; }
+.strip-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+.strip-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+/* ---------- 수신문 ---------- */
+.two { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 1240px) { .two { grid-template-columns: minmax(0, 1fr); } }
+table { border-collapse: collapse; width: 100%; }
+.msgt th { text-align: left; font-size: 12px; font-weight: 600; color: var(--ink-3); padding: 4px 6px; border-bottom: 1px solid var(--rule); }
+.msgt td { padding: 6px 6px; border-bottom: 1px solid var(--rule); vertical-align: middle; font-size: 14px; }
+.msgt td.code { font: 12px var(--mono); color: var(--ink-3); white-space: nowrap; }
+.msgt td.pics { white-space: nowrap; color: var(--ink); }
+.msgt td.pics svg { width: 26px; height: 26px; vertical-align: middle; }
+.msgbox { overflow-x: auto; }
+.msgt td.rx { font-weight: 600; }
+.msgt tr.pending td.rx { color: var(--ink-3); font-weight: 400; }
+.msgt tr.bad td.rx { color: var(--crit); }
+.msgt tr.bad td.rx s { color: var(--ink-3); font-weight: 400; margin-left: 6px; }
+.msgt tr.good td.rx { color: var(--good); }
+.bongrx { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--fire-soft); font-size: 14px; }
+.bongrx b { color: var(--fire-ink); }
+.fire-pic { display: inline-flex; gap: 3px; vertical-align: -3px; margin-right: 6px; }
+.fire-pic i { width: 7px; height: 14px; border-radius: 4px 4px 1px 1px; background: var(--fire); display: inline-block; }
+.fire-pic i.off { background: var(--rule); }
+#errchart { width: 100%; height: auto; display: block; }
+#errchart text { font: 11px var(--sans); fill: var(--ink-3); }
+.chart-note { font-size: 12.5px; color: var(--ink-3); margin: 6px 0 0; }
+
+/* ---------- 비교 ---------- */
+#cmpchart { width: 100%; height: auto; display: block; }
+#cmpchart text { font: 11.5px var(--sans); fill: var(--ink-2); }
+#cmpchart .rowt { font: 700 13px var(--serif); fill: var(--ink); }
+.cmpt { margin-top: 12px; font-size: 13.5px; }
+.cmpt th, .cmpt td { padding: 7px 8px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+.cmpt thead th { font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+.cmpt th[scope=row] { font-weight: 600; color: var(--ink-2); width: 22%; }
+.cmpt td.b { background: var(--fire-soft); }
+.cmpt td.s { background: var(--gold-soft); }
+.cmpt .big { font: 600 16px var(--mono); }
+.mcnote { font-size: 12.5px; color: var(--ink-3); margin: 8px 0 0; }
+
+/* ---------- 가정 ---------- */
+.assump { margin-top: 20px; }
+.assump .tablebox { overflow-x: auto; }
+.at { font-size: 13.5px; min-width: 760px; }
+.at th, .at td { padding: 9px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+.at thead th { font-size: 12.5px; color: var(--ink-3); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+.at td.v { font-family: var(--mono); font-size: 13px; white-space: nowrap; color: var(--indigo); }
+.at td.item { font-weight: 600; width: 16%; }
+.at td.why { color: var(--ink-2); line-height: 1.55; }
+.kind { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 4px; white-space: nowrap; }
+.kind.doc { background: var(--gold-soft); color: var(--gold-ink); }
+.kind.calc { background: var(--indigo-soft); color: var(--indigo); }
+.kind.est { background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--rule); }
+.kind.asm { background: var(--fire-soft); color: var(--fire-ink); }
+.foot { margin-top: 20px; font-size: 13px; color: var(--ink-3); display: grid; gap: 6px; max-width: 110ch; }
+.foot p { margin: 0; }
+.tip { position: fixed; z-index: 10; pointer-events: none; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; box-shadow: var(--shadow); max-width: min(280px, calc(100vw - 16px)); line-height: 1.45; }
+.tip b { font-weight: 700; }
+.tip .k { color: var(--ink-3); }
+
+/* ---------- 폰·터치 화면 ----------
+   (pointer: coarse) = 손가락으로 누르는 화면, (max-width: 620px) = 좁은 창. 넓은 데스크톱 창은 위 규칙 그대로 */
+@media (max-width: 560px) { .panel { padding: 14px; } }
+
+/* 가로로 눕힌 폰: 데스크톱처럼 두 칸 — 왼쪽 지도는 화면 높이에 맞춰 붙어 있고, 오른쪽 조작·현황만 스크롤 */
+@media (max-width: 980px) and (orientation: landscape) and (max-height: 560px) {
+  .layout { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 14px; }
+  .mapcol { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); height: calc(100vh - 16px); height: calc(100svh - 16px); display: flex; flex-direction: column; }
+  .mapcard { flex: 1 1 0; min-height: 0; }
+  #map { height: 100%; aspect-ratio: auto; max-height: none; }
+  .legend { flex: none; gap: 2px 12px; padding-top: 6px; }
+  .inst .sliders { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 누르는 자리는 44px 이상 */
+@media (pointer: coarse) {
+  .viewsw button { min-height: 44px; min-width: 48px; padding: 0 14px; font-size: 14px; }
+  .btn { min-height: 44px; padding: 9px 16px; }
+  .speed select { min-height: 44px; padding: 0 10px; }
+  details.adv summary { padding-block: 12px; }
+  .tog { min-height: 44px; align-items: center; }
+  .tog input { width: 22px; height: 22px; margin: 0; flex: none; }
+  /* 슬라이더: 높이 44px 전체가 잡는 자리, 손잡이 26px. 채운 길이 --f(0–1)는 app.js 의 syncRange 가 넣음 */
+  input[type=range] { -webkit-appearance: none; appearance: none; height: 44px; margin: 0; background: transparent; cursor: pointer; }
+  .sl input[type=range] { margin: 0; }
+  input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--indigo) calc(13px + (100% - 26px) * var(--f, 0)), var(--rule) 0); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 26px; height: 26px; margin-top: -10px; border-radius: 50%; background: var(--indigo); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--indigo), 0 1px 4px rgba(0,0,0,.25); }
+  input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--rule); }
+  input[type=range]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--indigo); }
+  input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--indigo); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--indigo); }
+  /* 세로로 밀어 페이지를 스크롤할 때 손가락이 지나간 슬라이더 값이 바뀌지 않게: 슬라이더 자체는 손가락을 받지 않고
+     둘레(.sl, .scrub)가 받아서 가로로 끌거나 탭할 때만 값을 바꾼다 (app.js 의 bindRangeTouch) */
+  input[type=range] { pointer-events: none; }
+  .sl, .scrub { touch-action: pan-y pinch-zoom; }
+  /* 노선 단면은 길게 누르면 말풍선이 손가락을 따라가므로 글자 선택·메뉴가 끼어들지 않게 */
+  #strip { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+}
+
+/* 글자는 12px 아래로 줄이지 않는다. 노선 단면은 viewBox와 1:1(820px)로 그리고 상자 안에서 가로로 밀어 봄,
+   두 차트는 app.js 의 chartWidth()가 좁은 폭에 맞춰 다시 배치 */
+@media (pointer: coarse), (max-width: 620px) {
+  .hud { max-width: calc(100% - 170px); }   /* 좁은 지도에서 오른쪽 위 ‘전국·영남대로’ 단추 밑으로 들어가지 않게 */
+  .mapcard.v-corr .hud { top: auto; bottom: 10px; }   /* 영남대로 보기: 왼쪽 위는 한양(도착점)이라 비어 있는 왼쪽 아래(전라)로 */
+  .hud .t3 small, .kind, .cmpt small { font-size: 12px; }
+  #strip { min-width: 820px; }
+  #strip text, #strip .lane-s, #strip .mark { font-size: 12px; }
+  #errchart text, #cmpchart text { font-size: 12px; }
+}
+
+/* 좁은 화면의 가정표: 네 칸 표 대신 항목마다 카드처럼 — 이름과 성격 / 값 / 근거 */
+@media (max-width: 620px) {
+  .at, .at tbody { display: block; min-width: 0; }
+  .at thead { display: none; }
+  .at tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+  .at td { display: block; padding: 0; border: 0; }
+  .at td.item { width: auto; grid-column: 1; grid-row: 1; }
+  .at td:last-child { grid-column: 2; grid-row: 1; }
+  .at td.v, .at td.why { grid-column: 1 / -1; }
+  .at td.v { white-space: normal; }
+}
+
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="mast">
+  <div class="seal" aria-hidden="true">信</div>
+  <div>
+    <p class="eyebrow">가상 역사 시뮬레이션 · 선조 25년(1592) 음력 4월 13일 · 양력 5월 23일</p>
+    <h1>조선 신호간 통신망<span class="hanja">朝鮮 信號竿 通信網</span></h1>
+    <p class="lede">16세기 조선에 프랑스 샤프(Chappe)식 세마포어, 곧 <b>신호간(信號竿)</b> 광학통신망이 전국에 깔려 있었다면? 동래에서 본 <b>“왜선 90여 척, 절영도 앞바다에 정박”</b> 급보가 한양 병조까지 얼마나 빨리, 얼마나 정확히 닿는지 실제 봉수 제2거와 나란히 달려 봅니다. 쓰인 수치는 모두 아래 <a href="#assumptions">가정과 근거</a>에 적었습니다.</p>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="mapcol" aria-label="지도">
+    <div class="mapcard">
+      <svg id="map" role="img" aria-label="조선 8도 지도 위에 그린 가상 신호간 노선망과 봉수 제2거" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="rainfx" id="rainFx" aria-hidden="true"></div>
+      <div class="hud" aria-live="off">
+        <div class="t1"><span class="sj" id="hudSj">申初</span><span class="hm num" id="hudHm">16:00</span></div>
+        <div class="t2" id="hudWx"></div>
+        <div class="t3" id="hudSig" hidden></div>
+      </div>
+      <div class="viewsw" role="group" aria-label="지도 범위">
+        <button type="button" id="vFull" aria-pressed="true">전국</button>
+        <button type="button" id="vCorr" aria-pressed="false">영남대로</button>
+      </div>
+
+    </div>
+    <div class="legend">
+        <span><i class="lg-line"></i>신호간 간선 (가상, 목멱산 중심)</span>
+        <span><i class="lg-dot"></i>중계소 — 부호를 걸고 있음</span>
+        <span><i class="lg-bong"></i>봉수 제2거 직봉</span>
+        <span><i class="lg-fog"></i>안개·비로 안 보이는 구간</span>
+      </div>
+  </section>
+
+  <div class="inst">
+    <section class="panel" aria-labelledby="h-ctrl">
+      <div class="ph"><h2 id="h-ctrl">조건</h2><span class="sub">전송 중에 바꾸면 그 시각부터 적용됩니다</span></div>
+      <div class="playrow">
+        <button type="button" class="btn primary" id="btnPlay">▶ 급보 발신</button>
+        <button type="button" class="btn" id="btnReset">처음으로</button>
+        <button type="button" class="btn ghost" id="btnSeed" title="안개 조각의 위치, 교대 시각, 오독 운을 새로 뽑습니다">다른 날로 바꾸기</button>
+        <label class="speed" for="speed">배속
+          <select id="speed">
+            <option value="auto" selected>자동</option>
+            <option value="30">×30</option>
+            <option value="120">×120</option>
+            <option value="600">×600</option>
+            <option value="3000">×3000</option>
+          </select>
+        </label>
+      </div>
+      <div class="scrub">
+        <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="모의 시각 이동">
+        <div class="lbl"><span id="scrubL"></span><span id="scrubR"></span></div>
+      </div>
+      <div class="sliders">
+        <div class="sl"><label for="inFog">안개</label><output id="outFog" for="inFog"></output>
+          <input type="range" id="inFog" min="0" max="100" value="12"><p class="note" id="noteFog"></p></div>
+        <div class="sl"><label for="inRain">비</label><output id="outRain" for="inRain"></output>
+          <input type="range" id="inRain" min="0" max="100" value="0"><p class="note" id="noteRain"></p></div>
+        <div class="sl"><label for="inShift">중계소 인원 교대</label><output id="outShift" for="inShift"></output>
+          <input type="range" id="inShift" min="2" max="12" step="1" value="4"><p class="note" id="noteShift"></p></div>
+        <div class="sl"><label for="inErr">부호 해독 오류율</label><output id="outErr" for="inErr"></output>
+          <input type="range" id="inErr" min="0" max="50" step="1" value="5"><p class="note" id="noteErr"></p></div>
+      </div>
+      <details class="adv" id="adv">
+        <summary>세부 조건 — 발신 시각 · 중계소 간격 · 운용 규칙</summary>
+        <div class="sliders">
+          <div class="sl"><label for="inStart">발신 시각</label><output id="outStart" for="inStart"></output>
+            <input type="range" id="inStart" min="0" max="95" step="1" value="64"><p class="note" id="noteStart"></p></div>
+          <div class="sl"><label for="inSpace">중계소 간격</label><output id="outSpace" for="inSpace"></output>
+            <input type="range" id="inSpace" min="30" max="120" step="5" value="50"><p class="note" id="noteSpace"></p></div>
+          <label class="tog"><input type="checkbox" id="inVerify" checked><span>복창 대조(對照)<small>앞 역이 뒤 역의 복창을 보고, 틀리면 訂(정정) 부호를 걸고 다시 보냄</small></span></label>
+          <label class="tog"><input type="checkbox" id="inLamps"><span>야간 등화(燈火) 신호<small>팔 끝에 등롱을 달아 밤에도 운용 — 조작 1.5배, 오독 2.5배</small></span></label>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="h-live">
+      <div class="ph"><h2 id="h-live">전송 현황 — 동래에서 한양까지</h2><span class="sub num" id="liveClock"></span></div>
+      <div class="stat-row">
+        <span class="sys"><i class="sw" style="background:var(--gold)"></i><b>신호간</b><span id="semTxt" class="num"></span><span class="chip idle" id="semChip">발신 전</span></span>
+        <span class="sys"><i class="sw" style="background:var(--fire)"></i><b>봉수</b><span id="bongTxt" class="num"></span><span class="chip idle" id="bongChip">발신 전</span></span>
+      </div>
+      <div class="stripbox"><svg id="strip" viewBox="0 0 820 186" aria-label="노선 단면: 역마다 장부에 적힌 부호 수와 가시도"></svg></div>
+      <div class="strip-legend">
+        <span><i style="background:var(--gold)"></i>역 장부에 적힌 부호 (막대 높이 = 16개 중 몇 개)</span>
+        <span><i style="background:var(--crit)"></i>틀리게 적힌 부호</span>
+        <span><i style="background:var(--ink-3)"></i>위 띠: 구간이 안 보일수록 짙음</span>
+        <span><i style="background:var(--fire)"></i>불 올린 봉수대</span>
+        <span><i style="background:var(--indigo)"></i>야간 대기</span>
+      </div>
+      <div class="counters">
+        <div class="cnt"><div class="k">경과</div><div class="v num" id="cElapsed">—</div></div>
+        <div class="cnt"><div class="k">오독 누적</div><div class="v num" id="cMis">0</div></div>
+        <div class="cnt"><div class="k">복창으로 정정</div><div class="v num" id="cCor">0</div></div>
+        <div class="cnt"><div class="k">주자 전환</div><div class="v num" id="cRun">0</div></div>
+        <div class="cnt"><div class="k">대기 누적 (역·분)</div><div class="v num" id="cWait">0</div></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-msg">
+      <div class="ph"><h2 id="h-msg">한양 병조에 닿은 글</h2><span class="sub">부호 2개 = 부호책 한 구절 · 始와 終을 더해 신호 16개</span></div>
+      <div class="two">
+        <div>
+          <div class="msgbox"><table class="msgt">
+            <thead><tr><th>보낸 구절</th><th>쪽·줄</th><th>신호</th><th>한양 수신</th></tr></thead>
+            <tbody id="msgBody"></tbody>
+          </table></div>
+          <div class="bongrx" id="bongRx"></div>
+        </div>
+        <div>
+          <svg id="errchart" viewBox="0 0 420 230" aria-label="시간에 따른 오독과 정정 누적"></svg>
+          <p class="chart-note" id="errNote"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-cmp">
+      <div class="ph"><h2 id="h-cmp">봉수 대 신호간</h2><span class="sub" id="mcSub"></span></div>
+      <svg id="cmpchart" viewBox="0 0 640 196" aria-label="현재 조건에서 두 체계의 소요 시간 분포"></svg>
+      <table class="cmpt">
+        <thead><tr><th scope="col"></th><th scope="col">봉수 제2거 <span class="kind doc">실제 체계</span></th><th scope="col">신호간 동래선 <span class="kind asm">가상</span></th></tr></thead>
+        <tbody id="cmpBody"></tbody>
+      </table>
+      <p class="mcnote">몬테카를로: 같은 조건에서 안개 조각의 위치, 교대 시각, 오독 운만 바꿔 신호간 40회·봉수 120회 모의한 값입니다. 막대는 10–90% 범위, 점은 중앙값, ◆는 지금 재생 중인 한 번의 결과입니다.</p>
+    </section>
+  </div>
+</main>
+
+<section class="panel assump" id="assumptions" aria-labelledby="h-as">
+  <div class="ph"><h2 id="h-as">가정과 근거</h2><span class="sub">푸른 글씨 값은 지금 조건을 따라 바뀝니다</span></div>
+  <p class="sub"><span class="kind doc">문헌</span> 사료·통설 &nbsp; <span class="kind calc">계산</span> 물리·천문 계산 &nbsp; <span class="kind est">추정</span> 비슷한 체계에서 가져온 값 &nbsp; <span class="kind asm">가정</span> 근거가 약해 조절할 수 있게 둔 값</p>
+  <div class="tablebox">
+    <table class="at">
+      <thead><tr><th scope="col">항목</th><th scope="col">값</th><th scope="col">근거와 계산</th><th scope="col">성격</th></tr></thead>
+      <tbody id="asBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="foot">
+  <p>이 페이지는 반사실(反事實) 사고실험입니다. 조선에는 신호간 통신망이 없었고, 노선·역 위치·운용 규칙은 모두 가상입니다. 봉수와 1592년의 사실은 통설과 사료를 따랐지만 모델은 단순화되어 있습니다.</p>
+  <p>지도: Natural Earth 1:10m 행정 경계·하천 (퍼블릭 도메인). 조선 8도 경계는 현대 행정구역을 병합한 근사입니다.</p>
+</footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+// Natural Earth 1:10m admin-0 (public domain) — 한반도(남북 병합)·섬·주변국 윤곽. 0.001° 단위 델타 부호화.
+const MAP_MAIN = "6qQg7Q4ErHU_BuB_CyFxIqE_I-ClDa5BwOtQ4I1HG5CMpBoCfuC3FahB6BlB6CtE4B1BoB9CgDzCejCc3EmBzCmDxDIXpBhCATgBxHSxCiCnFGxCVtCrBjCjBxCwB3HLpFLjB1C_CJlBJxHIhBkBhBa3DcVHdPRpBNfVBboD5CoBF0BiBgEwDYgBgBTgBtDlD7Eb7FzB3DEpC1BhE3B9CwBnCXtF1BjCdNZyCZiBZGRnBcDQRKzBJbpBHPLO5CjBxBedDZtCd3BtBvBCNhCXjBMlB3B7ChBjBhB1BlDBtBJBbQTEXLZrBRpC6BzBtBXjBHnBPJhBqBG7BNAPQnBTNMPuBW8CEcJIvCtDZBAwCNAfvCzFEV4BR3BTHtBSViBXCfTA4CHIPFNTBdzCkCnBNIcPoBIQT0BLGvBxBATarBWnCyB7BETHZ2BNhBL9BENkBhBarDe_CHRHCNWZ3FzBNzBVRANoG2CiBCYzCPZhCR_BKNRcRObPpESPSGUkBaZtC_CrBJ7BCAgB4BCKO1EUhBwBkCatBqCfZhBzBtBBpBuBVMtBETJJXD7BpBG9CDjBQFwBrDIPIJQKsBD0Ee8C3C7CvBDkBlCXN1BAzBZhBkCVOF_BVzBpBdzBDpBKbJdUhBIrDCZuBXOCxBVxB9ChCpBPdWlB-BdKVXLnBChByBxCkBnBsCvB2C8BqBGoCHmBQBnBxB3FPVnCT1BWtBIjBhCLGPFc1BO5CHP1BmBvBEjBQVeJuBMqBsBwCHiBvBsCpBOKef0BDUMqBNUHCLLhBnCTRtCV9DBhBHcR-CbAN1CVpBTHZQLmBMUFOTTNcvC4DrCsBxBnCA2CbS_BnBb_BD3D2B5BPbPJPcvBsBNsCQqBb9CnChBnBjBO5BjBGjBaV3BAxC4CbwBrCkClDlBOd5CaReDcOS6BgBoBsBasBqBaJhCd5B6BCyBQcgBA8BnB0BAekCkCiBTEPLTMZSRWFgBK4ByCzB2ClBXrBPjBaxBiCblBnBzCbddHpCIXFpCjCpEnCnBLF7BnB3BOZtD5CExCTNzBWRRHpBMVxCoB9CaPmBKmGNaVOVFVPXnBWlC9BPIXsBvBnD5BkBNATRBdMZDPrBpCVVN5BzEDrBvBK7CZXEBYSwBDWROXEzBBSgCYCiBgCRahCMQqCDOfJIwBoBaoDIVchBOyBoBCSZMlBd3BObnBhDBzBLDgBRStBUVgBLVdH7BmBFUUUIJUAOKHU_CuBD6BoBuDCwBgBGcJqCjDZnB0BpEYLkDNqBXYCQiBVB1BMrBuBGuBZDLbVBR2COeJiB2BE0CNKPA1BmF_CIKpBsBaG0CnB6BNqBIpBG_C-BQOrBahCkC1CY5BDpBWxBLtBOFScecK8BHsCc8C3BeEcNFqCYayBK8CXuBBNagBMkBCdcrBInDHISHwBakBAUPeZGdJVZOjCbpBVjCVXnBBLMcqBbM9BZ1BKPHDTlCLTKHUmCoCMcDuBgBiBXQVgBLoBEgBiCsBKQxBKVBXThBNM7BbVjBB7BYcOfWViBWIoCHFqB4BuBNqB5BgChBalBMOtBLZdAbeUWzB4BHgBecoBEkBNQfaOekCQpBLvCYAQrBsBRwBHJVCVkBlByB-CEiCHOlBIdSTsBhCgCNcawBdcEa1BJ3BBWYyDQnBOuBwBIQNoBIe8B2CqBpB2BHFQhC8BJWQwB4CiFuB0BgCUqEO6B2BoBIoClCaHrBuDdO7IlBhDyBIsCuBSuCkCmE-B4BgCI6BiCkBoCGmCHsBbgBFWdS-BzFiDEQiBeSEoEDSIaqBkBKdeXI5EzBxHIFyCRO7BQ3CLJ-B8LegBQiBH0D-B-CeoBYEc9EnBrCvB7DjBdMX6BjCyCcSLM1BQtBgChBMnBLAWtBYlBFTxBNKI6BkCc8BQ0CTtB2BVOdFJGbciCmEeQVWzDiBeW4CSUUNahDILInBiBAOaAdsBuCamBuByCSmBQzDAbLrBzBdDTSdsCAW-BgCFKlBJrBWHSGkBV6BaAoBQqBBQuBPSXEfawBoBRcvBIJiBOYwBGbYNetBjBfJFPQdChBNnBIzBnB9BjBWnBClBUW0EXIIyBVWfFlBvCrBB2BrCOhBVNCRiBjB3BPnBlBL2BawB5BuCSoBP2BjBP1B1BlDXXMRuBKIyCAWMBeTe_BUZSPpCJXXPHQBiD6BiCSsBmBlCMIsBHpB4B6BNWEQYzBEdKDagBqBrBeCciBWyBOLvBENuCDMIOSBoDKyBuBMDnCgB_CpBzBO3B1BhBCPQdwBeaC6BfpBoCNsBUU0BrBSe-BOAM3BQAMwBIemBGsBPiBlCGXITSFUIGeRMgBNSdIjBBiBaWC2BVIGHeqCAiBJQZpB3BOfoBYUAUrBCNbhBA5CGZeZ8BqGKM8BrBmB1BeBvB4CjEuDIWQB2BvBkBTsBICONOhCUpBeVuCkBAgBL2FpDUbJZRRYtBFxBeaBiCIQgBuBiBMgCD4CVsCzBErBf1CYOmBmBUCOPO1CN3BmBlDFRfHObcNMsBe4BRyB0CNlC-BTiBkFuBgD0BUSOyBZc6CeGY3DbRTG9BNNtBLhCIvCkBlC4Bb2B4DKAMZOsBCkBPHmBvBqCO0BVIRRVjDTHRQtCN7CWDoDWiBcegBMsEWKOEkBLIlCnBtBMJoB1CnB5CpCrBFLKASqB0B5BLTGFaMWoCcYaFG1BFRKrBoCcQOJ-BK0CbgBMArBIPUHUGU-BiBoBcBgBPsBGlBkBtBELQtCBlDW1C0BFYiCiCFOnDKxBxBxBgBwBkCRWjCeBgCUcqCUEQZGHPpBDJUDkBKwBZwB7BkC7BoJIaaEuDd8CUaNKXEjBPvD-BnBuCZwBBlBexDiCsByDb-BDoBIoBWgBPORBfPVZHf1DxBhBI1IsEhCuCLKvCPjGtCjFH7BrBiBlDNlC_CQtB2DvBENqE7BhBZAXgCdY1BcdTOZsBdalD7BiBjCKzBoB5D-E7BQBqCJIxBG1BY3DIvCejDKjBNBfmBhB4CjBkCIULNlBqBKoBJnB3BmBAeQOPxBhB7BRfArC0BHtBc7CjBlBqBbTZxBHWxCLHVClBMRMQQXKVCPJFXnBEPOOgBvBhB5B_CnCVrDHPLHfVbbHZUcoDeuB0BLuDmBfQjCLjBMacqBa6CciDTmBKIyBhBJbEjBkB8B0BCU7CUjBgBrBPQZzBArBN4CjBkBbBhBlBazBS3BItBJWZiBPjD7BlBHNc5DAYe2CsBakBNiB3CoBGkBnBF9BhDfRfH5EOrCqBhCIfMLYOsBjCdIiBQW6CWyBecCwChBkBF8BIWMUUNQtBPvCsBPiCSO0CC4CMWFYxBqBBOkCqBQRgBhBMzDEhDYhErBhDNZN3EoChC2BnBORjBVNtERpHiBTWOWwBQ-CGoBQQoBiDUkCyCuBIgBR0BhCwEsCxBQpDL3BgBdaDwBU-DgDgEmB0CYUaCCrBYW-B-CKiBLUjBWHUG4BdUGQcCoBRoBOoBtBsBgBuBUyBbOWEkClBoBBYMSeHmB7BuBGGOJeEaSFKTSHiCK-BYWNuBL8BsBsCgByERSkBYG4CpBQ3BMJYCYyBoBRqB3BwBV4BJoBK1B4BzCO5C6CfUpCEXK_B4CCKRBbnBbBuBjBdP7BXfITcNALbRHzBIRcJAJNYbAN7BHfKXSNWISoBkBbQKSJYXSfGKvBZ_B5BBfwB1BcP2BWiCIuDqB-C4BoCDWqDgEmB-B6CBmBGlDOOeH2BOeNKoBaqCIdwBeoBqBQwBBsBLhBgCsCuDaUfCZQJaOkBZcmBPsBUakBlFQlBMGcwB2BrBAlBLG0BmD0CiBqC4BSQUEaNatHlDvCXhD0ChBGTOekBlEAa1BrDElBqCrCDXG7BoBNWxBI3BuBVCRhBnCgBR8BVYhCkB7CQHU3BEVMHuBTYLpBe3BT1CYFHfXAVNcpBRDlBKpBRnBfzBTXrBZQKcTGPckBgBGkBaMKeFctBHdqBvBSFQOkCtBaHQE2BjIiBfLbgBNyBjCMpB4BnBaUYsCea-DuByB4BFgCTkCQpBQpEKlBYVmCTe8JoHqBOMoBgBWwCoBgCsBkDSmBO6B4D4DwBiDsCkCkCYkBsBtBiBJyBDiFOKU9BqCAcUYiDc4G8C0EqBqB6BgBKeC6BR2BM2BdsBAMmCOIkBDSIO4BSYuBQyCCaIOWOyCYOeFuBpB2DCcOTe3B2BsCqCuBYwCQekBkBB2CdUCqD2BiBCkCrB4Bc-BGaKOUJK5BAWcqCOiBUoBwBMYFQOQ4BYFaqCmCbmBuBgBgI6DmCuD-CyCwB0C4DyDgCmB4BBZbAPkCQA0BpBwDyCuDiB6CkB4BIab2BAYmC4BgBwBmDC2DkCxCuBPYkBK8BH8DxCoBkCwDiBsBsCsBWqBKUNCrBKLmCFoD9BUCIb8BrChBCVHHTIdUT8ChBPbqEhBcT1CflBZZlBuBJOTqBSSDeX2B6BsCjBaFuBMQLCLpBboCTuCHmCQ0BdsBB-CgBoDdiBOErBcVuCPwCnByBiB2BP-FDyBOmBToBFgBMOiBSO-DU8BpBUIiBiBWVG9CSD2BUHrBiBVwBCgBWcNbb0CFwC4BsG6IesCnBsBDkBXoBjBiB1BShE2CHsBVqB9CoELmBhCQTcPgBnBqFCeccoBI8CCiKkCsGNuBJqBZ8CEkCXcD0CYoBNUGwBuBUG2EH0BIYkBgGHsFjBqCSwBsD6CMkBOoCkCEkBuBVkBBcO2FuEGMJSrBCLOEY4BYKwBYOfUjBGAOgCAUMMeZWBSQeOK6DWWgCYKWZcOZiBCOYGWFSXcJiCaeAgD7BOP4BXUjBQFmBOS2ByBOMWD0ByCFsCNgCI0BkCQ6G0BqBAMhBIHaSc0BIJegBeBQ5BmBDkBKwB6B8CS6CgD2FKkCWO4COhBOTa6BYyBAsCjCwBXmDA0EoBaRHbjB7BZNyCdsDC6CLiBlCbpFCtCoBjCsDzCQhBoE3C2BDQJD1BKTsBZeMGefeaegBUiBCgBXcpE6CnFWbmBVuBLiBbWjBM7DqCzBHL9EhBlBRFmCzBiB3BG9BkB5BIdJGZZTfFpBeXCBjBrBfEnBKNeFJlBPEdcTDNXSXVFNZhBDHrBvBRSoCRiBZC1C_BrBtBbNZBFxEbGVJbbOPPHtCiB1BAnBXLzBdDNbVvCNFXqBXFDpBlBNqBpBhBNVZT1CVNhBYtBOhBNb9CEhCdhCdRFhBRLfmBbArClBjC1EzBRvBxBrBzEnB1BYtBP_BM5BwD5CqBCsB3BWN4BASTLNb3CfTVrBtC7HP3CgBrCP5BQ5EKTkBhBcPRJNrBINlBlBGnBnBnCVCPUlCNlBGjBHrDEjBVFlBlBFbXXF5BEjDZ1EnCvB1BxB3CfUhBwBpCDdTXnBCXRzBVpBXZDlCXFTnBxExE_CCrDb3E7DtCzB7BJhBXjDPXX7BIjCPjBnBZADSlBNhBfFzByCbWhBJdEvBbHrBhBvCO7CnBdvBjBP7BA9BzBbJvBPlBI1BF1B7BTtCzBKrBgChBY1BRPXM1BxCArCZPEPSnIkBRxBjCfvB5BTFtBYftBN1DRR5FPcRDT_BXlCG9BRf_BhBRbcxBUhBpBbH9BrBZtB3BbnBvCWzDyCXiBlBKtBrC1ChBzC2CrKB3BPTVHVGTWBaqB0CjCsCZwBXI1C5Bbd_CbAPgDb4BWcHKfLPxCTjBafBMjBzBnFqBrC2BZgCtBoBEISFgBkBEqBtCoBT2EMyBL6BxBeFmFBiEzEavBejBkC1BGZIHgBUKFY7BoCfiC1CoBhB4EbuHnHyE2B8BrCmCnBYjB";
+const MAP_ISL = "kyNs5GQZrBbOnB9BlCjCtBzBxCNrBlCLzBErCzBpGdjCvBxCP5CIjDP1CU9FB5BVjB1BfDfMtB-B7BS7ByBTgCkBwCiB0B6C0B8B2C2BMasBoJsC0BmBiGQmEwBgBF-Hc-BJYbeTgDfeXU7BSX.6iRqwJLvBRNZIkBnCGdPFhBK9BeLpBhBhBLZqCpBfVvElBrBBkCqBbKJSM2B_BbRMHuBOKyBIOWMiCbOTTnCZfVpC0CHmBOW4BmBmDWUA2CjBmBBAMlBUVeJiCaBsEgCXmBMkBeUkBLIPLpDe9BHxBfjC8BY.4uMk5IEZP9B3B5CTL1BqBHrB1G7CzCFVEDSekBJM5BeApBpBqBaiC4B2B4BEe6BSS4BUGeWXgBDcQMeNazBgBOSgBCgBPyBbiBnB2BaCR.s4P-sJKVXjCE_BZRQpBHTdD9BajBNhBDTmBVyCfOZNRhBHpBLRbAvBSLSDgBDa3B0EFiBEkBYkBqBSKsBMM6BgBeHcTOXBZRZrBlBcjCQHsBLYjBmEe.42M66OPBLEjBaZNpDDlBOpBsB-BMOISWBKVQnCsDDQIWB-CIWSGwBsBkBGgBR8BxBiCZYTKfN1Bc3BGnCFPcpBZLVpB.m6M01OaXOXhBTjBFNCjCXZRNT3CzBtBCHaPINJDWLCTRjBKMKDMVQDKGQMCSF6CyBsDEqBSOsBcIWR.qwM2zMQlBafMfRI5CFbEFeaWISvBXVIGekBoBNObZHSVJMwBR2DT4B0BsBmBKchBCLHNPJCNiB9BGRJRMNWJSZpBAALqBNDX.4mNqtIOhBFFTEfOJAALJF1CYAOSKDQRETFZGXONOFWAyBIaQSUIwBGsBRYXSlBGfYrB.wpV03OiBTDzBV3BVlBlBNzBGxBYfgBJoBQgBkBSoCK.qgOo4I-BGiBBaLWfFlBZdlBLxCLfEnCkBAOOUZUaQgBM.smP6kJUFUXetCCdFbNbTPVBXKlC8BHWMmBuBgBGMQyBdcEQUIaCWHERJV.6nJ4yPWTDdbPlBSzBBJDAVUHYBKHnBZxCK7BoBUmCyBNwDgB.y4P6uJSRTF5CUxBLdCdQPcMegCsCgBIKVV3BCRMFiB0BUEGNUNQ3B.upM0nPsCDUPNjBjBXrBBxCOTFVHTBHWc-BYUeGgBF.-9L27JLBzBMTBZMQgCKS8BWKOOakBUqBIeF7BdNPBTIVcjBVFVR.qsMgwJmBJErBnBdVIUWFI_Be5BHZJdDXGLOKKgBCoBMIIIOaGIMCOPSHUWKkBHkBNYVBLRBdPDJET.0mN-xIHAJIewBcgBoBSqBIYDKLCNJHCDSJcdCLNBpBKPDJL1BTRTFVJFNMDmB.u3L6qJCpBpBORTzBELDNzBRPXJXCPOJWDaGYQSuBUcHyDcQH.w6LkzJIaUEWLQXEbFbNXXPbHdORG3CLAMSOkBwBcUwBD.8hM6nJInBLRZBpBoBTCRLPANIBSTalBiBHSiBDkBIaDwBXsBFUV.qtM-gPsBfETVVnBBnE0CSOa-BUSUAQ7BWX.q2LymJeZBdlBvBNJhBCAG9BYHBRiBOO6BUmBqBME.-7LutJdoBGQeMYCSJUAEMDYUQmBAUPCLZNKfFRNHTCLLFpBVJRCDU.s9MulOKZJRlDhCvBDCKUYEOJKaYCYLebiBEEgBLcSIAFRIP-BX.ksQotJyBOiBAUNGZLPIJHLTGHDADQDQJHLTVfAPQHQPAEMFOZCHISMEOTOjBKjBFDOQOYEeJ.0lMu7JEK_BKLIZETKf0BMQaIqBRkBOMFEHKAMCGLNLTAFHAJWTSFUBcpBEPHRHFDGXERW.ssNqtIHHRDZoBNG_BJ7BYBG4BOQBSFWIaSWEMH0BDuBNDNNRBNLLjBA.6vNsmIgBZFZPbXLdBnBYNBFJHEHeY4BOKcMiBF.u8MykISFQRDHJGFADHZMRBRRVNxBdlBCVYBeSekBUeAoBTcC.42Om2IIfxBhBfHLGAQNMTGJKGIVMNIIQFUKE6BRAFcSSA.o9Lq_IINJ9BrBhBlBRVDXGFKWEMIKIBGrBIMM4BEWOKUduBLiBQImBbYL.umP25IOFILDLpBHJMvBQTMHSnBiBKQiBOkBEaPevBBV.o9M0nIIJCPNJFXtBDKNJFdGTUREBIQgBBQMGLUIGeLqBF.o7NyvIKNLBlBKNDSLxBhBTHBSWSFIrBIGIFKLIhBCTGgBOmBgBBEWLUhBQFuBI.s0KglJWGEH_BhCjBxBTGNcCcauBOSQKQCKDGP.o1M-mOUJIZHHVFJXRRVDPKPBLGFaEaSSiBQ.o9L4jONFHCAIQ6BQSQJOROJyBTONhBhBnBHTIRc.ghNyjIOLNHDfJPRDLEBKTIFcSmCRUSOAGSAiBNETRNDN.2oR85JJpBLNJDPsBTYCOPgBEOWKWCUDOZ.yhMwrJNREZLLXDvBehBKXMSMyBIsBUUF.s5Ly9IRFPKHmCGmBSS-BjDDV.y8LotIAjBHLTBLHPOHABJNBnBONSBKKUOImCLcE.umQgiJEFBJbXvBArBTGWBKZOIeIGOC-BbALKA.4mJuqPQFENX1BNHdBJHDBAIVaGQgCuB.gjQouJqBpBHLfDANFFdIVOLQQcaS.knMm8KPUEMWKLIEESOUEDMgBDWQIDELFP9BvBVN.wgKi9HnCuBDQKUOMWFSRcxBCPFH.kiMw7JIlBTJjBYTDDIFEJADEOIVEEKOIOCSHYCSD.6oOo7HaLGFDJ1BQPkBNMFOEYOASIEHFRCT.-zJq4SJNXHwB1ClDvBpBlBlBFvBTkB0BaHOWbUEKYCGSLIAiBiBOBeYQDQmBE.mxJi1QiBvBIV1CUnBOlBWtBbRSIiBsCmBYEKR4BT.itKulPSExB3BhBZhD3BpBHJQ6B4BcKWFIeMAQM.-kJy0SVLbBhBU5CXHECOQI0BgBkBAyBMiBBONDR.4hK0mPNcyBcsBKKPPF5BpB.glJuzSMQWEGNFpBNLZAJKIQDK.s6J4pPWDIRFPLATRTDVANEAKcSaHGCEMDK";
+const MAP_NB = "Cw7Fw-a6-PAEzGapCPjCYjC9BvDMX2GrEOtEhCnCT7EpE_DDnBuB1CLjBjD_Bb7BzC1BHtC6BlF5BZjDBdRhBrCvIC7DmBvBFlCzCrFK9DX9FnCnF7C1BrCwBlBoGAoEvDYtBC7BrDtCbqEfYhBB5BxBgBdFddLrBaFqClCOnE4CPiBrD0CnBkCa4HhBmClGKxCe-BqCIcZSzEnBlDA7D8CxBA5BX2BnBtDbJjCrFrLFzC8B1BfdKdzBHRbIZiBHALzBpBP5GzBjC_BH9EUHpCxBNR1BlBNjBqBlFkD_CZtBiBtBAYvBbNVaXJV_BnEfPdcnBLdzCLANkCZXNJvB3BXDX4BPEd1FtE_BLtBWDjBnCjC9DZvBrDpCRrFkB_FIXjBpGA3C5BnBOzCX_Cc7CD3CkBrGOhKjCjEJd5B4BpGUbiCPqDtFe1C4FnDoD5EdrCrG5IvC3BzCGccbOfVvBBhBWIsBnCPF-CVW1BpB7BqB9DTfvBfLtCaxBN9FE1BQxBhBvCoBtCQbWDsBhBNnDe9CfrBCzBelCPtCInCUqBcRYnCFrCkB1B5BdY7BNNUtBKgCgC2CgBlF2BQc7CiBTUAyB4BGjCoD7D8BlCGfmC1CfrBrCvDhBnBjC7DyC_CBiDlC1DjClDBlDnDUnDlCxExCtDqBvDAzBjCPasB3BC_BlB3DxDvBzC9CxClCtDtJ5EclBpClCGZ3BX7BnDrDhBVb6BADdvErBjCsBhBB9D3B5DgBdjB9DnBrCpCsCzCbN1DBrCwBXNbnD5EZfvCjCLLlCrBA1Be1BL3CQfJpB5BtOhFTzB-BpCJTzGJhBKrBuB7CnDhDrC3DvB5B3DpEfvEzCfVLnBpBNzK5HMnEXrB3CrCb1B3BN_D_C9CjBpC3B7BmBhCrBpEnB3C-B9BftBD_EelCnBpDa5EgDcyCzBfhC9GlCvBpBuB5BM9BjBrDpDjBQDWS-ElBNMPhBnBxEbxCkCRZNIJgBfd6B_CfLtCOLTQb2CNWtB3FlC7CBnByBjDdhDKRR.Cw7F40SkBFsBdTrBvBVLC.C6mGo4RevClCtBfcGaiBUpBe.RguXw-aA1rB_C5BrBD3CgB-BsBIYjD7BvBAiE4G-CgCsCSG8CPXvBDUqBpBc7DahDbnBaaetBInD5CblE1BdAPmCNMRbVlBBnC4B_ChCIZgBC4BkBXzB_FlGvBXEzChBF7BgBjBRPfIzCzDP_BiBXLP9BoBHKRV3B2DWaAAV5FzClBvBIxBXPnDmB1BfpCrE0BzBPZ7BNtB9CuBRUfpBJWZHflCKjBgBc6BtBH9BgBNkDbClB3B3FC1CZrCzBxCEvCsBjBQwBSkDHuBrBoBCkBmCrGQ5DN6CoBKkBXO_EjBvBmB_DnCIpBsBCkD3BFpCyBkBmBAUjB0DnB-B9BFTXOdJH_CnDT3C3G1C1DpC0BL8DVkB1D-BvDkGsDuCB8BXuBnEwDnGAvBmB2BsCoF8C-FoC-DYsFJmC0CwBG8DlBwIBiBsCeSkDC6Ba5BmFIuC0C2Bc8BkDgCMkBtB2CEoBqEgEU8EiCoCNuE1GsELY-BwDXkCQkCZqCD0G.RgpX4tZJnC_BtB7CA_E6BkCMrBmBIMkBHZ4BqBQ4DfAQ_BoB4BH.J44W66EFnBgClCvD1BbzD1BpCzmCAQ-COE0BrBSWDwC-BsCqBWSyBF0BjBcoBc6BBjCyC4E6D2B0C7MjCbM2B0B0F8C6DWxBsBRuBqBgCnBmCvJ4GnBoKzCoBbgC1EUhDsCrB5BnE9CtBSgClE8D9EFnBdHArBdbnFtCiDjCyCGiD8B-DCgClBoC5EBxCtBlCUflBpBnCfrCBbxBhBFbfxDZI0BxCsBB2C0BEoC4BoBmBDmBpBUGqBXUnDH_BM7BT_BzBxCXpBDVoBTNMZ3DjFrDvBRtBhDzCnBMtBXLaiD0B-BwDIcHMVJLc6BaQVyB-BlCFnBkDxBmBPuBfIrBXXqBjC4BhBkD_BsBLoDsByBD8B8B4DsCde_BeUURpB5BG3BwB2B-BP0B7BfhEViCRAGnCcTGfZVmDpCwBecuByGjCeGvEoFeuFhE-CxDnBDoBvBctBlB5BQZoCgBHF2BcKBSVClBjBLoCZKLlDtBGbbJ0BsBIGWZkBpBUAoBNO5BD1BgBzBAXea8C0BWnBsCSkDYU6BrBuBG6BqCIpCwBR2CW-DfQhBYpCyBbVoCKgCyB8BRYOOpD6B5B6BiB2BcE-BzCaJSM1BsCNgCkBoBDoBgBbiBFwBWgCdmBlBnBhCYLUSY5B0CPuBeekCiDiBWFqDyBMa3CNTGDcpBKHWgBiB8BKkBYGuBsCIU-B6BpBTRIfoBVqBINtByBdyBuB4EQiB6CRmBjD3BrDuBByB8BvBqBFyCekFmEBoClBUEYsBgBiBqCmBLwCgCqFC2DuDwCJwBYwEHNnBwCMoB7BgBN6BUuBuC4BmB8BSYTzBzDOvBdAMhB1BvBDhBwBNqBIGlEsD5FuC5ByJlB4BtBoFNkDO0DkDuBmCsBSqEOqCdwCB-DtFUvCV1BQ3B9B1ERHrCiBlBLJ1CjCRJfvCFtBoB1BFPrBYnEsCjBgED2CmB6CjBWgB-GzB8DwBmBD9BlDAdxC7BpBzCiCd0BgB0CHzC9BLVkBPUKsCXKwBQCgBzBkBNeSKuBINAnCrEDtBlCH5BgCtBeBSboBKqBTAhCjBjBkBjB3C1C0CEEZlBjBhCLlBd9CKzBhGPHzBqBlDrDH3BvBhCrCLtB9CGZWVuBDkBhBnBlBrBJ.JguXw0H3BK7BkCzF-CjBFrBvBeAAL9CKDgB6CyCjF6BrCXbGvDnB1BAZUPTYvBjBhBVALmBVL_BSnCwBbJKZhClCnBoBVfhBGY-BduBxD7E1EpCPavBFTgBrCpBjBuBMwBzCuBpB8BlEkBrBhCjFrEf9BpCwBCYmBAWwBOqCXmBQuBRazBERwBNqBiDyCY8B5BwErBuBcqBO2COY0CHaW-EoBfW9DURVXIyB-BiBY2BZOf2BCsCcwBXmCBOjCgCTmB0BjBgBFoBsBJ4DY4B5BvCaVFpBhD2BauFWYuB-EQB8BiD6CNoB4BSqDsCegBMiCuCEC2CkBKyCVwBqBkEA-F8BiBUgB4CsBIwG6E.J0qUg9E-CcYbjClBzC_F9BrBPiD7BbjFdnB2BReMmB6BS0CiCyE6BcHMb.Jg7Tk_E6BvBUzCS1GRvC_ChC7FAOOjCOpBP5B2BFiCkBuBBmCoC0D1BmDwCbiG6B.J8qRknFqB9BhFPFYrBKZJPduBrBJvBhBbpC-BxEBTVpDuBwBqDQGIzBGRe2CXmFmBsBkBAqBtC-EiCKWwBYGjC-BNQfPtC.J04R46FYJ4DuBapBNjB3E_CR3BMjC5BIF1ClBIEwFduBrDeEYuCqBebmBYVqBMwCgBIGxBgBIEqDgBOKkBVwBY0CUPRpCeZpBtD.Jo1Sm1GM5CjC1CUNvBjBpBpD7C7CjCpBpCPhCUOiCmC7BeGOQ5BqBgByBuBFVsC-BsBMmDoDUawBebgBWfYEc.JgjT6rHwBPAbfZhDBbtC3C-BIeTMbNT8BwCb1ByBF-BqBAJiBgBuCYRkEhBA1C8Bf.JimSwrIIc8BN5B5BO5B3BTAhDZXN5B5B5BXCfXRWpBejBPIyFuBwHQakBDBjCOA4CeLcWCsBdBnB.J6uS2gJyBrBb1CjBtClE7DK5BrBlBFbkCoBR3BIfoBdNbhC9BvBNlBKnBoBgBSwBNE6BXKlBlBVCIyCrBjBMhBNJbY1CAMYqCQFyDQSeBmBoBDM3BfJW6B0DqBejByBhBHDcciBoB6DuDFgC8BgBGPOKU0CMuBxBlBtBmBNATNf.J-sUqiFIjCJTpBLGTlBYBiCRWeqBgCG.JosRkwFOvBxB5BfA9BuBAuCWQ4BnCVoC.JyvR0zFKhCZjBAlBvBiBJkBlCwBUQkBJoBfAeSHSmB.Jo0Ro1FHnDhBiB5BBZkC-BNhB6BaS6BX.Jg7RouGc9BtBpBlCOhBKcuB.Jo1Ss6GiBEJhBbL1BOVLZAISmCwBUA";
+// Natural Earth 1:10m rivers (T=두만강, N=남한강, H=한강, Y=압록강, K=낙동강)
+const MAP_RIV = "TigQ0rXgGNsHsD-CEgDdyCYqBN4C6B0EH2BIYkBgGHsFhBqCSwBqD8DaqCkCCkBwBViBBeQ2FsEDerBCLOEY4BYKwBYOjCaAOgCAUMMeboBQgBmEeYiCWIWXeMXyBuBBSXcJgDasDrC6BXkBpBmBOS2BwBQOUF0BgFTgCK0BiCO6G2BqBAOhBGJaUcyBIHeeeBQ5BmBI0C4B-CU4C-C2FMkCWO4COhBOVayCeqBN8B7ByBXmDA0EoBYRFZlB9BXNyCdkGHkBnCZ1HmBlCuDxCOjBqE3CkCLIrCqBXgBKGefeYgBiBSiBCeVepE4CpFYb2D9BUjBO7DqCzB.N-qR6uOhBAnBiEhBarDSvF3BfhBpBN0C5B5BtBvCJTORNUVJ7BavBeNLPdRhB1BpBGhBTDmBXSbFLbQ3B9BZGxB_BhCuC5BmB5BFZ3BVjB5B1DRpC9CdRhBIIjB9BXnGZVKnC6CfO1CZ3B3B3CnBjCoB9BgClCiBnDlCnBUXwBoBqCJmB3CSxE-EhBiDrDwBjBgDnBiBLP3FmEzBkDjCkCLoC5CmB3CNxC8BvBI9BlBVGrCuBnC0CdMnBF.H-gO45OnDvB1B_CfD9DoCnDjCvBoBjF-B_G-E.Y-1JstU4EQMa9BmCIgBqBcoF0BoCuBqFwBkBSkBuBsCKsBR.Y25P8oXUzCThBMnC-CnEe1CiEzC2BTkBfctCoBpBftCrG3ItC3BzCEcebMfVvBAjBUIsBlCNF8CVW1BnB7BoB9DTftBfLtCYzBN7FE3BQvBhBxCqBrCQdUDuBhBNlDc9CfrBEzBclCNtCGnCUoBcPYpCFpCkB3B5BtBcrBRLUvBMgC-B2CgBZUpEkBOa5CkBTUAwB2BGjCoDRBnDgClCEN4BRO1CftBpCtDjBpBjC5DyC7BKjBLQXyCtB1DjClDBfvBlC3BatCFZlCxExCrDqBxDAzBlCNcqB5BC9BjB5DzDtBxC_CzClCtDrJ5EclBpClCGZ5BXR3BpBvBpDfXd8BAKJPR1CP3BblCsBfD9D3B5DgBfjBtCNtBZtCpCsCzCbNzDAvBoBbGXLbpDtDJrBPftClCNJlCrBC3Bc1BL.Y-1JstUxCOtBuB5CnDhDrC3DtB5B5DrEdtEzChBVLpBnBN7JnH.Ki2Rk4N0C9DTfrBvB7BAhBVOTfhCnErBlCpBT5BQ5CjBlBWdlDVU7BzBF2CvGHTjKQ5DcxCPzBIzC9BjCIxCT5DpDjFkD_BClB5BhB1DDTYPrBhBchB0DpBGfrBxCGrBkCZU5CyCjFyB_HPjGWhCVnCMzBSPqDRqBtBlDZxBjBPxB-C3DbL7DQTJKf2BlBSfDlBtC5BGhE8DlDTb7BZDrB8EpDsBByCasCZmIWwEhC6Ca-CmCuCrByBJwE5DmBvBS3BhB_BAlBnBpBXxBK5B";
+// 8도 경계 근사 (Natural Earth 1:10m admin-1 을 조선 8도 단위로 병합해 도 사이 경계선만 추출)
+const MAP_DO = "-sSy9M3CM_BVpEoBWwBd2EwBoDfcIuBxEI5CkBfuChCapByBHgCOyBoCgB6BRuBcRuB9BelCMpDfpCatCKvBFpBazD1BAmCpCUboB1BE1BTlBjBOxBR3CtDOlDmB.08Q82NvCkBnDMjD4BtFT1B6BCeTQ_FdxBgBkBqB4BgBYqB1EYvDgB1CtBvBIpD1BhCLXcAqBrCgClDZlBlBKhDlCtBhBQ7BE9BLSgDzGXzGtB.08Q82NxBhBXITJhEjDpBJnDtC5C7DoBnBdtClF3BnCSdwBpDsCvBvBX_B3BE9CiBjCzBnBDfS9B1DkCzCtEStCapBzBjE7BP_BpCnC5BPWtBuCJiDzDjBbTtBT7EiBhCbtBrBfM9CwCOwBLgD1BmDUuBZWnD5CIvBfGxDhBpBPzBfvBhDhB.u7O29NsDgF0GgMQuBLsBgCoCoBOUiBzB0BjFa1G8C1BG1BLrBegByEzBNXY6B2BZoCI8CmD6BoBMYcKwCvB6BrCUb6B7CAxBeZ0BJ-Cf6BnBLhBSzCVrCO9BmBBkBkBgCNIfAlC5BtBHnBWZuBTfAhCZfpCa5CkCZB7C4DjDyBnBQzBtC.u7O29N9B5BzDvFxBbzBUlC1CzBRfbR5BxHnC9CKtC0B1CgBlF5BrFQ.4xN8-PjByB_BShBkBDcW4Bb0BgByCTIpBVZClD0BjF4HNkCYyDjCgDgBsBkEiBwC6BmE2FQuCDuDSkBwBekEO4BwBmB-ChCkDHqC.4xN8-PnBtCxEpDpFtGvCxBvDfJvBMrF.s0N62RY0CoBuBiD2BLc_B6B.s0N62R7EFhEyCnEiBxCsB9FTrBQpBoBdEflBA1B-F5HIRPJhFLhDyBdCrBvBYzBEzBbZfBjFoB_DwBpDItC0B3CI_BlBnBIfnBFlCcnB6CrBuC7CK_CZjBtDd1CrC3CNxHyCPUAqBXczG4C3GIvGjD7BPM3BiC9BgB9D.i3No_RceN-CsDuBuB8F8ByB4GMmFRwFMoBL.i3No_R9BWjDHdILWOkCpByB7BA5Bdd8BhBY5BCnDd3BWVgBG6BqC8GTkBhDqCLkBW6B6BkCRuDiD-CJczBOBckC6C2B0DkCeuDWgEAmCRwBzBcJ2BkBsDMoBuBEuBrC4DbgE2BeB-B6EiDceEkBde9CwBLUP2CW6BPgBrE6C_BO1FDEgCUkC6DiEJiEYiBmGoD2EckBsBe2DqBuB8EmC4CW8ByBIkCXYrCcrBsBJkCOqCiB0BkD0CcwBM2DNoDRmBpBYzDPtBXnC1CpBT_FaxD6BlBaZmBTwCrBqBMuBNgBjCqBTmBXoD3B6CgBkBFgBnBE9DbxBsBR-BcwB4DEyBiCiDyBSuBX4CMsDqC0D.4pN-5L6C6CwGcwG2BqCLR3CqB1BkKkC8B-BgCtB6ChE8CfG7B0DLiFYgDqCkBfeSgCtBsExBqE8B6BjB0BoB.ssPu3LyCvDJ_DpC_BRpBjDpB_CTlBhC3ClCdxD3B7CjCpFBxB0BRgB9CBxBUlBcPL3BxCvCRnDpBhBJrBqBnBUzBIpDanB-ChCoBvC8DvDgBjD";
+
+;
+// ===================================================================
+//  지리: 지도 데이터 복호, 투영, 지명, 가상 신호간 노선망, 봉수 제2거
+// ===================================================================
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const B64I = {};
+for (let i = 0; i < 64; i++) B64I[B64[i]] = i;
+
+function decodePts(s) {
+  const nums = [];
+  let i = 0;
+  while (i < s.length) {
+    let z = 0, mul = 1, c;
+    do { c = B64I[s[i++]]; z += (c & 31) * mul; mul *= 32; } while (c & 32);
+    nums.push(z & 1 ? -(z + 1) / 2 : z / 2);
+  }
+  const out = [];
+  let x = 0, y = 0;
+  for (let j = 0; j + 1 < nums.length; j += 2) { x += nums[j]; y += nums[j + 1]; out.push([120 + x / 1000, 30 + y / 1000]); }
+  return out;
+}
+
+const GEO = {
+  main: decodePts(MAP_MAIN),
+  islands: MAP_ISL.split('.').map(decodePts),
+  neighbors: MAP_NB.split('.').map(s => ({ c: s[0], pts: decodePts(s.slice(1)) })),
+  rivers: MAP_RIV.split('.').map(s => ({ c: s[0], pts: decodePts(s.slice(1)) })),
+  doLines: MAP_DO.split('.').map(decodePts),
+};
+
+// 등거리 원통 투영 (위도 37.5° 기준 축척 보정) — 좌표 단위는 km
+const LON0 = 127.5, LAT0 = 38.3;
+const KX = 111.32 * Math.cos(37.5 * Math.PI / 180), KY = 110.95;
+const PX = lon => (lon - LON0) * KX;
+const PY = lat => (LAT0 - lat) * KY;
+function kmBetween(a, b) {
+  const dx = (b[0] - a[0]) * 111.32 * Math.cos((a[1] + b[1]) / 2 * Math.PI / 180);
+  const dy = (b[1] - a[1]) * 110.95;
+  return Math.hypot(dx, dy);
+}
+
+// 지명 (경도, 위도) — 조선 시대 읍치·역참·고개의 대략적 위치
+const PL = {
+  hanyang: [126.977, 37.579], mokmyeok: [126.988, 37.551],
+  // 영남대로 (동래선)
+  pangyo: [127.108, 37.393], yongin: [127.200, 37.236], yangji: [127.285, 37.236], baegam: [127.372, 37.160],
+  mugeuk: [127.585, 36.995], sungseon: [127.760, 36.995], chungju: [127.926, 36.991], suanbo: [127.990, 36.846],
+  joryeong: [128.065, 36.800], mungyeong: [128.115, 36.735], yugok: [128.205, 36.622], nakdong: [128.265, 36.366],
+  haepyeong: [128.370, 36.195], chilgok: [128.500, 36.030], daegu: [128.596, 35.870], paljo: [128.640, 35.745],
+  cheongdo: [128.735, 35.648], miryang: [128.748, 35.503], jagwon: [128.840, 35.398], mulgeum: [129.005, 35.310],
+  sosan: [129.080, 35.268], dongnae: [129.085, 35.205],
+  // 의주대로·만포
+  byeokje: [126.880, 37.700], paju: [126.780, 37.760], gaeseong: [126.555, 37.970], geumcheon: [126.480, 38.160],
+  pyeongsan: [126.400, 38.330], seoheung: [126.200, 38.430], bongsan: [125.830, 38.520], hwangju: [125.775, 38.670],
+  junghwa: [125.800, 38.870], pyeongyang: [125.750, 39.030], sunan: [125.700, 39.200], sukcheon: [125.630, 39.420],
+  anju: [125.660, 39.620], jeongju: [125.330, 39.700], gwaksan: [125.080, 39.680], seoncheon: [124.920, 39.800],
+  cheolsan: [124.700, 39.770], yongcheon: [124.560, 39.960], uiju: [124.530, 40.200],
+  yeongbyeon: [125.800, 39.820], huicheon: [126.280, 40.170], ganggye: [126.600, 40.970], manpo: [126.300, 41.150],
+  // 관북로 (경흥)
+  nuwon: [127.040, 37.690], pocheon: [127.200, 37.890], yeongpyeong: [127.260, 38.030], gimhwa: [127.440, 38.280],
+  geumseong: [127.600, 38.460], hoeyang: [127.620, 38.710], cheollyeong: [127.630, 38.880], anbyeon: [127.530, 39.020],
+  wonsan: [127.440, 39.150], munchon: [127.360, 39.260], gowon: [127.240, 39.430], yeongheung: [127.240, 39.550],
+  jeongpyeong: [127.440, 39.790], hamheung: [127.530, 39.920], hongwon: [127.950, 40.030], bukcheong: [128.330, 40.200],
+  iwon: [128.640, 40.300], dancheon: [128.910, 40.460], seongjin: [129.180, 40.680], gilju: [129.320, 40.960],
+  myeongcheon: [129.450, 41.080], gyeongseong: [129.600, 41.590], buryeong: [129.720, 42.050], hoeryeong: [129.750, 42.430],
+  jongseong: [129.850, 42.760], onseong: [129.990, 42.940], gyeongwon: [130.200, 42.790], gyeongheung: [130.360, 42.500],
+  // 관동대로 (강릉)
+  mangu: [127.100, 37.600], pyeonggu: [127.200, 37.600], yanggeun: [127.490, 37.490], jipyeong: [127.630, 37.470],
+  wonju: [127.950, 37.340], anheung: [128.160, 37.480], bangnim: [128.370, 37.470], daehwa: [128.460, 37.510],
+  jinbu: [128.560, 37.640], hoenggye: [128.710, 37.670], daegwallyeong: [128.760, 37.690], gangneung: [128.900, 37.750],
+  // 삼남대로 (순천·해남)
+  dongjak: [126.980, 37.510], gwacheon: [126.990, 37.430], suwon: [127.010, 37.280], jinwi: [127.080, 37.080],
+  seonghwan: [127.130, 36.910], cheonan: [127.150, 36.810], gwangjeong: [127.100, 36.580], gongju: [127.120, 36.460],
+  gyeongcheon: [127.150, 36.330], eunjin: [127.080, 36.150], yeosan: [127.080, 36.070], samnye: [127.070, 35.910],
+  jeonju: [127.148, 35.815], imsil: [127.280, 35.610], osu: [127.330, 35.530], namwon: [127.390, 35.410],
+  gurye: [127.460, 35.200], suncheon: [127.490, 34.950], yeosu: [127.730, 34.745],
+  geumgu: [127.000, 35.730], taein: [126.960, 35.660], jeongeup: [126.860, 35.570], jangseong: [126.780, 35.300],
+  gwangju: [126.850, 35.160], naju: [126.710, 35.030], yeongam: [126.700, 34.800], haenam: [126.600, 34.570], usuyeong: [126.310, 34.580],
+  // 경상우도
+  goryeong: [128.260, 35.730], hapcheon: [128.170, 35.570], uiryeong: [128.260, 35.320], jinju: [128.080, 35.190],
+  goseong: [128.320, 34.970], geoje: [128.600, 34.870],
+  // 봉수 제2거
+  eungbong: [128.970, 35.050], hwangryeong: [129.090, 35.157], gyemyeong: [129.050, 35.380], eonyang: [129.120, 35.560],
+  gyeongju: [129.210, 35.840], yeongcheon: [128.940, 35.970], sinnyeong: [128.790, 36.050], uiheung: [128.700, 36.170],
+  uiseong: [128.700, 36.350], andong: [128.730, 36.570], yeongju: [128.620, 36.810], punggi: [128.530, 36.870],
+  jungnyeong: [128.440, 36.870], danyang: [128.370, 36.980], cheongpung: [128.170, 37.000], chungju_b: [127.930, 37.010],
+  eumjuk: [127.620, 37.130], icheon: [127.440, 37.270], gwangju_g: [127.260, 37.410], cheollim: [127.100, 37.405],
+  // 기타
+  jeju: [126.530, 33.500], busanpo: [129.060, 35.110], jeolyeong: [129.075, 35.080], sangju: [128.160, 36.410],
+};
+
+const NAME = {
+  hanyang: '한양', dongnae: '동래', yongin: '용인', chungju: '충주', joryeong: '조령', mungyeong: '문경', nakdong: '낙동',
+  daegu: '대구', cheongdo: '청도', miryang: '밀양', gaeseong: '개성', pyeongyang: '평양', anju: '안주', uiju: '의주',
+  ganggye: '강계', manpo: '만포', wonsan: '원산', hamheung: '함흥', bukcheong: '북청', gilju: '길주', hoeryeong: '회령',
+  gyeongheung: '경흥', gangneung: '강릉', wonju: '원주', suwon: '수원', gongju: '공주', jeonju: '전주', namwon: '남원',
+  suncheon: '순천', yeosu: '여수 좌수영', gwangju: '광주', naju: '나주', usuyeong: '우수영', jinju: '진주', geoje: '거제',
+  gyeongju: '경주', andong: '안동', yeongju: '영주', jungnyeong: '죽령', danyang: '단양', icheon: '이천', jeju: '제주',
+  sangju: '상주', pangyo: '판교', mugeuk: '무극', suanbo: '수안보', haepyeong: '해평', chilgok: '칠곡', jagwon: '작원',
+  mulgeum: '물금', eungbong: '다대포 응봉', hwangryeong: '황령산', eonyang: '언양', yeongcheon: '영천', uiseong: '의성',
+  cheongpung: '청풍', eumjuk: '음죽', gwangju_g: '광주', cheollim: '천림산', mokmyeok: '목멱산', yangji: '양지',
+  punggi: '풍기', gyemyeong: '계명산', jeolyeong: '절영도', busanpo: '부산포', hoeyang: '회양', pocheon: '포천',
+  cheonan: '천안', daegwallyeong: '대관령', hapcheon: '합천', paljo: '팔조령', baegam: '백암', sungseon: '숭선',
+  yugok: '유곡', sosan: '소산', sinnyeong: '신녕', uiheung: '의흥', seongjin: '성진', dancheon: '단천', jongseong: '종성',
+};
+
+// 가상 신호간 간선: 모두 목멱산(남산)에서 출발. 첫 노선(동래선)이 시뮬레이션 대상.
+const NETWORK = [
+  { id: 'yeongnam', name: '동래선', sub: '영남대로', main: true,
+    route: ['mokmyeok', 'pangyo', 'yongin', 'yangji', 'baegam', 'mugeuk', 'sungseon', 'chungju', 'suanbo', 'joryeong', 'mungyeong',
+      'yugok', 'nakdong', 'haepyeong', 'chilgok', 'daegu', 'paljo', 'cheongdo', 'miryang', 'jagwon', 'mulgeum', 'sosan', 'dongnae'] },
+  { id: 'uiju', name: '의주선', sub: '의주대로',
+    route: ['mokmyeok', 'hanyang', 'byeokje', 'paju', 'gaeseong', 'geumcheon', 'pyeongsan', 'seoheung', 'bongsan', 'hwangju', 'junghwa',
+      'pyeongyang', 'sunan', 'sukcheon', 'anju', 'jeongju', 'gwaksan', 'seoncheon', 'cheolsan', 'yongcheon', 'uiju'] },
+  { id: 'manpo', name: '만포지선', sub: '안주–강계', route: ['anju', 'yeongbyeon', 'huicheon', 'ganggye', 'manpo'] },
+  { id: 'gyeongheung', name: '경흥선', sub: '관북로',
+    route: ['mokmyeok', 'hanyang', 'nuwon', 'pocheon', 'yeongpyeong', 'gimhwa', 'geumseong', 'hoeyang', 'cheollyeong', 'anbyeon', 'wonsan',
+      'munchon', 'gowon', 'yeongheung', 'jeongpyeong', 'hamheung', 'hongwon', 'bukcheong', 'iwon', 'dancheon', 'seongjin', 'gilju',
+      'myeongcheon', 'gyeongseong', 'buryeong', 'hoeryeong', 'jongseong', 'onseong', 'gyeongwon', 'gyeongheung'] },
+  { id: 'gangneung', name: '강릉선', sub: '관동대로',
+    route: ['mokmyeok', 'hanyang', 'mangu', 'pyeonggu', 'yanggeun', 'jipyeong', 'wonju', 'anheung', 'bangnim', 'daehwa', 'jinbu', 'hoenggye',
+      'daegwallyeong', 'gangneung'] },
+  { id: 'suncheon', name: '순천선', sub: '삼남대로',
+    route: ['mokmyeok', 'dongjak', 'gwacheon', 'suwon', 'jinwi', 'seonghwan', 'cheonan', 'gwangjeong', 'gongju', 'gyeongcheon', 'eunjin',
+      'yeosan', 'samnye', 'jeonju', 'imsil', 'osu', 'namwon', 'gurye', 'suncheon', 'yeosu'] },
+  { id: 'haenam', name: '해남지선', sub: '전주–우수영',
+    route: ['jeonju', 'geumgu', 'taein', 'jeongeup', 'jangseong', 'gwangju', 'naju', 'yeongam', 'haenam', 'usuyeong'] },
+  { id: 'jinju', name: '진주지선', sub: '대구–거제', route: ['daegu', 'goryeong', 'hapcheon', 'uiryeong', 'jinju', 'goseong', 'geoje'] },
+];
+
+// 봉수 제2거 직봉: 다대포 응봉 → 경주 → 안동 → 죽령 → 충주 → 목멱산 (경로 근사)
+const BONG_ROUTE = ['eungbong', 'hwangryeong', 'gyemyeong', 'eonyang', 'gyeongju', 'yeongcheon', 'sinnyeong', 'uiheung', 'uiseong',
+  'andong', 'yeongju', 'punggi', 'jungnyeong', 'danyang', 'cheongpung', 'chungju_b', 'eumjuk', 'icheon', 'gwangju_g', 'cheollim', 'mokmyeok'];
+const BONG_STATIONS = 44;
+
+// 안개가 잘 끼는 곳: 해안(부산 앞바다), 고개(조령·죽령·팔조령·대관령)
+const FOG_SPOTS = [
+  { at: [129.05, 35.12], r: 16, k: 0.55 },
+  { at: PL.joryeong, r: 9, k: 0.45 },
+  { at: PL.jungnyeong, r: 9, k: 0.45 },
+  { at: PL.paljo, r: 7, k: 0.25 },
+  { at: PL.daegwallyeong, r: 9, k: 0.45 },
+];
+function terrainFog(p) {
+  let f = 1;
+  for (const s of FOG_SPOTS) { const d = kmBetween(p, s.at); f += s.k * Math.exp(-(d / s.r) * (d / s.r)); }
+  return f;
+}
+
+// 폴리라인을 따라 등간격으로 역을 배치. 반환: {pts, x(누적 km), L}
+function polyline(keys) { return keys.map(k => PL[k]); }
+function placeStations(pts, n) {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + kmBetween(pts[i - 1], pts[i]));
+  const L = cum[cum.length - 1];
+  const out = [], xs = [];
+  let seg = 1;
+  for (let s = 0; s <= n; s++) {
+    const target = L * s / n;
+    while (seg < pts.length - 1 && cum[seg] < target) seg++;
+    const a = pts[seg - 1], b = pts[seg];
+    const f = cum[seg] > cum[seg - 1] ? (target - cum[seg - 1]) / (cum[seg] - cum[seg - 1]) : 0;
+    out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+    xs.push(target);
+  }
+  return { pts: out, x: xs, L, cum };
+}
+function routeLength(keys) { const p = polyline(keys); let L = 0; for (let i = 1; i < p.length; i++) L += kmBetween(p[i - 1], p[i]); return L; }
+
+// 시뮬레이션용 노선 객체: 0번 역 = 발신지(동래/응봉), 마지막 역 = 목멱산
+function buildSimLine(keysFromOrigin, nHops, armCritKm) {
+  const pts = polyline(keysFromOrigin);
+  const st = placeStations(pts, nHops);
+  const N = st.pts.length;
+  const d = new Float64Array(N), xm = new Float64Array(N), terr = new Float64Array(N), resRead = new Float64Array(N), resErr = new Float64Array(N);
+  for (let h = 1; h < N; h++) {
+    d[h] = kmBetween(st.pts[h - 1], st.pts[h]);
+    xm[h] = (st.x[h - 1] + st.x[h]) / 2;
+    const mid = [(st.pts[h - 1][0] + st.pts[h][0]) / 2, (st.pts[h - 1][1] + st.pts[h][1]) / 2];
+    terr[h] = terrainFog(mid);
+    const r = Math.max(1, d[h] / (armCritKm || 1e9));
+    resRead[h] = r * r;
+    resErr[h] = r * r * r;
+  }
+  // 경유지 이름표 위치(km)
+  const marks = [];
+  let acc = 0;
+  for (let i = 0; i < keysFromOrigin.length; i++) {
+    if (i > 0) acc += kmBetween(pts[i - 1], pts[i]);
+    if (NAME[keysFromOrigin[i]]) marks.push({ key: keysFromOrigin[i], name: NAME[keysFromOrigin[i]], x: acc });
+  }
+  return { N, pts: st.pts, x: st.x, L: st.L, d, xm, terr, resRead, resErr, marks };
+}
+
+if (typeof module !== 'undefined') module.exports = { GEO, PL, NAME, NETWORK, BONG_ROUTE, BONG_STATIONS, kmBetween, placeStations, buildSimLine, routeLength, polyline, PX, PY, terrainFog };
+
+;
+// ===================================================================
+//  시뮬레이션 엔진 (DOM 없음) — 신호간(세마포어) 이산 사건 모델 + 봉수 모델
+// ===================================================================
+
+// ---------- 결정적 난수: (시드, 종류, 역, 부호, 판) → [0,1) ----------
+function mix32(h) {
+  h ^= h >>> 16; h = Math.imul(h, 0x7feb352d); h ^= h >>> 15; h = Math.imul(h, 0x846ca68b); h ^= h >>> 16;
+  return h >>> 0;
+}
+function rnd(seed, a, b, c, d) {
+  let h = mix32((seed | 0) ^ 0x9e3779b9);
+  h = mix32(h ^ Math.imul(a | 0, 0x85ebca6b));
+  h = mix32(h ^ Math.imul(b | 0, 0xc2b2ae35));
+  h = mix32(h ^ Math.imul(c | 0, 0x27d4eb2f));
+  h = mix32(h ^ Math.imul(d | 0, 0x165667b1));
+  return h / 4294967296;
+}
+const expRand = (u, mean) => -Math.log(1 - u) * mean;
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+
+const K = { NOTICE: 1, READ: 2, ERR: 3, ERRK: 4, ERRK2: 5, SET: 6, BACK: 7, VIS: 8, DET: 9, RUN: 10, OFF: 11,
+  B_NOTICE: 21, B_IGN: 22, B_ERR: 23, B_ERRD: 24, B_VIS: 25, B_RUN: 26, B_OFF: 27, FOGPH: 90 };
+
+// ---------- 고정 가정값 ----------
+const A = {
+  armLen: 6,              // 지시팔 길이 (m)
+  armCritKm: 5.2,         // 팔 길이가 4′(각분)으로 보이는 거리: 6 m / tan(4′)
+  encodeSec: 240,         // 동래부에서 부호책으로 부호화
+  decodeSec: 180,         // 병조에서 해독
+  gapSec: 360,            // 교대 인계 공백
+  timeoutMin: 30,         // 연속 불통 30분이면 주자(走者) 전환
+  noticeSem: 6,           // 신호간: 상류 역 변화 알아채기 평균 (초)
+  readBase: 5, readVar: 4,// 판독 시간 = 5 + 4·F·해상도 (초)
+  setSec: 10,             // 팔 조작 (초)
+  backSec: 5,             // 하류 역 복창 확인 평균 (초)
+  corrSec: 10,            // 訂(정정) 부호를 거는 시간
+  detect: 0.9,            // 복창 대조로 오류를 잡을 확률 (시정 양호 시)
+  runPathK: 1.25,         // 산길 굴곡 (직선 거리 대비)
+  runDay: 8, runNight: 4, // 주자 속도 km/h (역마다 새 주자가 이어 달림)
+  crewSem: 2, crewBong: 5,
+  bNotice: 360,           // 봉수: 망보기 평균 반응 (초)
+  bIgnDay: 240, bIgnNight: 120, bConfirm: 60,
+  bErrK: 0.3,             // 봉수 오독은 신호간 기본 오류율의 0.3배
+};
+
+// ---------- 해와 날씨 ----------
+// 1592-05-23(양력) 위도 36.5° 지방시: 해뜸 04:51, 해짐 19:09, 시민박명 04:22 / 19:38
+const SUN = { dawn: 4 * 3600 + 22 * 60, rise: 4 * 3600 + 51 * 60, set: 19 * 3600 + 9 * 60, dusk: 19 * 3600 + 38 * 60 };
+function daylight(t) {
+  const s = ((t % 86400) + 86400) % 86400;
+  if (s <= SUN.dawn || s >= SUN.dusk) return 0;
+  if (s < SUN.rise + 1200) return smoothstep(SUN.dawn, SUN.rise + 1200, s);
+  if (s > SUN.set - 1200) return smoothstep(SUN.dusk, SUN.set - 1200, s);
+  return 1;
+}
+const DARK_DL = 0.38;
+let DAWN_OK = SUN.dawn;
+while (daylight(DAWN_OK) < DARK_DL + 0.02) DAWN_OK += 30;
+function nextDawn(t) {
+  const day = Math.floor(t / 86400), s = t - day * 86400;
+  return s < DAWN_OK ? day * 86400 + DAWN_OK : (day + 1) * 86400 + DAWN_OK;
+}
+
+function wx(P) {
+  if (P._w) return P._w;
+  const R = 30 * Math.pow(P.rain, 1.6);                               // mm/h
+  const Vf = P.fog > 0.001 ? 60 * Math.pow(0.25 / 60, P.fog) : Infinity; // 안개 시정 km
+  const sFog = isFinite(Vf) ? 3.912 / Vf : 0;
+  const sRain = R > 0.01 ? 0.117 * Math.pow(R, 0.75) : 0;             // 강우 소광계수 km⁻¹ (5 mm/h→시정 10 km, 25 mm/h→3 km)
+  const sAir = 3.912 / 80;                                             // 맑은 공기 시정 80 km
+  const w = { R, Vf, sFog, sRain, sAir, V: 3.912 / (sFog + sRain + sAir) };
+  Object.defineProperty(P, '_w', { value: w, enumerable: false });
+  return w;
+}
+function visLabel(V) {
+  if (V >= 20) return '맑음';
+  if (V >= 10) return '연무';
+  if (V >= 4) return '박무';
+  if (V >= 1) return '안개';
+  return '짙은 안개';
+}
+function rainLabel(R) {
+  if (R < 0.05) return '비 없음';
+  if (R < 3) return '약한 비';
+  if (R < 15) return '보통 비';
+  return '강한 비';
+}
+
+function makeFog(seed) {
+  const ph = [1, 2, 3, 4].map(i => rnd(seed, K.FOGPH, i, 0, 0) * 6.2832);
+  // 바람에 실려 흐르는 안개 조각: 파장 28·61 km, 이동 15·11 km/h + 3~4시간 주기로 짙어졌다 옅어짐
+  return (x, t) => {
+    const m = t / 60;
+    return 0.5 * Math.sin((x - 0.25 * m) * 0.2244 + ph[0]) + 0.3 * Math.sin((x + 0.18 * m) * 0.1030 + ph[1])
+      + 0.2 * Math.sin(m * 0.0251 + ph[2]) * (0.6 + 0.4 * Math.sin(x * 0.05 + ph[3]));
+  };
+}
+function sigmaAt(W, n, terr) { return W.sAir + W.sRain * (1 + 0.15 * n) + W.sFog * Math.exp(0.8 * n) * terr; }
+function pSem(sig, d, dl, lamps) {
+  const dayK = smoothstep(0.25, 0.75, dl);
+  let C = 0.8 * dayK * Math.exp(-sig * d);
+  if (lamps) C = Math.max(C, 0.8 * (1 - dayK) * Math.exp(-sig * d * 1.6));
+  return C <= 0 ? 0 : clamp01(Math.log(C / 0.025) / Math.log(3.2));   // 대비 2.5% 미만 판독 불가, 8% 이상 확실
+}
+function pBong(sig, d, dl, R) {
+  const dayK = smoothstep(0.25, 0.75, dl);
+  const cs = 0.45 * dayK * (1 - Math.min(0.8, 0.025 * R)) * Math.exp(-sig * d);
+  const cf = 2.0 * (1 - dayK) * (1 - Math.min(0.6, 0.02 * R)) * Math.exp(-sig * d * 0.5);
+  const C = Math.max(cs, cf);
+  return C <= 0 ? 0 : clamp01(Math.log(C / 0.012) / Math.log(0.035 / 0.012));
+}
+
+// 교대·피로
+function shiftPhase(offF, H, t) { const p = (t - offF * H) % H; return p < 0 ? p + H : p; }
+function fatigueAt(offF, P, t) {
+  const H = P.shiftH * 3600;
+  const h = shiftPhase(offF, H, t) / 3600;
+  let F = 1 + 0.06 * Math.pow(h, 1.4);
+  const s = ((t % 86400) + 86400) % 86400;
+  if (s < 5 * 3600) F *= 1.25;
+  return F;
+}
+function gapEndAt(offF, P, t) {
+  const H = P.shiftH * 3600;
+  const p = shiftPhase(offF, H, t);
+  return p < A.gapSec ? t + (A.gapSec - p) : 0;
+}
+
+// ---------- 신호간 부호 ----------
+// 좌·우 지시팔 각 8방향(0=위, 시계 방향 45°씩): 64조합 - 제어 4 = 자료 부호 60개
+const combo = (L, R) => L * 8 + R;
+const CTRL = { START: combo(0, 0), END: combo(6, 2), CORR: combo(7, 1), REST: combo(4, 4) };
+const CTRL_SET = new Set(Object.values(CTRL));
+const DATA = [];
+for (let c = 0; c < 64; c++) if (!CTRL_SET.has(c)) DATA.push(c);
+const DATA_OF = {};
+DATA.forEach((c, v) => { DATA_OF[c] = v; });
+const isCtrl = c => CTRL_SET.has(c);
+function confuse(c, u1, u2) {
+  const L = c >> 3, R = c & 7;
+  const dir = u2 < 0.5 ? 1 : -1;
+  const tryC = [];
+  if (u1 < 0.8) {
+    if (u2 * 4 % 1 < 0.5) tryC.push(combo((L + dir + 8) % 8, R), combo((L - dir + 8) % 8, R), combo(L, (R + dir + 8) % 8));
+    else tryC.push(combo(L, (R + dir + 8) % 8), combo(L, (R - dir + 8) % 8), combo((L + dir + 8) % 8, R));
+  } else {
+    tryC.push(combo((L + dir + 8) % 8, (R + dir + 8) % 8), combo((L - dir + 8) % 8, (R - dir + 8) % 8), combo((L + dir + 8) % 8, R));
+  }
+  for (const x of tryC) if (!isCtrl(x)) return x;
+  return c;
+}
+
+// 부호책 符號冊: 쪽(첫 부호) × 줄(둘째 부호) → 구절. 정의된 쪽 일부만 수록.
+const COUNTS = ['1척', '2척', '3척', '4척', '5척', '6척', '7척', '8척', '9척', '10척', '20척', '30척', '40척', '50척', '60척', '70척', '80척',
+  '90여 척', '100여 척', '150여 척', '200여 척', '300여 척', '400여 척', '500여 척', '700여 척', '1,000여 척', '셀 수 없음'];
+const TIMES = ['子初', '子正', '丑初', '丑正', '寅初', '寅正', '卯初', '卯正', '辰初', '辰正', '巳初', '巳正', '午初', '午正', '未初', '未正',
+  '申初', '申正', '酉初', '酉正', '戌初', '戌正', '亥初', '亥正'];
+const CODEBOOK = {
+  3: { title: '머리말', lines: ['평안 무사', '급보(急報)', '화급(火急)', '재보(再報)', '속보 이어짐', '보고 끝', '회보 바람', '앞 보고 취소', '확인 바람', '명을 기다림'] },
+  7: { title: '병력', lines: ['수십 명', '수백 명', '1천여 명', '수천 명', '1만여 명', '수만 명', '기병', '보병', '조총수', '궁수'] },
+  11: { title: '적정', lines: ['왜선(倭船)', '왜적', '왜 사신선', '황당선', '명나라 배', '야인(여진)', '수적', '표류선', '아군 병선', '상선', '왜 대선', '왜 소선'] },
+  19: { title: '수량', lines: COUNTS },
+  23: { title: '방향', lines: ['동', '서', '남', '북', '동남', '동북', '서남', '서북', '해안 쪽', '먼바다 쪽'] },
+  27: { title: '경상좌도 연해', lines: ['다대포', '절영도 앞바다', '부산포', '서평포', '해운대', '기장', '가덕도', '몰운대', '좌수영', '서생포', '울산', '장기', '영일', '동래부성', '부산진'] },
+  34: { title: '동태', lines: ['출현', '접근', '정박', '상륙', '교전', '퇴거', '북상', '서진', '동진', '포위', '함락', '방화', '대기', '흩어짐'] },
+  42: { title: '시각', lines: TIMES },
+  50: { title: '경상우도 연해', lines: ['거제', '옥포', '지세포', '안골포', '제포', '웅천', '고성', '사천', '남해', '노량'] },
+};
+// 동래 → 한양 급보: "급보. 왜선 90여 척, 절영도 앞바다에 정박. 신초(申初). 속보 이어짐."
+const MSG_CODES = [[3, 1], [11, 0], [19, 17], [27, 1], [34, 2], [42, 16], [3, 4]];
+const MSG = [CTRL.START];
+for (const [p, l] of MSG_CODES) MSG.push(DATA[p], DATA[l]);
+MSG.push(CTRL.END);
+function decodeCode(cp, cl) {
+  const p = DATA_OF[cp], l = DATA_OF[cl];
+  if (p === undefined || l === undefined) return { text: '〔제어 부호〕', page: p, line: l, bad: true };
+  const pg = CODEBOOK[p];
+  if (!pg) return { text: `〔없는 쪽 ${p}〕`, page: p, line: l, bad: true };
+  const tx = pg.lines[l];
+  if (!tx) return { text: `〔${pg.title} ${l}줄: 빈 줄〕`, page: p, line: l, bad: true };
+  return { text: tx, page: p, line: l, cat: pg.title };
+}
+
+const BONG_LEVELS = ['', '평시(무사)', '왜적이 바다에 나타남', '해안에 접근', '아군 병선과 교전', '육지에 상륙'];
+
+// ---------- 최소 힙 ----------
+function Heap() { this.a = []; }
+Heap.prototype.push = function (e) {
+  const a = this.a; a.push(e);
+  let i = a.length - 1;
+  while (i > 0) { const p = (i - 1) >> 1; if (a[i].t < a[p].t || (a[i].t === a[p].t && a[i].s < a[p].s)) { const x = a[i]; a[i] = a[p]; a[p] = x; i = p; } else break; }
+};
+Heap.prototype.pop = function () {
+  const a = this.a, top = a[0], last = a.pop();
+  if (a.length) {
+    a[0] = last;
+    let i = 0;
+    for (;;) {
+      const l = 2 * i + 1, r = l + 1; let m = i;
+      if (l < a.length && (a[l].t < a[m].t || (a[l].t === a[m].t && a[l].s < a[m].s))) m = l;
+      if (r < a.length && (a[r].t < a[m].t || (a[r].t === a[m].t && a[r].s < a[m].s))) m = r;
+      if (m === i) break;
+      const x = a[i]; a[i] = a[m]; a[m] = x; i = m;
+    }
+  }
+  return top;
+};
+
+// ===================================================================
+//  신호간 모의
+//  - 각 역은 상류 역의 팔 모양을 읽어 장부에 적고(LOG), 같은 모양을 건다(SET).
+//  - 흐름 제어: 하류 역이 같은 부호를 복창해 건 것을 확인해야 다음 부호로 넘어감(ACK).
+//  - 복창 대조: 복창이 다르면 訂(정정)을 걸고 다시 보냄.
+//  - 안개로 30분 이상 불통이면 장부 전문을 주자가 들고 다음 역까지 달림.
+//  - 야간(등화 없음)에는 여명까지 대기.
+// ===================================================================
+const EV = { LOG: 1, SET: 2, READ: 3, ACK: 4, TRY: 5, RUN: 6 };
+
+function simSemaphore(line, t0, seed, getP) {
+  const N = line.N, M = MSG.length;
+  const fog = makeFog(seed);
+  const st = [];
+  for (let i = 0; i < N; i++) st.push({
+    log: new Int16Array(M).fill(-1), logT: new Float64Array(M).fill(Infinity), logVer: new Float64Array(M).fill(-1), nLogged: 0,
+    dispIdx: -1, dispVal: -1, dispVer: 0, busy: false, acked: new Uint8Array(M), runnerOut: false, runnerSent: false, viaRunner: false, tryPending: false,
+    offF: rnd(seed, K.OFF, i, 0, 0),
+  });
+  const rec = {
+    N, M, t0, disp: st.map(() => []), logs: st.map(() => []), waits: st.map(() => []), runners: [], misreads: [], corrections: [],
+    tAllArrive: Infinity, tDone: Infinity, final: null, events: 0,
+  };
+  const heap = new Heap();
+  let seq = 0;
+  const sched = (t, type, i, k, a, b) => heap.push({ t, type, i, k, a, b, s: seq++ });
+
+  const visCache = new Map();
+  function pv(h, t) {
+    const P = getP(t), W = wx(P);
+    const sig = sigmaAt(W, fog(line.xm[h], t), line.terr[h]);
+    return pSem(sig, line.d[h], daylight(t), P.lamps);
+  }
+  function readable(h, m) {
+    const key = h * 1e6 + m;
+    let v = visCache.get(key);
+    if (v === undefined) { v = rnd(seed, K.VIS, h, m, 0) < pv(h, m * 60 + 30); visCache.set(key, v); }
+    return v;
+  }
+  const isDark = t => !getP(t).lamps && daylight(t) < DARK_DL;
+  // 안개·비 때문에 (한낮이라도) 읽을 수 없는 분(分)인가 — 어둠과 구별
+  function fogBlocked(h, m) {
+    const key = -(h * 1e6 + m) - 1;
+    let v = visCache.get(key);
+    if (v === undefined) {
+      const t = m * 60 + 30, P = getP(t), W = wx(P);
+      v = rnd(seed, K.VIS, h, m, 0) >= pSem(sigmaAt(W, fog(line.xm[h], t), line.terr[h]), line.d[h], 1, false);
+      visCache.set(key, v);
+    }
+    return v;
+  }
+  function fogP(h, t) { const W = wx(getP(t)); return pSem(sigmaAt(W, fog(line.xm[h], t), line.terr[h]), line.d[h], 1, false); }
+  function blockedMin(h, m) {
+    let c = 0;
+    for (let j = 0; j < A.timeoutMin; j++) { if (!fogBlocked(h, m - j)) break; c++; }
+    return c;
+  }
+  function addWait(h, a, b, why) {
+    const w = rec.waits[h], last = w[w.length - 1];
+    if (last && last.why === why && a <= last.t1 + 1) { if (b > last.t1) last.t1 = b; } else w.push({ t0: a, t1: b, why });
+  }
+  // 관측 가능 여부 판정. observer: 교대 공백을 따질 역, hop: 관측 구간(h-1 ↔ h)
+  //  맑은 밤이면 여명까지 대기, 안개·비로 30분 넘게 막히면(밤낮 불문) 주자 전환
+  function gate(observer, h, t) {
+    const P = getP(t);
+    const ge = gapEndAt(st[observer].offF, P, t);
+    if (ge) return { retryAt: ge + 1, why: 'gap' };
+    const m = Math.floor(t / 60);
+    if (readable(h, m)) return { ok: true };
+    // 주자로 받은 전문은 앞이 짙게 막혔거나 밤이면 곧장 다음 주자로 넘김
+    if (st[h - 1].viaRunner && (isDark(t) || fogP(h, t) < 0.2)) return { runner: true };
+    if (isDark(t) && !fogBlocked(h, m)) return { retryAt: nextDawn(t) + 5, why: 'night' };
+    const bl = blockedMin(h, m);
+    if (bl >= A.timeoutMin) return { runner: true };
+    for (let j = 1; j <= A.timeoutMin - bl; j++) {
+      const mm = m + j;
+      if (readable(h, mm) || !fogBlocked(h, mm)) return { retryAt: mm * 60 + 1, why: 'fog' };
+    }
+    return { retryAt: (m + A.timeoutMin - bl + 1) * 60 + 1, why: 'fog' };
+  }
+
+  function setDur(i, t) {
+    const P = getP(t), W = wx(P);
+    const lampNight = P.lamps && daylight(t) < DARK_DL;
+    return A.setSec * (1 + 0.02 * W.R) * (lampNight ? 1.5 : 1) * Math.pow(fatigueAt(st[i].offF, P, t), 0.25) * (0.85 + 0.3 * rnd(seed, K.SET, i, st[i].dispIdx + 1, st[i].dispVer));
+  }
+  function startSet(i, k, t, extra) {
+    const s = st[i];
+    s.busy = true;
+    sched(t + extra + setDur(i, t), EV.SET, i, k);
+  }
+  function tryDisplay(i, t) {
+    const s = st[i];
+    if (s.busy) return;
+    const k = s.dispIdx + 1;
+    if (k >= M || s.logT[k] > t) return;
+    if (k > 0 && i < N - 1 && !s.runnerOut && !s.acked[k - 1]) return;
+    const ge = gapEndAt(s.offF, getP(t), t);
+    if (ge) { if (!s.tryPending) { s.tryPending = true; sched(ge + 1, EV.TRY, i, 0); } return; }
+    startSet(i, k, t, 0);
+  }
+  function startRunner(i, t) {
+    const s = st[i];
+    if (s.runnerOut) return;
+    s.runnerOut = true;
+    if (s.nLogged === M) dispatchRunner(i, t);
+    tryDisplay(i, t);
+  }
+  function dispatchRunner(i, t) {
+    const s = st[i];
+    s.runnerSent = true;
+    const P = getP(t), W = wx(P);
+    const v = (daylight(t) < DARK_DL ? A.runNight : A.runDay) * Math.max(0.55, 1 - 0.012 * W.R);
+    const dur = line.d[i + 1] * A.runPathK / v * 3600 * (0.9 + 0.2 * rnd(seed, K.RUN, i, 0, 0));
+    rec.runners.push({ from: i, t0: t, t1: t + dur });
+    sched(t + dur, EV.RUN, i + 1, 0, Array.from(s.log));
+  }
+  function logSymbol(j, k, ver, v, t, src) {
+    const s = st[j];
+    if (s.logVer[k] > ver) return;
+    const first = s.logT[k] === Infinity;
+    s.log[k] = v; s.logVer[k] = ver;
+    if (first) { s.logT[k] = t; s.nLogged++; }
+    rec.logs[j].push([t, k, v, src]);
+    if (j === N - 1 && s.nLogged === M && rec.tAllArrive === Infinity) rec.tAllArrive = t;
+    if (first) {
+      if (s.runnerOut && !s.runnerSent && s.nLogged === M) dispatchRunner(j, t);
+      tryDisplay(j, t);
+    } else if (!s.busy && s.dispIdx === k && j < N) {
+      startSet(j, k, t, A.corrSec);   // 정정을 받아 다시 건다 (하류에도 전파됨)
+    }
+  }
+
+  // 발신: 동래부에서 부호화 후 0번 역 장부에 전문 기재
+  const tStart = t0 + A.encodeSec;
+  for (let k = 0; k < M; k++) { st[0].log[k] = MSG[k]; st[0].logT[k] = tStart; st[0].logVer[k] = 1e9; rec.logs[0].push([tStart, k, MSG[k], 2]); }
+  st[0].nLogged = M;
+  sched(tStart, EV.TRY, 0, 0);
+
+  const tLimit = t0 + 12 * 86400;
+  let guard = 0;
+  while (heap.a.length && guard++ < 400000) {
+    const e = heap.pop();
+    const t = e.t;
+    if (t > tLimit) break;
+    rec.events++;
+    switch (e.type) {
+      case EV.TRY: { st[e.i].tryPending = false; tryDisplay(e.i, t); break; }
+      case EV.SET: {
+        const i = e.i, k = e.k, s = st[i];
+        s.busy = false;
+        if (s.dispIdx === k) s.acked[k] = 0;   // 다시 건 부호는 새로 복창을 확인받아야 함
+        s.dispIdx = k; s.dispVal = s.log[k]; s.dispVer++;
+        rec.disp[i].push([t, k, s.dispVal]);
+        if (i < N - 1 && !s.runnerOut) {
+          const F = fatigueAt(st[i + 1].offF, getP(t), t);
+          sched(t + 1 + expRand(rnd(seed, K.NOTICE, i + 1, k, s.dispVer), A.noticeSem * F), EV.READ, i + 1, k, s.dispVer);
+        }
+        if (i > 0 && !st[i - 1].runnerOut) {
+          const F = fatigueAt(st[i - 1].offF, getP(t), t);
+          sched(t + 1 + expRand(rnd(seed, K.BACK, i - 1, k, s.dispVer), A.backSec * F), EV.ACK, i - 1, k, s.dispVer);
+        }
+        tryDisplay(i, t);
+        break;
+      }
+      case EV.READ: {   // j 역이 j-1 역의 k번 부호(판 ver)를 읽음
+        const j = e.i, k = e.k, ver = e.a, up = st[j - 1];
+        if (up.runnerOut || up.dispIdx !== k || up.dispVer !== ver || st[j].logVer[k] >= ver) break;
+        const g = gate(j, j, t);
+        if (g.runner) { startRunner(j - 1, t); break; }
+        if (!g.ok) { addWait(j, t, g.retryAt, g.why); sched(g.retryAt, EV.READ, j, k, ver); break; }
+        const P = getP(t), W = wx(P), F = fatigueAt(st[j].offF, P, t), p = pv(j, t);
+        const dur = (A.readBase + A.readVar * F * line.resRead[j]) * (0.8 + 0.4 * rnd(seed, K.READ, j, k, ver));
+        const lampNight = P.lamps && daylight(t) < DARK_DL;
+        const err = Math.min(0.5, P.err * F * (1 + 0.03 * W.R) * line.resErr[j] * (1 + 2 * (1 - p)) * (lampNight ? 2.5 : 1));
+        let v = up.dispVal;
+        if (!isCtrl(v) && rnd(seed, K.ERR, j, k, ver) < err) {
+          v = confuse(v, rnd(seed, K.ERRK, j, k, ver), rnd(seed, K.ERRK2, j, k, ver));
+          rec.misreads.push({ t: t + dur, hop: j, k, from: up.dispVal, to: v });
+        }
+        sched(t + dur, EV.LOG, j, k, ver, v);
+        break;
+      }
+      case EV.LOG: logSymbol(e.i, e.k, e.a, e.b, t, 0); break;
+      case EV.ACK: {    // i 역이 i+1 역의 복창(k번, 판 ver)을 확인
+        const i = e.i, k = e.k, ver = e.a, s = st[i], dn = st[i + 1];
+        if (s.runnerOut || dn.dispIdx !== k || dn.dispVer !== ver || s.dispIdx !== k) break;
+        const g = gate(i, i + 1, t);
+        if (g.runner) { startRunner(i, t); break; }
+        if (!g.ok) { addWait(i + 1, t, g.retryAt, g.why); sched(g.retryAt, EV.ACK, i, k, ver); break; }
+        const P = getP(t);
+        if (P.verify && dn.dispVal !== s.dispVal && rnd(seed, K.DET, i, k, ver) < A.detect * (0.5 + 0.5 * pv(i + 1, t))) {
+          rec.corrections.push({ t, hop: i + 1, k });
+          if (!s.busy) startSet(i, k, t, A.corrSec);
+          break;
+        }
+        s.acked[k] = 1;
+        tryDisplay(i, t);
+        break;
+      }
+      case EV.RUN: {    // 주자 도착: 기록된 전문 인계
+        const j = e.i, vals = e.a, s = st[j];
+        s.viaRunner = true;
+        for (let k = 0; k < M; k++) if (s.logT[k] === Infinity) logSymbol(j, k, 1e9, vals[k], t, 1);
+        if (s.runnerOut && !s.runnerSent && s.nLogged === M) dispatchRunner(j, t);
+        tryDisplay(j, t);
+        break;
+      }
+    }
+  }
+  const term = st[N - 1];
+  let lastLog = 0;
+  for (const L of rec.logs[N - 1]) if (L[0] > lastLog) lastLog = L[0];
+  if (term.nLogged === M) rec.tDone = Math.max(rec.tAllArrive, lastLog) + A.decodeSec;
+  rec.final = Array.from(term.log);
+  rec.wrong = 0;
+  for (let k = 0; k < M; k++) if (rec.final[k] !== MSG[k]) rec.wrong++;
+  rec.correct = term.nLogged === M && rec.wrong === 0;
+  // 한양에서 읽힌 구절
+  rec.decoded = MSG_CODES.map((_, c) => decodeCode(rec.final[1 + 2 * c], rec.final[2 + 2 * c]));
+  rec.semanticWrong = rec.decoded.filter((d, c) => !(d.page === MSG_CODES[c][0] && d.line === MSG_CODES[c][1])).length;
+  let fogMin = 0, nightMin = 0;
+  for (const w of rec.waits) for (const x of w) { if (x.why === 'fog') fogMin += (x.t1 - x.t0) / 60; else if (x.why === 'night') nightMin += (x.t1 - x.t0) / 60; }
+  rec.fogMin = fogMin; rec.nightMin = nightMin;
+  return rec;
+}
+
+// ===================================================================
+//  봉수 모의: 한 가지 상태(거수)만 차례로 전달
+// ===================================================================
+function simBongsu(line, t0, seed, getP, level) {
+  const N = line.N;
+  const fog = makeFog(seed ^ 0x5bd1e995);
+  const lit = new Float64Array(N).fill(Infinity), obs = new Float64Array(N).fill(Infinity), lvl = new Int8Array(N);
+  const rec = { N, t0, lit, obs, lvl, waits: Array.from({ length: N }, () => []), runners: [], misreads: [], tDone: Infinity };
+  const offF = i => rnd(seed, K.B_OFF, i, 0, 0);
+  function pv(h, t) {
+    const P = getP(t), W = wx(P);
+    return pBong(sigmaAt(W, fog(line.xm[h], t), line.terr[h]), line.d[h], daylight(t), W.R);
+  }
+  const readable = (h, m) => rnd(seed, K.B_VIS, h, m, 0) < pv(h, m * 60 + 30);
+  function blockedMin(h, m) { let c = 0; for (let j = 0; j < A.timeoutMin; j++) { if (readable(h, m - j)) break; c++; } return c; }
+  lit[0] = t0 + 60; lvl[0] = level; obs[0] = t0;
+  for (let i = 1; i < N; i++) {
+    let t = lit[i - 1], att = 0, viaRunner = false;
+    for (;;) {
+      const P = getP(t);
+      const F = fatigueAt(offF(i), P, t);
+      const mean = (att === 0 ? A.bNotice : 90) * F * (daylight(t) < DARK_DL ? 0.7 : 1);
+      t += 20 + expRand(rnd(seed, K.B_NOTICE, i, att, 0), mean);
+      const ge = gapEndAt(offF(i), getP(t), t);
+      if (ge) { rec.waits[i].push({ t0: t, t1: ge, why: 'gap' }); t = ge; }
+      const m = Math.floor(t / 60);
+      if (readable(i, m)) break;
+      const bl = blockedMin(i, m);
+      if (bl >= A.timeoutMin) {
+        const W = wx(getP(t));
+        const v = (daylight(t) < DARK_DL ? A.runNight : A.runDay) * Math.max(0.55, 1 - 0.012 * W.R);
+        const dur = line.d[i] * A.runPathK / v * 3600 * (0.9 + 0.2 * rnd(seed, K.B_RUN, i, 0, 0));
+        rec.runners.push({ from: i - 1, t0: t, t1: t + dur });
+        t += dur; viaRunner = true;
+        break;
+      }
+      let nx = (m + A.timeoutMin - bl + 1) * 60;
+      for (let j = 1; j <= A.timeoutMin - bl; j++) if (readable(i, m + j)) { nx = (m + j) * 60; break; }
+      rec.waits[i].push({ t0: t, t1: nx, why: 'fog' });
+      t = nx; att++;
+    }
+    obs[i] = t;
+    let L = lvl[i - 1];
+    if (!viaRunner) {
+      const P = getP(t), F = fatigueAt(offF(i), P, t);
+      const e = Math.min(0.5, P.err * A.bErrK * F * (1 + 2 * (1 - pv(i, t))));
+      if (rnd(seed, K.B_ERR, i, 0, 0) < e) {
+        const nl = Math.max(1, Math.min(5, L + (rnd(seed, K.B_ERRD, i, 0, 0) < 0.5 ? -1 : 1)));
+        rec.misreads.push({ t, hop: i, from: L, to: nl });
+        L = nl;
+      }
+    }
+    lvl[i] = L;
+    const P = getP(t), W = wx(P);
+    const night = daylight(t) < 0.5;
+    const ign = (night ? A.bIgnNight : A.bIgnDay) * (1 + 0.06 * W.R) * (0.8 + 0.4 * rnd(seed, K.B_IGN, i, 0, 0)) + A.bConfirm;
+    lit[i] = t + ign;
+  }
+  rec.tDone = lit[N - 1];
+  rec.levelAtEnd = lvl[N - 1];
+  rec.correct = lvl[N - 1] === level;
+  let fogMin = 0;
+  for (const w of rec.waits) for (const x of w) if (x.why === 'fog') fogMin += (x.t1 - x.t0) / 60;
+  rec.fogMin = fogMin;
+  return rec;
+}
+
+function timelineGetter(entries) {
+  return t => { for (let i = entries.length - 1; i > 0; i--) if (entries[i].t <= t) return entries[i].P; return entries[0].P; };
+}
+function quantile(arr, q) { const a = arr.slice().sort((x, y) => x - y); const i = (a.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); }
+
+if (typeof module !== 'undefined') module.exports = { simSemaphore, simBongsu, MSG, MSG_CODES, DATA, DATA_OF, CTRL, CODEBOOK, decodeCode, wx, daylight, A, SUN, timelineGetter, quantile, BONG_LEVELS, visLabel, rainLabel, fatigueAt };
+
+;
+// ===================================================================
+//  화면: 지도, 노선 단면, 재생, 수신문, 비교, 가정표
+// ===================================================================
+'use strict';
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// 폰·터치 화면 (style.css 의 같은 조건). 이때는 차트를 실제 폭에 맞춰 다시 배치해 글자가 12px 아래로 줄지 않게 한다
+const touchUI = typeof matchMedia === 'function' ? matchMedia('(pointer: coarse), (max-width: 620px)') : { matches: false };
+// 12px 글자 폭 어림 (한글·한자 12, 나머지 7 — 실제보다 조금 넉넉하게)
+const estW = s => { let w = 0; for (const ch of s) w += ch.charCodeAt(0) > 0x2e80 ? 12 : 7; return w; };
+
+// ---------- 시각 표기 ----------
+const SIJIN = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+function sijin(t) {
+  const h = (((t % 86400) + 86400) % 86400) / 3600;
+  const x = (h + 1) % 24;
+  return SIJIN[Math.floor(x / 2)] + (x % 2 < 1 ? '初' : '正');
+}
+function hhmm(t) {
+  const s = ((t % 86400) + 86400) % 86400;
+  return String(Math.floor(s / 3600)).padStart(2, '0') + ':' + String(Math.floor(s % 3600 / 60)).padStart(2, '0');
+}
+const dayLabel = t => `4월 ${13 + Math.floor(t / 86400)}일`;
+function durTxt(sec, short) {
+  if (!isFinite(sec)) return '—';
+  const m = Math.max(0, Math.round(sec / 60));
+  if (m < 60) return m + '분';
+  const h = Math.floor(m / 60), mm = m % 60;
+  if (h < 48) return short ? `${h}시간 ${mm}분`.replace(' 0분', '') : `${h}시간 ${mm}분`;
+  const d = Math.floor(h / 24), hh = h % 24;
+  return `${d}일 ${hh}시간`;
+}
+const pct = x => (x * 100).toFixed(x < 0.1 && x > 0 ? 1 : 0) + '%';
+
+// ---------- 상태 ----------
+const SEM_KEYS = NETWORK[0].route.slice().reverse();   // 동래 → 목멱산
+const SEM_L = routeLength(SEM_KEYS);
+const S = {
+  P: { fog: 0.12, rain: 0, shiftH: 4, err: 0.005, verify: true, lamps: false },
+  spacing: 5, startTod: 16 * 3600, seed: 1,
+  tl: null, getP: null, t0: 0, t: 0, tEnd: 0, playing: false, started: false, speed: 'auto',
+  line: null, bline: null, sem: null, bong: null, fogSem: null, fogBong: null,
+  view: 'full', vb: null, mc: null, mcToken: 0,
+};
+
+function rebuildLines() {
+  S.line = buildSimLine(SEM_KEYS, Math.max(8, Math.round(SEM_L / S.spacing)), A.armCritKm);
+  if (!S.bline) S.bline = buildSimLine(BONG_ROUTE, BONG_STATIONS - 1, 0);
+}
+function simulate() {
+  S.sem = simSemaphore(S.line, S.t0, S.seed, S.getP);
+  S.bong = simBongsu(S.bline, S.t0, S.seed, S.getP, 2);
+  S.fogSem = makeFog(S.seed);
+  S.fogBong = makeFog(S.seed ^ 0x5bd1e995);
+  const semEnd = isFinite(S.sem.tDone) ? S.sem.tDone : S.t0 + 6 * 86400;
+  S.tEnd = Math.min(S.t0 + 12 * 86400, Math.max(semEnd, S.bong.tDone) + 600);
+  S.t = Math.min(S.t, S.tEnd);
+}
+function resetRun() {
+  S.t0 = S.startTod; S.t = S.t0; S.playing = false; S.started = false;
+  S.tl = [{ t: -Infinity, P: S.P }];
+  S.getP = timelineGetter(S.tl);
+  simulate();
+  updatePlayBtn();
+}
+
+// ---------- 구간 가시도 (그림용: 밤낮과 무관한 안개·비만) ----------
+function semHopP(h, t) {
+  const L = S.line, W = wx(S.getP(t));
+  return pSem(sigmaAt(W, S.fogSem(L.xm[h], t), L.terr[h]), L.d[h], 1, false);
+}
+function bongHopP(h, t) {
+  const L = S.bline, W = wx(S.getP(t));
+  return pBong(sigmaAt(W, S.fogBong(L.xm[h], t), L.terr[h]), L.d[h], 1, W.R);
+}
+
+// ===================================================================
+//  지도
+// ===================================================================
+const map = $('map');
+const VIEWS = {
+  full: [123.95, 131.05, 32.95, 43.12],
+  corr: [126.55, 129.6, 34.82, 37.88],
+};
+function viewBoxOf(v) {
+  const [lo0, lo1, la0, la1] = VIEWS[v];
+  const x0 = PX(lo0), x1 = PX(lo1), y0 = PY(la1), y1 = PY(la0);
+  return [x0, y0, x1 - x0, y1 - y0];
+}
+const M = {};   // 지도 요소 참조
+const CITY = [
+  // [key, 이름, 종류, 방향, 보이는 범위: 0=늘, 1=전국만, 2=영남대로만]
+  ['hanyang', '한양', 'cap', 'r', 0], ['dongnae', '동래', 'city', 'r', 0], ['gaeseong', '개성', 'city', 'l', 1],
+  ['pyeongyang', '평양', 'city', 'r', 1], ['uiju', '의주', 'city', 'r', 1], ['ganggye', '강계', 'city', 'r', 1],
+  ['hamheung', '함흥', 'city', 'l', 1], ['gyeongheung', '경흥', 'city', 'l', 1], ['hoeryeong', '회령', 'city', 'l', 1],
+  ['wonsan', '원산', 'city', 'l', 1], ['gangneung', '강릉', 'city', 'r', 1], ['wonju', '원주', 'city', 'r', 1],
+  ['gongju', '공주', 'city', 'l', 1], ['jeonju', '전주', 'city', 'l', 1], ['suncheon', '순천', 'city', 'l', 1],
+  ['yeosu', '좌수영', 'city', 'r', 1], ['usuyeong', '우수영', 'city', 'l', 1], ['jinju', '진주', 'city', 'l', 1],
+  ['daegu', '대구', 'city', 'l', 0], ['gyeongju', '경주', 'city', 'r', 0], ['andong', '안동', 'city', 'r', 0],
+  ['chungju', '충주', 'city', 'l', 0], ['jeju', '제주', 'city', 'r', 1],
+  ['yongin', '용인', 'city', 'l', 2], ['joryeong', '조령', 'pass', 'l', 2], ['mungyeong', '문경', 'city', 'r', 2],
+  ['nakdong', '낙동', 'city', 'l', 2], ['cheongdo', '청도', 'city', 'l', 2], ['miryang', '밀양', 'city', 'l', 2],
+  ['jungnyeong', '죽령', 'pass', 'r', 2], ['yeongju', '영주', 'city', 'r', 2], ['danyang', '단양', 'city', 'r', 2],
+  ['icheon', '이천', 'city', 'r', 2], ['yeongcheon', '영천', 'city', 'l', 2], ['uiseong', '의성', 'city', 'r', 2],
+  ['sangju', '상주', 'city', 'l', 2], ['gwangju_g', '광주', 'city', 'r', 2],
+];
+const DO_NAMES = [['京畿', 127.45, 37.78], ['忠淸', 126.95, 36.62], ['慶尙', 128.62, 36.25], ['全羅', 126.95, 35.30],
+  ['江原', 128.45, 37.95], ['黃海', 125.85, 38.42], ['平安', 125.95, 40.05], ['咸鏡', 128.55, 41.05]];
+const SEA_NAMES = [['東海', 130.25, 38.4], ['西海', 124.75, 37.0], ['南海', 127.9, 33.95]];
+const NB_NAMES = [['明 · 遼東', 124.4, 41.25], ['女眞', 129.1, 42.72], ['對馬島', 129.62, 34.66], ['日本', 130.72, 33.55]];
+
+function ptsD(pts, close) {
+  let d = '';
+  for (let i = 0; i < pts.length; i++) d += (i ? 'L' : 'M') + PX(pts[i][0]).toFixed(1) + ' ' + PY(pts[i][1]).toFixed(1);
+  return close ? d + 'Z' : d;
+}
+
+function buildMap() {
+  map.innerHTML = '';
+  const defs = svgEl('defs', null, map);
+  const g1 = svgEl('radialGradient', { id: 'fogGrad' }, defs);
+  svgEl('stop', { offset: '0', style: 'stop-color:var(--fog);stop-opacity:.95' }, g1);
+  svgEl('stop', { offset: '.55', style: 'stop-color:var(--fog);stop-opacity:.6' }, g1);
+  svgEl('stop', { offset: '1', style: 'stop-color:var(--fog);stop-opacity:0' }, g1);
+  const pat = svgEl('pattern', { id: 'rainPat', width: 7, height: 7, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(18)' }, defs);
+  svgEl('line', { x1: 0, y1: 0, x2: 0, y2: 4.2, style: 'stroke:var(--rain)', 'stroke-width': 0.55 }, pat);
+
+  svgEl('rect', { class: 'sea', x: -900, y: -1200, width: 1800, height: 2600 }, map);
+  const nb = svgEl('g', { class: 'nb' }, map);
+  for (const n of GEO.neighbors) svgEl('path', { d: ptsD(n.pts, true), 'vector-effect': 'non-scaling-stroke' }, nb);
+  const land = svgEl('g', { class: 'land' }, map);
+  svgEl('path', { d: ptsD(GEO.main, true), 'vector-effect': 'non-scaling-stroke' }, land);
+  for (const r of GEO.islands) svgEl('path', { d: ptsD(r, true), 'vector-effect': 'non-scaling-stroke' }, land);
+  const dog = svgEl('g', { class: 'do' }, map);
+  for (const l of GEO.doLines) svgEl('path', { d: ptsD(l, false), 'vector-effect': 'non-scaling-stroke' }, dog);
+  const riv = svgEl('g', { class: 'riv' }, map);
+  for (const r of GEO.rivers) svgEl('path', { d: ptsD(r.pts, false), 'vector-effect': 'non-scaling-stroke' }, riv);
+
+  M.hazeOv = svgEl('rect', { class: 'hazeov', x: -900, y: -1200, width: 1800, height: 2600, opacity: 0 }, map);
+  M.labelsBg = svgEl('g', { class: 'bglabels' }, map);
+  M.net = svgEl('g', { class: 'net' }, map);
+  M.bongG = svgEl('g', { class: 'bong' }, map);
+  M.mainG = svgEl('g', { class: 'main' }, map);
+  M.fx = svgEl('g', { class: 'fx' }, map);
+  M.live = svgEl('g', { class: 'live' }, map);
+  M.cityG = svgEl('g', { class: 'cities' }, map);
+  M.nightOv = svgEl('rect', { class: 'nightov', x: -900, y: -1200, width: 1800, height: 2600, opacity: 0 }, map);
+  M.rainOv = svgEl('rect', { class: 'rainov', x: -900, y: -1200, width: 1800, height: 2600, opacity: 0 }, map);
+
+  // 배경 글자: 도·바다·이웃
+  M.bgText = [];
+  for (const [n, lo, la] of DO_NAMES) M.bgText.push({ el: svgEl('text', { class: 'do-t', x: PX(lo), y: PY(la), 'text-anchor': 'middle' }, M.labelsBg), size: 15, only: 1, txt: n });
+  for (const [n, lo, la] of SEA_NAMES) M.bgText.push({ el: svgEl('text', { class: 'sea-t', x: PX(lo), y: PY(la), 'text-anchor': 'middle' }, M.labelsBg), size: 15, only: 0, txt: n });
+  for (const [n, lo, la] of NB_NAMES) M.bgText.push({ el: svgEl('text', { class: 'nb-t', x: PX(lo), y: PY(la), 'text-anchor': 'middle' }, M.labelsBg), size: 13, only: 0, txt: n });
+  for (const b of M.bgText) b.el.textContent = b.txt;
+
+  // 다른 간선들 (정적)
+  M.netStations = [];
+  for (const ln of NETWORK) {
+    if (ln.main) continue;
+    const pts = polyline(ln.route);
+    svgEl('path', { d: ptsD(pts, false), 'vector-effect': 'non-scaling-stroke' }, M.net);
+  }
+  // 봉수 제2거
+  svgEl('path', { class: 'bongline', d: ptsD(polyline(BONG_ROUTE), false), 'vector-effect': 'non-scaling-stroke' }, M.bongG);
+  M.bongSt = S.bline.pts.map(p => svgEl('circle', { class: 'bongst', cx: PX(p[0]), cy: PY(p[1]), r: 2, 'vector-effect': 'non-scaling-stroke' }, M.bongG));
+  M.bongFog = [];
+  for (let h = 1; h < S.bline.N; h++) {
+    const a = S.bline.pts[h - 1], b = S.bline.pts[h];
+    M.bongFog.push(svgEl('circle', { class: 'fogpuff', cx: PX((a[0] + b[0]) / 2), cy: PY((a[1] + b[1]) / 2), r: S.bline.d[h] * 0.75, opacity: 0 }, M.fx));
+  }
+  // 도시
+  M.cities = [];
+  for (const [key, name, kind, side, only] of CITY) {
+    const p = PL[key];
+    const g = svgEl('g', { class: 'city' }, M.cityG);
+    const c = svgEl('circle', { cx: PX(p[0]), cy: PY(p[1]), r: 2, class: kind === 'cap' ? 'capital' : '' }, g);
+    const tx = svgEl('text', { class: kind === 'cap' ? 'cap-t' : '', 'text-anchor': side === 'l' ? 'end' : 'start' }, g);
+    tx.textContent = name;
+    M.cities.push({ g, c, tx, x: PX(p[0]), y: PY(p[1]), side, only, kind });
+  }
+  // 절영도 앞바다의 왜선
+  const sp = [129.10, 35.035];
+  M.ship = svgEl('g', { class: 'ship' }, M.cityG);
+  M.shipTx = svgEl('text', { 'text-anchor': 'start', style: 'fill:var(--fire-ink);font-weight:700' }, M.ship);
+  M.shipTx.textContent = '왜선 90여 척';
+  M.shipXY = [PX(sp[0]), PY(sp[1])];
+  M.shipMark = svgEl('path', { style: 'fill:var(--fire)' }, M.ship);
+
+  // 재생 요소
+  M.bongDone = svgEl('path', { class: 'bongdone', d: '', 'vector-effect': 'non-scaling-stroke' }, M.live);
+  M.msgSeg = svgEl('path', { class: 'msgseg', d: '', 'vector-effect': 'non-scaling-stroke' }, M.live);
+  M.donePath = svgEl('path', { class: 'donepath', d: '', 'vector-effect': 'non-scaling-stroke' }, M.live);
+  M.bhead = svgEl('circle', { class: 'bhead', r: 3, opacity: 0 }, M.live);
+  M.headRing = svgEl('circle', { class: 'headring', r: 3, opacity: 0, 'vector-effect': 'non-scaling-stroke' }, M.live);
+  M.head = svgEl('circle', { class: 'head', r: 3, opacity: 0, 'vector-effect': 'non-scaling-stroke' }, M.live);
+  M.runners = [];
+  for (let i = 0; i < 6; i++) M.runners.push(svgEl('circle', { class: 'runner', r: 2, opacity: 0, 'vector-effect': 'non-scaling-stroke' }, M.live));
+
+  buildMainLineSvg();
+  setView(S.view, true);
+}
+
+function buildMainLineSvg() {
+  M.mainG.innerHTML = '';
+  M.fx.querySelectorAll('.semfog').forEach(e => e.remove());
+  const L = S.line;
+  svgEl('path', { class: 'mainline', d: ptsD(L.pts, false), 'vector-effect': 'non-scaling-stroke' }, M.mainG);
+  M.st = L.pts.map(p => svgEl('circle', { class: 'st', cx: PX(p[0]), cy: PY(p[1]), r: 2, 'vector-effect': 'non-scaling-stroke' }, M.mainG));
+  M.semFog = [];
+  for (let h = 1; h < L.N; h++) {
+    const a = L.pts[h - 1], b = L.pts[h];
+    M.semFog.push(svgEl('circle', { class: 'fogpuff semfog', cx: PX((a[0] + b[0]) / 2), cy: PY((a[1] + b[1]) / 2), r: Math.max(3.2, L.d[h] * 0.95), opacity: 0 }, M.fx));
+  }
+  // 다른 간선의 역 점 (간격에 맞춰 다시 배치)
+  M.net.querySelectorAll('circle').forEach(e => e.remove());
+  M.netDots = [];
+  for (const ln of NETWORK) {
+    if (ln.main) continue;
+    const pts = polyline(ln.route);
+    const Ln = routeLength(ln.route);
+    const st = placeStations(pts, Math.max(2, Math.round(Ln / S.spacing)));
+    st.pts.forEach((p, i) => { if (i > 0) M.netDots.push(svgEl('circle', { cx: PX(p[0]), cy: PY(p[1]), r: 1 }, M.net)); });
+  }
+  applyScale();
+}
+
+// 확대 수준에 맞춰 점 크기·글자 크기 조정 (사용자 단위 = km)
+function pxPerUnit() {
+  const r = map.getBoundingClientRect();
+  const vb = S.vb;
+  const w = r.width || 480, h = r.height || 850;
+  return Math.min(w / vb[2], h / vb[3]);
+}
+function applyScale() {
+  if (!S.vb) return;
+  const u = pxPerUnit(), k = 1 / u;
+  const corr = S.view === 'corr';
+  M.st && M.st.forEach(c => c.setAttribute('r', (corr ? 3.1 : 2.1) * k));
+  M.netDots && M.netDots.forEach(c => c.setAttribute('r', 1.15 * k));
+  M.bongSt.forEach(c => c.setAttribute('r', (corr ? 3.2 : 2.1) * k));
+  M.runners.forEach(c => c.setAttribute('r', 3.6 * k));
+  M.head.setAttribute('r', 4.6 * k); M.headRing.setAttribute('r', 5 * k); M.bhead.setAttribute('r', 4.6 * k);
+  for (const c of M.cities) {
+    const vis = c.only === 0 || (c.only === 1 && !corr) || (c.only === 2 && corr);
+    c.g.style.display = vis ? '' : 'none';
+    if (!vis) continue;
+    const fs = (c.kind === 'cap' ? 14 : 12) * k;
+    c.c.setAttribute('r', (c.kind === 'cap' ? 3.6 : c.kind === 'pass' ? 1.4 : 1.9) * k);
+    c.tx.setAttribute('font-size', fs);
+    c.tx.setAttribute('x', c.x + (c.side === 'l' ? -5 : 5) * k);
+    c.tx.setAttribute('y', c.y + 4 * k);
+    c.tx.style.strokeWidth = (3 * k) + 'px';
+  }
+  for (const b of M.bgText) {
+    b.el.style.display = (b.only === 1 && corr) ? 'none' : '';
+    b.el.setAttribute('font-size', b.size * k);
+  }
+  const [sx, sy] = M.shipXY;
+  M.ship.style.display = corr ? '' : 'none';
+  // 폭이 좁은 지도(폰 세로)에서는 배 오른쪽에 쓴 글자가 지도 끝에 잘리므로 배 아래 왼쪽(바다)으로 옮김
+  const visR = S.vb[0] + S.vb[2] / 2 + (map.getBoundingClientRect().width || 480) * k / 2;
+  const flip = sx + 80 * k > visR;
+  M.shipTx.setAttribute('text-anchor', flip ? 'end' : 'start');
+  M.shipTx.setAttribute('x', sx + (flip ? 6 : 7) * k); M.shipTx.setAttribute('y', sy + (flip ? 19 : 4) * k); M.shipTx.setAttribute('font-size', 12 * k);
+  M.shipTx.style.strokeWidth = (3 * k) + 'px';
+  M.shipMark.setAttribute('d', `M${sx - 5 * k} ${sy - 1 * k}h${10 * k}l${-2 * k} ${4 * k}h${-6 * k}zM${sx} ${sy - 8 * k}v${7 * k}l${4 * k} ${-2 * k}z`);
+}
+let viewAnim = 0;
+function setView(v, instant) {
+  S.view = v;
+  $('vFull').setAttribute('aria-pressed', v === 'full');
+  $('vCorr').setAttribute('aria-pressed', v === 'corr');
+  map.parentNode.classList.toggle('v-corr', v === 'corr');   // 좁은 지도에서 HUD 자리 (style.css)
+  const to = viewBoxOf(v);
+  const from = S.vb || to;
+  const id = ++viewAnim;
+  const t0 = performance.now(), dur = (instant || reduceMotion) ? 0 : 650;
+  function step(now) {
+    if (id !== viewAnim) return;
+    const f = dur ? Math.min(1, (now - t0) / dur) : 1;
+    const e = f < .5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+    S.vb = from.map((a, i) => a + (to[i] - a) * e);
+    map.setAttribute('viewBox', S.vb.map(x => x.toFixed(2)).join(' '));
+    applyScale();
+    if (f < 1) requestAnimationFrame(step); else setTimeout(() => { if (id === viewAnim && S.vb !== to) { S.vb = to; map.setAttribute('viewBox', to.join(' ')); applyScale(); } }, 0);
+  }
+  if (dur === 0) step(t0); else { requestAnimationFrame(step); setTimeout(() => step(t0 + dur + 1), dur + 80); }
+}
+
+// ===================================================================
+//  재생 상태 계산
+// ===================================================================
+function semState(t) {
+  const rec = S.sem, N = rec.N, Mn = rec.M;
+  const out = { logged: new Int8Array(N), wrong: new Int8Array(N), disp: new Int16Array(N).fill(-1), dispV: new Int16Array(N).fill(-1), wait: new Array(N).fill(null), head: -1, tail: -1, runners: [] };
+  for (let i = 0; i < N; i++) {
+    const vals = new Int16Array(Mn).fill(-1);
+    for (const L of rec.logs[i]) { if (L[0] > t) break; vals[L[1]] = L[2]; }
+    let c = 0, w = 0;
+    for (let k = 0; k < Mn; k++) if (vals[k] >= 0) { c++; if (vals[k] !== MSG[k]) w++; }
+    out.logged[i] = c; out.wrong[i] = w;
+    const D = rec.disp[i];
+    for (let j = D.length - 1; j >= 0; j--) if (D[j][0] <= t) { out.disp[i] = D[j][1]; out.dispV[i] = D[j][2]; break; }
+    for (const x of rec.waits[i]) { if (x.t0 > t) break; if (t < x.t1) { out.wait[i] = x.why; break; } }
+    if (c > 0 && t >= rec.t0) out.head = i;
+    if (c === Mn) out.tail = i;
+  }
+  for (const r of rec.runners) if (r.t0 <= t && t < r.t1) out.runners.push({ from: r.from, f: (t - r.t0) / (r.t1 - r.t0) });
+  return out;
+}
+function bongState(t) {
+  const b = S.bong, N = b.N;
+  let last = -1;
+  for (let i = 0; i < N; i++) if (b.lit[i] <= t) last = i;
+  let wait = null;
+  if (last >= 0 && last < N - 1) for (const x of b.waits[last + 1]) if (x.t0 <= t && t < x.t1) wait = x.why;
+  const runners = b.runners.filter(r => r.t0 <= t && t < r.t1).map(r => ({ from: r.from, f: (t - r.t0) / (r.t1 - r.t0) }));
+  return { last, wait, runners, level: last >= 0 ? b.lvl[last] : 0 };
+}
+function countUpTo(arr, t) { let c = 0; for (const x of arr) if (x.t <= t) c++; return c; }
+
+// ===================================================================
+//  노선 단면 (strip)
+// ===================================================================
+const strip = $('strip');
+const SVW = 820, SX0 = 80, SX1 = 810;
+const T = {};
+function buildStrip() {
+  strip.innerHTML = '';
+  const L = S.line, B = S.bline;
+  const sx = x => SX0 + (SX1 - SX0) * x;
+  T.sx = sx;
+  const tt = (x, y, s, cls, anchor) => { const e = svgEl('text', { x, y, class: cls || '', 'text-anchor': anchor || 'start' }, strip); e.textContent = s; return e; };
+  T.night = svgEl('rect', { class: 'nightband', x: SX0 - 4, y: 20, width: SX1 - SX0 + 8, height: 150, opacity: 0 }, strip);
+  // 신호간 차선
+  tt(0, 50, '신호간', 'lane-t'); tt(0, 64, `동래선 ${Math.round(L.L)} km`, 'lane-s'); tt(0, 77, `${L.N}개 역`, 'lane-s');
+  for (const m of L.marks) {
+    if (!['동래', '밀양', '청도', '대구', '낙동', '조령', '충주', '용인', '목멱산'].includes(m.name)) continue;
+    tt(sx(m.x / L.L), 14, m.name === '목멱산' ? '한양' : m.name, 'mark', m.name === '동래' ? 'start' : m.name === '목멱산' ? 'end' : 'middle');
+  }
+  svgEl('line', { class: 'base', x1: SX0, x2: SX1, y1: 46, y2: 46 }, strip);
+  T.vis = []; T.tick = []; T.lg = []; T.lb = [];
+  const bw = Math.max(2, Math.min(9, (SX1 - SX0) / L.N * 0.62));
+  for (let h = 1; h < L.N; h++) {
+    const a = sx(L.x[h - 1] / L.L), b = sx(L.x[h] / L.L);
+    T.vis.push(svgEl('rect', { class: 'vis', x: a, y: 22, width: Math.max(0.5, b - a - 0.6), height: 11, opacity: 0 }, strip));
+  }
+  for (let i = 0; i < L.N; i++) {
+    const x = sx(L.x[i] / L.L);
+    T.tick.push(svgEl('rect', { class: 'tick', x: x - 1.3, y: 39, width: 2.6, height: 14, rx: 1 }, strip));
+    T.lg.push(svgEl('rect', { class: 'lg', x: x - bw / 2, y: 57, width: bw, height: 0 }, strip));
+    T.lb.push(svgEl('rect', { class: 'lb', x: x - bw / 2, y: 57, width: bw, height: 0 }, strip));
+  }
+  svgEl('line', { class: 'axis', x1: SX0, x2: SX1, y1: 99.5, y2: 99.5, 'stroke-dasharray': '2 3' }, strip);
+  tt(SX0 - 6, 101, '16', 'mark', 'end');
+  // 봉수 차선
+  tt(0, 150, '봉수', 'lane-t'); tt(0, 164, `제2거 ${Math.round(B.L)} km`, 'lane-s'); tt(0, 177, `${B.N}개 봉수대`, 'lane-s');
+  T.bvis = [];
+  for (let h = 1; h < B.N; h++) {
+    const a = sx(B.x[h - 1] / B.L), b = sx(B.x[h] / B.L);
+    T.bvis.push(svgEl('rect', { class: 'vis', x: a, y: 122, width: Math.max(0.5, b - a - 0.8), height: 10, opacity: 0 }, strip));
+  }
+  svgEl('line', { class: 'base', x1: SX0, x2: SX1, y1: 146, y2: 146 }, strip);
+  T.bt = [];
+  for (let i = 0; i < B.N; i++) T.bt.push(svgEl('circle', { class: 'bt', cx: sx(B.x[i] / B.L), cy: 146, r: 3.6 }, strip));
+  for (const m of B.marks) {
+    if (!['다대포 응봉', '경주', '영천', '안동', '죽령', '충주', '이천', '목멱산'].includes(m.name)) continue;
+    tt(sx(m.x / B.L), 166, m.name === '목멱산' ? '한양' : m.name === '다대포 응봉' ? '다대포' : m.name, 'mark', m.name === '다대포 응봉' ? 'start' : m.name === '목멱산' ? 'end' : 'middle');
+  }
+  T.srun = []; T.brun = [];
+  for (let i = 0; i < 5; i++) { T.srun.push(svgEl('circle', { class: 'rn', r: 3.4, cy: 46, opacity: 0 }, strip)); T.brun.push(svgEl('circle', { class: 'rn', r: 3.4, cy: 146, opacity: 0 }, strip)); }
+  T.hit = svgEl('rect', { x: SX0 - 6, y: 0, width: SX1 - SX0 + 12, height: 186, fill: 'transparent' }, strip);
+  T.hit.addEventListener('pointermove', stripHover);
+  T.hit.addEventListener('pointerleave', ev => { if (ev.pointerType !== 'touch') $('tip').hidden = true; });
+  for (const type of ['pointerdown', 'pointerup', 'pointercancel']) T.hit.addEventListener(type, stripTouch);
+}
+// 마우스·펜: 올려 보기 (원래 동작)
+function stripHover(ev) {
+  if (ev.pointerType === 'touch') { stripTouch(ev); return; }
+  TT.pinned = false; clearTimeout(TT.off);
+  stripTip(ev.clientX, ev.clientY, false);
+}
+// 터치: 탭하면 그 자리의 말풍선을 띄워 둔다 — 단면 밖을 누르거나, 스크롤하거나, 6초가 지나면 닫힘.
+// 0.3초 길게 누른 채 끌면 손가락을 따라가고, 그냥 밀면 원래대로 상자(가로)·페이지(세로)가 스크롤된다.
+const TT = { id: -1, x0: 0, y0: 0, x: 0, y: 0, moved: false, drag: false, pinned: false, lp: 0, off: 0 };
+function stripTouch(ev) {
+  if (ev.pointerType !== 'touch') return;
+  if (ev.type === 'pointerdown') {
+    if (TT.id !== -1) return;   // 두 번째 손가락은 무시
+    Object.assign(TT, { id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, x: ev.clientX, y: ev.clientY, moved: false, drag: false });
+    clearTimeout(TT.lp);
+    TT.lp = setTimeout(() => { if (TT.id !== -1 && !TT.moved) { TT.drag = true; tipTouchShow(TT.x, TT.y); } }, 300);
+    return;
+  }
+  if (ev.pointerId !== TT.id) return;
+  if (ev.type === 'pointermove') {
+    TT.x = ev.clientX; TT.y = ev.clientY;
+    if (TT.drag) tipTouchShow(TT.x, TT.y);
+    else if (Math.hypot(TT.x - TT.x0, TT.y - TT.y0) > 10) { TT.moved = true; clearTimeout(TT.lp); }
+    return;
+  }
+  clearTimeout(TT.lp);
+  if (ev.type === 'pointerup' && (TT.drag || !TT.moved)) tipTouchShow(ev.clientX, ev.clientY);   // 탭, 또는 끌기를 마친 자리
+  if (TT.pinned) { clearTimeout(TT.off); TT.off = setTimeout(tipTouchHide, 6000); }
+  TT.id = -1; TT.drag = false;
+}
+function tipTouchShow(x, y) { clearTimeout(TT.off); TT.pinned = stripTip(x, y, true); }
+function tipTouchHide() { clearTimeout(TT.off); if (TT.pinned) { TT.pinned = false; $('tip').hidden = true; } }
+// 말풍선을 화면 안에 놓는다. 마우스는 원래처럼 오른쪽 아래(아래가 잘리면 위), 터치는 손가락에 가리지 않게 위 가운데
+function placeTip(tip, cx, cy, touch) {
+  tip.style.left = '0px'; tip.style.top = '0px';   // 폭을 재기 전에 왼쪽 위로 (오른쪽 끝에 있으면 좁게 접혀 재짐)
+  const w = tip.offsetWidth, h = tip.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+  let x, y;
+  if (touch) { x = cx - w / 2; y = cy - h - 28; if (y < 8) y = cy + 28; }
+  else { x = Math.min(vw - 300, cx + 14); y = cy + 16; if (y + h > vh - 8) y = cy - h - 12; }
+  tip.style.left = Math.max(8, Math.min(vw - w - 8, x)) + 'px';
+  tip.style.top = Math.max(8, Math.min(vh - h - 8, y)) + 'px';
+}
+function stripTip(cx, cy, touch) {
+  const r = strip.getBoundingClientRect();
+  const vx = (cx - r.left) / r.width * SVW, vy = (cy - r.top) / r.height * 186;
+  const f = (vx - SX0) / (SX1 - SX0);
+  const tip = $('tip');
+  if (f < -0.01 || f > 1.01) { tip.hidden = true; return false; }
+  const t = S.t;
+  let html;
+  if (vy < 112) {
+    const L = S.line; let i = 0, best = 1e9;
+    for (let j = 0; j < L.N; j++) { const d = Math.abs(L.x[j] / L.L - f); if (d < best) { best = d; i = j; } }
+    const st = semState(t);
+    const P = S.getP(t);
+    const F = fatigueAt(rnd(S.seed, K.OFF, i, 0, 0), P, t);
+    const dv = st.disp[i] >= 0 ? symbolName(st.dispV[i]) : '—';
+    const w = st.wait[i];
+    const p = i > 0 ? semHopP(i, t) : 1;
+    html = `<b>신호간 ${i === 0 ? '발신역 (동래)' : i === L.N - 1 ? '종착역 (목멱산)' : i + '번 역'}</b><br><span class="k">동래에서</span> ${L.x[i].toFixed(1)} km` +
+      (i > 0 ? ` · <span class="k">앞 구간</span> ${L.d[i].toFixed(1)} km, 가시도 ${pct(p)}` : '') +
+      `<br><span class="k">장부</span> ${st.logged[i]}/16 부호${st.wrong[i] ? ` · <b style="color:var(--crit)">틀린 부호 ${st.wrong[i]}</b>` : ''}` +
+      `<br><span class="k">건 부호</span> ${dv}<br><span class="k">근무자 피로</span> ×${F.toFixed(2)}` + (w ? `<br><b>${w === 'fog' ? '안개·비로 대기' : w === 'night' ? '야간 대기' : '교대 인계 중'}</b>` : '');
+  } else {
+    const B = S.bline; let i = 0, best = 1e9;
+    for (let j = 0; j < B.N; j++) { const d = Math.abs(B.x[j] / B.L - f); if (d < best) { best = d; i = j; } }
+    const lit = S.bong.lit[i];
+    html = `<b>봉수대 ${i === 0 ? '(다대포 응봉)' : i === B.N - 1 ? '(목멱산)' : i + '번'}</b><br><span class="k">응봉에서</span> ${B.x[i].toFixed(1)} km` +
+      (i > 0 ? ` · <span class="k">앞 구간</span> ${B.d[i].toFixed(1)} km, 가시도 ${pct(bongHopP(i, t))}` : '') +
+      `<br>${lit <= t ? `불 올림 ${hhmm(lit)} · <b>${S.bong.lvl[i]}거</b> (${BONG_LEVELS[S.bong.lvl[i]]})` : '아직 불 없음'}`;
+  }
+  tip.innerHTML = html;
+  tip.hidden = false;
+  placeTip(tip, cx, cy, touch);
+  return true;
+}
+function symbolName(c) {
+  if (c === CTRL.START) return '始 (시작)';
+  if (c === CTRL.END) return '終 (끝)';
+  if (c === CTRL.CORR) return '訂 (정정)';
+  const v = DATA_OF[c];
+  return v === undefined ? '—' : `${armPic(c, 18)} ${v + 1}번`;
+}
+
+// ===================================================================
+//  신호간 그림
+// ===================================================================
+function armPic(c, size) {
+  const Lp = c >> 3, Rp = c & 7, len = 9.5, y = 12, lx = 9, rx = 31;
+  const ex = (x, p) => (x + len * Math.sin(p * Math.PI / 4)).toFixed(1);
+  const ey = p => (y - len * Math.cos(p * Math.PI / 4)).toFixed(1);
+  return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true" style="vertical-align:middle"><path d="M20 38V12M${lx} ${y}H${rx}" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none" opacity=".4"/><path d="M${lx} ${y}L${ex(lx, Lp)} ${ey(Lp)}M${rx} ${y}L${ex(rx, Rp)} ${ey(Rp)}" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" fill="none"/><circle cx="${lx}" cy="${y}" r="1.8" fill="currentColor"/><circle cx="${rx}" cy="${y}" r="1.8" fill="currentColor"/></svg>`;
+}
+
+// ===================================================================
+//  수신문
+// ===================================================================
+let lastMsgKey = '';
+function renderMessage(t) {
+  const rec = S.sem, N = rec.N;
+  const vals = new Int16Array(rec.M).fill(-1);
+  for (const L of rec.logs[N - 1]) { if (L[0] > t) break; vals[L[1]] = L[2]; }
+  const done = t >= rec.tDone;
+  const bs = bongState(t);
+  const key = Array.from(vals).join(',') + '|' + done + '|' + bs.last + '|' + (t >= S.bong.tDone);
+  if (key === lastMsgKey) return;
+  lastMsgKey = key;
+  const rows = MSG_CODES.map(([p, l], c) => {
+    const truth = CODEBOOK[p].lines[l];
+    const a = vals[1 + 2 * c], b = vals[2 + 2 * c];
+    let cls = 'pending', rx = '아직 안 닿음';
+    if (a >= 0 && b >= 0) {
+      const d = decodeCode(a, b);
+      if (d.page === p && d.line === l) { cls = done ? 'good' : ''; rx = d.text; }
+      else { cls = 'bad'; rx = `${d.text}<s>${truth}</s>`; }
+    } else if (a >= 0 || b >= 0) { rx = '반쪽만 닿음'; }
+    return `<tr class="${cls}"><td>${truth}</td><td class="code">${p + 1}쪽 ${l + 1}줄</td><td class="pics">${armPic(DATA[p], 26)}${armPic(DATA[l], 26)}</td><td class="rx">${rx}</td></tr>`;
+  });
+  $('msgBody').innerHTML = rows.join('');
+  const b = S.bong;
+  const fires = n => `<span class="fire-pic" aria-hidden="true">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= n ? '' : 'off'}"></i>`).join('')}</span>`;
+  let btxt;
+  if (t >= b.tDone) {
+    const lv = b.levelAtEnd;
+    btxt = `${fires(lv)}봉수: 목멱산에 <b>${lv}거</b> — “${BONG_LEVELS[lv]}” ${lv === 2 ? '(보낸 그대로)' : '<b style="color:var(--crit)">(보낸 것은 2거)</b>'}. 몇 척인지, 어디인지, 정박했는지는 전할 수 없습니다.`;
+  } else if (bs.last >= 0) {
+    btxt = `${fires(bs.level)}봉수: ${bs.last}번째 봉수대까지 <b>${bs.level}거</b>가 올라갔습니다. 한양에는 아직 닿지 않았습니다.`;
+  } else btxt = `${fires(2)}봉수: 발신하면 다대포 응봉에서 <b>2거</b>(“왜적이 바다에 나타남”)를 올립니다.`;
+  $('bongRx').innerHTML = btxt;
+}
+
+// ===================================================================
+//  오류 누적 차트
+// ===================================================================
+// 차트의 좌표 폭. 폰·터치 화면에서 원래 viewBox로는 11px 글자가 12px 아래로 줄어들 만큼 좁으면
+// 1 단위 = 1px 이 되게 viewBox 폭을 실제 폭으로 바꾸고 그 폭(좁은 배치)을 돌려준다. 아니면 원래 폭 그대로, 0을 돌려줌
+const chartW = {};   // 실제 폭 캐시 — 창 크기가 바뀌면 비움
+function chartWidth(svg, stdW, H) {
+  let w = 0;
+  if (touchUI.matches) {
+    if (!(svg.id in chartW)) chartW[svg.id] = Math.round(svg.getBoundingClientRect().width);
+    w = chartW[svg.id];
+  }
+  const narrow = w > 0 && w < stdW * 12 / 11;
+  const W = narrow ? Math.max(260, w) : stdW;
+  const vb = `0 0 ${W} ${H}`;
+  if (svg.getAttribute('viewBox') !== vb) svg.setAttribute('viewBox', vb);
+  return narrow ? W : 0;
+}
+
+let lastErrT = -1;
+function renderErrChart(t, force) {
+  if (!force && Math.abs(t - lastErrT) < 20) return;
+  lastErrT = t;
+  const svg = $('errchart');
+  const rec = S.sem;
+  const cw = chartWidth(svg, 420, 230);
+  const leg2 = cw > 0 && cw < 380;   // 좁으면 범례를 두 줄로
+  const W = cw || 420, H = 230, x0 = 34, x1 = W - 10, y0 = leg2 ? 34 : 18, y1 = 190;
+  const el = Math.max(0, t - rec.t0);
+  const tEndSem = isFinite(rec.tDone) ? rec.tDone - rec.t0 : el;
+  const span = Math.max(600, Math.min(el, tEndSem + 600), Math.min(tEndSem, 3 * 3600));
+  const mis = rec.misreads.map(m => m.t - rec.t0).sort((a, b) => a - b);
+  const cor = rec.corrections.map(m => m.t - rec.t0).sort((a, b) => a - b);
+  // 한양 장부의 틀린 부호 수 변화
+  const term = rec.logs[rec.N - 1];
+  const vals = new Int16Array(rec.M).fill(-1);
+  const wrongSteps = [[0, 0]];
+  for (const L of term) { vals[L[1]] = L[2]; let w = 0; for (let k = 0; k < rec.M; k++) if (vals[k] >= 0 && vals[k] !== MSG[k]) w++; wrongSteps.push([L[0] - rec.t0, w]); }
+  const yMax = Math.max(4, mis.length, cor.length);
+  const nice = yMax <= 5 ? 5 : yMax <= 10 ? 10 : yMax <= 20 ? 20 : yMax <= 40 ? 40 : Math.ceil(yMax / 20) * 20;
+  const X = s => x0 + (x1 - x0) * Math.min(1, s / span);
+  const Y = v => y1 - (y1 - y0) * v / nice;
+  const stepPath = (times, cap) => { let d = `M${X(0)} ${Y(0)}`, c = 0; for (const s of times) { if (s > cap) break; d += `H${X(s).toFixed(1)}V${Y(++c).toFixed(1)}`; } return d + `H${X(Math.min(cap, span)).toFixed(1)}`; };
+  const cap = Math.min(el, span);
+  let d3 = `M${X(0)} ${Y(0)}`;
+  for (const [s, w] of wrongSteps) { if (s > cap) break; d3 += `H${X(s).toFixed(1)}V${Y(w).toFixed(1)}`; }
+  d3 += `H${X(cap).toFixed(1)}`;
+  let g = '';
+  for (let v = 0; v <= nice; v += nice / 5) g += `<line x1="${x0}" x2="${x1}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--rule)" stroke-width="${v ? .6 : 1}"/><text x="${x0 - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+  let stepT = span <= 3600 ? 600 : span <= 3 * 3600 ? 1800 : span <= 12 * 3600 ? 7200 : span <= 3 * 86400 ? 21600 : 86400;
+  if (cw) {   // 좁은 배치: 눈금 글자끼리 겹치지 않을 때까지 간격을 넓힘
+    for (const s of [600, 1200, 1800, 3600, 7200, 10800, 21600, 43200, 86400, 172800, 345600, 691200]) {
+      if (s < stepT) continue;
+      let wMax = 0;
+      for (let k = s; k <= span + 1; k += s) wMax = Math.max(wMax, estW(durTxt(k, true)));
+      stepT = s;
+      if (s * (x1 - x0) / span >= wMax + 10) break;
+    }
+  }
+  for (let s = 0; s <= span + 1; s += stepT) g += `<text x="${X(s)}" y="${y1 + 16}" text-anchor="middle">${s === 0 ? '발신' : durTxt(s, true)}</text>`;
+  const lastC = (arr) => arr.filter(s => s <= cap).length;
+  const lastW = (() => { let w = 0; for (const [s, v] of wrongSteps) if (s <= cap) w = v; return w; })();
+  svg.innerHTML = g +
+    `<path d="${stepPath(mis, cap)}" fill="none" stroke="var(--crit)" stroke-width="5" stroke-opacity=".45" stroke-linejoin="round"/>` +
+    `<path d="${stepPath(cor, cap)}" fill="none" stroke="var(--good)" stroke-width="1.8"/>` +
+    `<path d="${d3}" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-dasharray="4 3"/>` +
+    `<text x="${x0}" y="10" style="fill:var(--crit);font-weight:600">● 오독 ${lastC(mis)}</text>` +
+    `<text x="${x0 + (cw ? 84 : 92)}" y="10" style="fill:var(--good);font-weight:600">● 복창 정정 ${lastC(cor)}</text>` +
+    `<text x="${leg2 ? x0 : x0 + (cw ? 184 : 214)}" y="${leg2 ? 26 : 10}" style="fill:var(--ink);font-weight:600">┅ 한양 장부의 틀린 부호 ${lastW}</text>`;
+  const P = S.getP(t);
+  $('errNote').textContent = P.verify
+    ? '오독이 나도 앞 역이 복창을 보고 대부분 되돌립니다. 놓친 오독은 끝까지 흘러가 한양 장부에 남습니다(점선).'
+    : '복창 대조가 꺼져 있어 오독이 그대로 다음 역으로 복제됩니다. 구간이 쌓일수록 한양에 닿는 부호가 틀릴 확률이 1−(1−p)ⁿ로 커집니다.';
+}
+
+// ===================================================================
+//  몬테카를로 비교
+// ===================================================================
+let mcTimer = 0;
+function scheduleMC() {
+  clearTimeout(mcTimer);
+  $('mcSub').textContent = '현재 조건으로 다시 모의하는 중…';
+  mcTimer = setTimeout(runMC, 250);
+}
+function runMC() {
+  const token = ++S.mcToken;
+  const P = Object.assign({}, S.P);
+  const getP = () => P;
+  const t0 = S.startTod;
+  const res = { sem: [], semOk: 0, semSun: 0, semMis: 0, semRun: 0, bong: [], bongOk: 0, n: 0, nb: 0 };
+  let sunset = Math.floor(t0 / 86400) * 86400 + SUN.set;
+  if (sunset <= t0) sunset += 86400;   // 밤에 보냈다면 이튿날 해 질 때까지
+  const NSEM = 40, NB = 120;
+  let i = 0;
+  function chunk() {
+    if (token !== S.mcToken) return;
+    const tStart = performance.now();
+    while (i < NSEM && performance.now() - tStart < 30) {
+      const seed = 1000 + i;
+      const r = simSemaphore(S.line, t0, seed, getP);
+      res.sem.push(isFinite(r.tDone) ? r.tDone - t0 : 12 * 86400);
+      if (r.correct) res.semOk++;
+      if (r.tDone <= sunset) res.semSun++;
+      res.semMis += r.misreads.length; res.semRun += r.runners.length;
+      res.n++; i++;
+    }
+    if (i < NSEM) { setTimeout(chunk, 0); return; }
+    for (let j = 0; j < NB; j++) {
+      const b = simBongsu(S.bline, t0, 5000 + j, getP, 2);
+      res.bong.push(b.tDone - t0); if (b.correct) res.bongOk++; res.nb++;
+    }
+    S.mc = res;
+    $('mcSub').textContent = `현재 조건 · 신호간 ${res.n}회 · 봉수 ${res.nb}회 모의`;
+    renderCompare(true);
+  }
+  setTimeout(chunk, 0);
+}
+
+function renderCompare(force) {
+  const svg = $('cmpchart');
+  const mc = S.mc;
+  const cw = chartWidth(svg, 640, 196);
+  const W = cw || 640, x0 = cw ? 82 : 132, x1 = W - 14;
+  const subFs = cw ? 12 : 11;   // 줄 제목 아래 작은 글씨
+  const lmin = Math.log(600), lmax = Math.log(8 * 86400);
+  const X = s => x0 + (x1 - x0) * (Math.log(Math.max(600, Math.min(8 * 86400, s))) - lmin) / (lmax - lmin);
+  const ticks = [[600, '10분'], [1800, '30분'], [3600, '1시간'], [3 * 3600, '3시간'], [6 * 3600, '6시간'], [12 * 3600, '12시간'], [86400, '1일'], [2 * 86400, '2일'], [4 * 86400, '4일'], [8 * 86400, '8일']];
+  // 좁은 배치: 눈금 선은 모두 긋고, 글자는 10분·1시간·6시간·1일·4일·8일부터 겹치지 않는 것만
+  const taken = [];
+  const labelFits = (x, lab) => {
+    if (!cw) return true;
+    const a = x - estW(lab) / 2, b = x + estW(lab) / 2;
+    if (a < 0 || b > W || taken.some(([p, q]) => b + 6 > p && a - 6 < q)) return false;
+    taken.push([a, b]); return true;
+  };
+  let g = '';
+  for (const i of cw ? [0, 2, 4, 6, 8, 9, 1, 3, 5, 7] : ticks.keys()) {
+    const [s, lab] = ticks[i];
+    g += `<line x1="${X(s)}" x2="${X(s)}" y1="14" y2="166" stroke="var(--rule)" stroke-width=".7"/>` + (labelFits(X(s), lab) ? `<text x="${X(s)}" y="182" text-anchor="middle">${lab}</text>` : '');
+  }
+  const sunsetIn = SUN.set - S.startTod;
+  if (sunsetIn > 600) g += `<line x1="${X(sunsetIn)}" x2="${X(sunsetIn)}" y1="10" y2="166" stroke="var(--indigo)" stroke-dasharray="3 3" stroke-width="1.2"/><text x="${X(sunsetIn) + 4}" y="12" style="fill:var(--indigo)">해 짐 19:09</text>`;
+  const row = (y, name, sub, color, arr, runT) => {
+    let s = `<text class="rowt" x="0" y="${y + 1}">${name}</text><text x="0" y="${y + 16}" style="fill:var(--ink-3);font-size:${subFs}px">${sub}</text>`;
+    if (arr && arr.length) {
+      const q1 = quantile(arr, 0.1), q5 = quantile(arr, 0.5), q9 = quantile(arr, 0.9);
+      s += `<rect x="${X(q1)}" y="${y - 9}" width="${Math.max(3, X(q9) - X(q1))}" height="18" rx="4" style="fill:${color};opacity:.22"/>` +
+        `<circle cx="${X(q5)}" cy="${y}" r="6" style="fill:${color}"/>` +
+        `<text x="${Math.min(X(q9) + 8, x1 - 60)}" y="${y + 4}" style="font-weight:600;fill:var(--ink)">${durTxt(q5, true)}</text>`;
+    }
+    if (isFinite(runT) && runT > 0) s += `<path d="M${X(runT)} ${y - 13}l5 5l-5 5l-5 -5z" style="fill:var(--ink)" transform="translate(0 -8)"/>`;
+    return s;
+  };
+  const semRun = S.sem && isFinite(S.sem.tDone) ? S.sem.tDone - S.t0 : NaN;
+  const bongRun = S.bong ? S.bong.tDone - S.t0 : NaN;
+  g += row(44, '신호간', '동래선 (가상)', 'var(--gold)', mc && mc.sem, semRun);
+  g += row(96, '봉수', '제2거', 'var(--fire)', mc && mc.bong, bongRun);
+  g += `<text class="rowt" x="0" y="149">1592년 실제</text><text x="0" y="164" style="fill:var(--ink-3);font-size:${subFs}px">박홍의 장계</text>` +
+    `<rect x="${X(4 * 86400) - 5}" y="139" width="10" height="10" transform="rotate(45 ${X(4 * 86400)} 144)" style="fill:var(--ink-2)"/>` +
+    `<text x="${X(4 * 86400) - 10}" y="148" text-anchor="end">13일 출현 → 17일 새벽 도착</text>`;
+  svg.innerHTML = g;
+
+  // 표
+  const L = S.line, B = S.bline, P = S.P;
+  const teams = Math.ceil(24 / P.shiftH);
+  const semPeople = L.N * A.crewSem * teams;
+  const bits = MSG_CODES.length * Math.log2(3600);
+  const med = arr => arr && arr.length ? quantile(arr, 0.5) : NaN;
+  const semMed = mc ? med(mc.sem) : NaN, bongMed = mc ? med(mc.bong) : NaN;
+  const rate = (b, s) => isFinite(s) ? (b / (s / 3600)) : NaN;
+  const fmtRate = r => !isFinite(r) ? '—' : r >= 10 ? r.toFixed(0) + ' bit/시간' : r.toFixed(r < 1 ? 2 : 1) + ' bit/시간';
+  const rows = [
+    ['전하는 내용', `2거 하나 — “왜적이 바다에 나타남” (다섯 단계 중 하나)`, `급보 · 왜선 · 90여 척 · 절영도 앞바다 · 정박 · 申初 · 속보 이어짐 (7구절)`],
+    ['정보량', `<span class="big">2.3</span> bit <small>(log₂5)</small>`, `<span class="big">${bits.toFixed(1)}</span> bit <small>(7구절 × log₂3,600, 신호 16개)</small>`],
+    ['소요 시간 (중앙값)', mc ? `<span class="big">${durTxt(bongMed, true)}</span><br><small>10–90%: ${durTxt(quantile(mc.bong, .1), true)} ~ ${durTxt(quantile(mc.bong, .9), true)}</small>` : '…',
+      mc ? `<span class="big">${durTxt(semMed, true)}</span><br><small>10–90%: ${durTxt(quantile(mc.sem, .1), true)} ~ ${durTxt(quantile(mc.sem, .9), true)}</small>` : '…'],
+    ['정보 전달률', mc ? fmtRate(rate(Math.log2(5), bongMed)) : '…', mc ? fmtRate(rate(bits, semMed)) : '…'],
+    ['뜻이 온전히 닿을 확률', mc ? `<span class="big">${pct(mc.bongOk / mc.nb)}</span> <small>(2거 그대로)</small>` : '…',
+      mc ? `<span class="big">${pct(mc.semOk / mc.n)}</span> <small>(16신호 모두 정확 · 평균 오독 ${(mc.semMis / mc.n).toFixed(1)}회)</small>` : '…'],
+    ['해 지기 전 도착', mc ? `<small>밤에는 횃불로 오히려 잘 보임</small>` : '…', mc ? `<span class="big">${pct(mc.semSun / mc.n)}</span> <small>(${S.startTod >= SUN.set ? '이튿날 ' : ''}19:09 전)</small>` : '…'],
+    ['중계소', `${B.N}곳 · 평균 ${(B.L / (B.N - 1)).toFixed(1)} km`, `${L.N}곳 · 평균 ${(L.L / (L.N - 1)).toFixed(1)} km`],
+    ['동원 인원', `약 360명 <small>(《경국대전》 연변 12·내지 8명 기준 어림)</small>`, `${semPeople.toLocaleString()}명 <small>(역당 ${A.crewSem}명 × ${teams}교대)</small>`],
+    ['약점', `낮 연기는 연무·비에 약하고, 한 단계 오독이면 뜻이 통째로 바뀜 (1거면 ‘평시’)`, `밤과 안개에 멈춤. 오독 하나가 구절 하나를 바꾸며, 줄(둘째 부호) 오독은 그럴듯한 오보가 됨 (90여 척 → 80척)`],
+  ];
+  $('cmpBody').innerHTML = rows.map(r => `<tr><th scope="row">${r[0]}</th><td class="b">${r[1]}</td><td class="s">${r[2]}</td></tr>`).join('');
+}
+
+// ===================================================================
+//  가정표
+// ===================================================================
+function renderAssumptions() {
+  const P = S.P, W = wx(P), L = S.line;
+  const teams = Math.ceil(24 / P.shiftH);
+  const kinds = { doc: '문헌', calc: '계산', est: '추정', asm: '가정' };
+  const k = (...ks) => ks.map(x => `<span class="kind ${x}">${kinds[x]}</span>`).join(' ');
+  const rows = [
+    ['시점과 해', '1592-05-23 (양력)<br>해뜸 04:51 · 해짐 19:09', '음력 4월 13일 = 양력 5월 23일. 태양 적위 +20.6°, 위도 36.5°, 대기 굴절을 넣어 계산한 지방 진태양시. 시민박명은 04:22 / 19:38. 신호간은 박명 중 밝기가 모자라면(04:44 이전, 19:15 이후) 읽지 못한다고 봄.', k('calc')],
+    ['망원경', '없음 (맨눈)', '망원경은 1608년 네덜란드에서 처음 알려졌고, 조선에는 1631년(인조 9) 정두원이 명에서 천리경을 들여왔다. 16세기 신호간은 맨눈으로 읽어야 한다.', k('doc')],
+    ['신호간 구조', '지시팔 2개 × 8방향<br>= 64조합 (자료 60 · 제어 4)', '샤프 체계(1794, 가로대 + 지시팔 2)를 망원경 없이 쓰도록 팔을 6 m로 키우고 단순화한 가상 설계. 제어 부호: 始(시작)·終(끝)·訂(정정)·休(쉼). 始·終은 모양이 뚜렷해 오독하지 않는다고 가정.', k('asm')],
+    ['중계소 간격', `${S.spacing.toFixed(1)} km<br>(동래선 ${L.N}곳)`, '시력 1.0 = 분해능 1′(각분). 팔 방향을 가려내려면 팔 길이가 4′ 이상으로 보여야 한다고 보면 6 m ÷ tan 4′ ≈ 5.2 km. 이보다 멀면 판독 시간 ∝ (d/5.2)², 오독 ∝ (d/5.2)³. 샤프 체계는 망원경을 써서 대개 10 km 안팎 간격을 두었다고 전한다.', k('calc', 'est')],
+    ['한 신호의 구간 처리', '알아챔 6 s + 판독 5–9 s<br>+ 팔 조작 10 s<br>→ 구간당 약 30 s', '앞 역의 변화를 알아채는 시간(평균 6 s, 지수분포) × 피로, 판독 시간, 도르래로 팔을 거는 시간(비 오면 +2%/mm·h). 샤프 체계 최전성기 기록(역당 수십 초 이내로 전해짐)보다 보수적으로 잡음. 뒤 역의 복창(5 s)을 확인해야 다음 부호를 걸기 때문에 이상적인 신호 간격은 약 45초지만, 70개 역의 반응 시간 흔들림·교대 공백·정정이 겹쳐 모의에서는 한양에 신호가 평균 1–2.5분 간격으로 닿는다. 첫 신호는 발신 약 35분 뒤 도착.', k('est')],
+    ['부호책', '60쪽 × 60줄 = 3,600구절<br>구절 1개 = 신호 2개', '첫 부호가 쪽, 둘째 부호가 줄을 가리킴 → 구절당 log₂3,600 ≈ 11.8 bit. 샤프 체계의 쪽·줄 방식 부호책(1795년 92쪽 × 92줄로 알려짐)을 본뜸. 이번 급보는 7구절 + 始·終 = 신호 16개. 쪽 오독은 엉뚱한 범주(‘수량’ 자리에 지명 등), 줄 오독은 그럴듯한 이웃 값(90여 척 → 80척)이 됨.', k('est')],
+    ['부호화·해독', '동래부 4분 · 병조 3분', '부호책에서 7구절을 찾아 옮겨 적는 시간.', k('asm')],
+    ['해독 오류율', `${(P.err * 100).toFixed(1)}% / 신호·구간`, '16세기 판독 오류에 대한 자료가 없어 슬라이더로 둠. 실제 오독률 = 기본값 × 피로 × (1 + 0.03·강우 mm/h) × 간격 보정 × (1 + 2·(1 − 가시도)) × (등화 야간 2.5). 오독은 대개 팔 하나를 한 칸(45°) 잘못 보는 것(80%), 나머지는 두 팔 모두.', k('asm')],
+    ['복창 대조', P.verify ? '켬 · 잡아낼 확률 90%' : '끔', '뒤 역은 받은 모양을 그대로 걸어(복창) 다음 역에 넘긴다. 앞 역이 그 복창을 보고 다르면 訂을 걸고 다시 보낸다. 잡아낼 확률 90% × (0.5 + 0.5 × 가시도). 샤프 체계도 뒤 역의 반복을 확인하며 보냈다고 알려져 있다.', k('est')],
+    ['시정(가시거리)', `안개 ${isFinite(W.Vf) ? W.Vf.toFixed(1) + ' km' : '없음'} · 비 ${W.R.toFixed(1)} mm/h<br>→ 종합 ${W.V.toFixed(1)} km`, '코시미더 법칙 C = C₀·e^(−3.912·d/V). 신호간(하늘을 배경으로 한 어두운 나무 팔, C₀ 0.8)은 대비 2.5% 미만이면 판독 불가, 8% 이상이면 확실. 봉수 연기(C₀ 0.45)와 밤 횃불(유효거리 절반)은 1.2% 미만 불가, 3.5% 이상 확실. 비의 소광계수 σ = 0.117·R^0.75 km⁻¹ (5 mm/h → 시정 약 10 km, 25 mm/h → 3 km가 되게 맞춘 근사). 맑은 공기 시정 80 km.', k('calc', 'asm')],
+    ['안개의 변화', '안개 조각 폭 15–45 km<br>시속 11–15 km로 이동', '바람에 실려 흐르는 안개 조각 + 3–4시간 주기로 짙어졌다 옅어짐. 부산 앞 해안과 조령·죽령·팔조령·대관령 부근은 최대 1.5배 짙음. 산 높이와 지구 곡률에 따른 가시선 차단은 계산하지 않음 — 모든 역이 서로 보이는 자리에 섰다고 가정.', k('asm')],
+    ['교대와 피로', `${P.shiftH}시간 근무 · ${teams}교대<br>인계 6분 동안 중단`, '피로 배수 F = 1 + 0.06·h^1.4 (근무 h시간째), 새벽 0–5시는 ×1.25. F는 알아채는 시간과 오독률에 곱해짐. 역마다 교대 시각은 무작위. 교대가 잦으면 인계 공백이, 길면 피로가 늘어남. 참고로 《경국대전》은 봉수군을 연변봉수 10명·내지봉수 6명, 오장 2명으로 두고 번을 서게 했다.', k('asm', 'doc')],
+    ['동원 인원', `신호간 ${(L.N * A.crewSem * teams).toLocaleString()}명 · 봉수 약 360명`, `신호간은 역당 1교대 ${A.crewSem}명(관측·기록 1, 조작 1) × ${teams}교대. 봉수 제2거는 《경국대전》 정원(연변 4곳 × 12명 + 내지 40곳 × 8명)으로 어림.`, k('doc', 'asm')],
+    ['밤', P.lamps ? '등화 신호 사용' : '맑은 밤이면 여명까지 대기', '샤프 체계도 밤과 안개에는 멈췄다. 등화 신호를 켜면 조작 1.5배, 오독 2.5배, 유효거리 1/1.6. 봉수는 밤에 횃불이라 오히려 멀리 보이고 점화가 빠름(2분).', k('est', 'asm')],
+    ['주자(走者) 전환', '30분 연속 불통 시<br>낮 8 km/h · 밤 4 km/h', '안개·비로 한 구간이 30분 넘게 막히면 장부에 적힌 전문을 들고 다음 역까지 달린다(산길이라 직선 거리의 1.25배, 비 오면 감속). 봉수도 구름·비로 불통이면 봉수군이 다음 봉수대까지 달려가 알리게 했다는 것이 통설. 주자로 받은 전문은 앞이 짙게 막혔거나 밤이면 곧장 다음 주자로 넘김. 파발(擺撥)은 1597년에야 생겨 넣지 않음.', k('doc', 'asm')],
+    ['봉수 제2거 노선', `${S.bline.N}곳 · ${Math.round(S.bline.L)} km`, '다대포 응봉 → 황령산 → 경주 → 영천 → 의성 → 안동 → 영주 → 죽령 → 단양 → 충주 → 이천 → 천림산 → 목멱산. 실제 봉수대 자리가 아니라 노선을 따라 고르게 배치한 근사. 직봉 봉수대 수는 시기·문헌마다 달라 40여 곳으로 둠.', k('est')],
+    ['봉수 구간 처리', '망보기 6분(밤 ×0.7)<br>+ 점화 낮 4분·밤 2분 + 확인 1분<br>→ 구간당 약 10분', '‘변경에서 한양까지 반나절(약 12시간) 안팎’이라는 통설에 어긋나지 않게 맞춘 값. 비가 오면 점화가 늦어지고(+6%/mm·h) 낮 연기가 흩어진다.', k('est')],
+    ['봉수 신호', '5거 → log₂5 ≈ 2.3 bit', '연변 봉수: 1거 평시, 2거 적이 바다에 나타남, 3거 해안에 접근, 4거 아군 병선과 교전, 5거 상륙(조선 전기 정비된 거화 규정으로 알려진 내용). 오독은 신호간 기본 오류율의 0.3배, 한 단계 위나 아래로.', k('doc', 'asm')],
+    ['1592년 실제', '출현 4월 13일<br>→ 한양 보고 4월 17일', '유성룡 《징비록》: 4월 17일 이른 아침 경상좌수사 박홍의 장계로 변보가 처음 이르렀다 — 봉수는 제 구실을 하지 못했다. 이순신 《난중일기》 4월 15일에는 원균의 공문에 ‘왜선 90여 척이 부산 앞 절영도에 정박’했다고 적혀 있어, 이 페이지의 급보 문안으로 삼았다.', k('doc')],
+    ['지도', 'Natural Earth 1:10m', '해안선·섬·하천은 Natural Earth(퍼블릭 도메인)를 0.001° 단위로 줄여 넣음. 조선 8도 경계는 현대 남북한 행정구역을 병합한 근사(원산·안변 일대 등은 실제와 다름). 지명 좌표는 읍치·역참의 대략적 위치.', k('calc')],
+  ];
+  $('asBody').innerHTML = rows.map(r => `<tr><td class="item">${r[0]}</td><td class="v">${r[1]}</td><td class="why">${r[2]}</td><td>${r[3]}</td></tr>`).join('');
+}
+
+// ===================================================================
+//  조작부
+// ===================================================================
+function updateLabels() {
+  const P = S.P, W = wx(P);
+  $('outFog').textContent = P.fog <= 0.001 ? '없음' : `시정 ${W.Vf >= 10 ? W.Vf.toFixed(0) : W.Vf.toFixed(1)} km`;
+  $('noteFog').textContent = P.fog <= 0.001 ? '안개 없음. 맑은 공기만으로도 80 km 너머는 흐려집니다.'
+    : `${visLabel(W.Vf)}. 신호간 한 구간(${(S.line.L / (S.line.N - 1)).toFixed(1)} km)은 시정이 7 km 아래로 떨어지면 읽기 어렵고, 봉수 낮 연기(${(S.bline.L / (S.bline.N - 1)).toFixed(1)} km)는 12 km 아래에서 흐려집니다.`;
+  $('outRain').textContent = W.R < 0.05 ? '없음' : `${W.R.toFixed(1)} mm/h`;
+  $('noteRain').textContent = W.R < 0.05 ? '비 없음.' : `${rainLabel(W.R)} — 빗줄기만으로 시정 ${(3.912 / W.sRain).toFixed(1)} km. 젖은 줄로 팔 조작이 느려지고, 봉수 연기가 흩어지며 점화가 늦어집니다.`;
+  const teams = Math.ceil(24 / P.shiftH);
+  const Fmax = 1 + 0.06 * Math.pow(P.shiftH, 1.4);
+  $('outShift').textContent = `${P.shiftH}시간 근무`;
+  $('noteShift').textContent = `${teams}교대, 역당 ${A.crewSem * teams}명 (동래선 ${(S.line.N * A.crewSem * teams).toLocaleString()}명). 교대 끝 무렵 피로 ×${Fmax.toFixed(2)}, 하루 역마다 인계 공백 ${Math.round(teams * 6)}분.`;
+  $('outErr').textContent = `${(P.err * 100).toFixed(1)}%`;
+  const n = S.line.N - 1;
+  const pSym = 1 - Math.pow(1 - P.err, n);
+  $('noteErr').textContent = P.err === 0 ? '오독 없음 (이상적인 판독).'
+    : `신호 하나가 한 구간에서 잘못 읽힐 확률. 대조 없이 ${n}구간을 지나면 신호 하나가 틀릴 확률 ≈ ${pct(pSym)}.`;
+  $('outStart').textContent = `${sijin(S.startTod)} ${hhmm(S.startTod)}`;
+  const toSet = SUN.set - S.startTod;
+  $('noteStart').textContent = toSet > 0 && S.startTod > SUN.rise ? `해 지기까지 ${durTxt(toSet)}. 신호간은 해가 지면 등화 없이는 멈춥니다.` : '밤입니다. 신호간은 여명(04:44경)까지 기다리고, 봉수는 횃불로 바로 전합니다.';
+  $('outSpace').textContent = `${S.spacing.toFixed(1)} km`;
+  const r = Math.max(1, S.line.d[1] / A.armCritKm);
+  $('noteSpace').textContent = `동래선 ${S.line.N}곳. ` + (r > 1.01 ? `6 m 팔이 4′보다 작게 보여 오독 ×${Math.pow(r, 3).toFixed(1)}, 판독 ×${(r * r).toFixed(1)}.` : '6 m 팔을 맨눈으로 읽을 수 있는 거리(5.2 km) 안쪽입니다.');
+  $('btnSeed').textContent = `다른 날로 바꾸기 · ${S.seed}번째 날`;
+  renderAssumptions();
+}
+
+function setParams(patch) {
+  const P = Object.assign({}, S.P, patch);
+  S.P = P;
+  if (S.started && S.t > S.t0) { S.tl = S.tl.filter(e => e.t < S.t); S.tl.push({ t: S.t, P }); }
+  else S.tl = [{ t: -Infinity, P }];
+  S.getP = timelineGetter(S.tl);
+  simulate();
+  updateLabels();
+  scheduleMC();
+  renderAll(true);
+}
+function setStructural(fn) {
+  fn();
+  rebuildLines();
+  resetRun();
+  buildMainLineSvg();
+  buildStrip();
+  updateLabels();
+  scheduleMC();
+  renderAll(true);
+}
+function updatePlayBtn() {
+  const b = $('btnPlay');
+  if (S.playing) b.textContent = '❚❚ 멈춤';
+  else if (!S.started) b.textContent = '▶ 급보 발신';
+  else if (S.t >= S.tEnd) b.textContent = '↺ 다시 보기';
+  else b.textContent = '▶ 이어서';
+}
+function bindControls() {
+  $('btnPlay').addEventListener('click', () => {
+    if (S.playing) { S.playing = false; }
+    else {
+      if (S.t >= S.tEnd) S.t = S.t0;
+      if (!S.started && S.view === 'full') setView('corr');
+      S.started = true; S.playing = true;
+    }
+    updatePlayBtn();
+  });
+  $('btnReset').addEventListener('click', () => { S.t = S.t0; S.playing = false; S.started = false; S.tl = [{ t: -Infinity, P: S.P }]; S.getP = timelineGetter(S.tl); simulate(); updatePlayBtn(); renderAll(true); });
+  $('btnSeed').addEventListener('click', () => setStructural(() => { S.seed++; }));
+  $('speed').addEventListener('change', e => { S.speed = e.target.value; });
+  $('scrub').addEventListener('input', e => {
+    S.t = S.t0 + (S.tEnd - S.t0) * (+e.target.value / 1000);
+    S.started = true; S.playing = false; updatePlayBtn(); renderAll(true);
+  });
+  $('inFog').addEventListener('input', e => setParams({ fog: +e.target.value / 100 }));
+  $('inRain').addEventListener('input', e => setParams({ rain: +e.target.value / 100 }));
+  $('inShift').addEventListener('input', e => setParams({ shiftH: +e.target.value }));
+  $('inErr').addEventListener('input', e => setParams({ err: +e.target.value / 1000 }));
+  $('inVerify').addEventListener('change', e => setParams({ verify: e.target.checked }));
+  $('inLamps').addEventListener('change', e => setParams({ lamps: e.target.checked }));
+  $('inStart').addEventListener('input', e => setStructural(() => { S.startTod = +e.target.value * 900; }));
+  $('inSpace').addEventListener('input', e => setStructural(() => { S.spacing = +e.target.value / 10; }));
+  $('vFull').addEventListener('click', () => setView('full'));
+  $('vCorr').addEventListener('click', () => setView('corr'));
+  // 창 크기·방향이 바뀌면 지도 글자 크기, 좁은 화면용 차트 배치를 다시 잡는다
+  let rz = 0;
+  window.addEventListener('resize', () => {
+    applyScale();
+    tipTouchHide();
+    clearTimeout(rz);
+    rz = setTimeout(() => {
+      for (const k in chartW) delete chartW[k];
+      renderErrChart(S.started && S.t > S.t0 ? S.t : S.t0, true);
+      renderCompare();
+    }, 80);
+  });
+  // 가로 폰 배치에서는 범례 줄 수(글꼴 로딩)에 따라 지도 높이가 바뀌므로 크기 변화도 지켜봄
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => applyScale()).observe(map);
+  // 노선 단면 말풍선(터치): 단면 밖을 누르거나 어디든 스크롤되면 닫음. 길게 눌러 끄는 동안에는 스크롤 대신 따라감
+  document.addEventListener('pointerdown', ev => { if (TT.pinned && !strip.contains(ev.target)) tipTouchHide(); }, true);
+  document.addEventListener('scroll', () => { if (TT.pinned && !TT.drag) tipTouchHide(); }, { capture: true, passive: true });
+  strip.addEventListener('touchmove', ev => { if (TT.drag && ev.cancelable) ev.preventDefault(); }, { passive: false });
+  strip.addEventListener('contextmenu', ev => { if (TT.id !== -1 || TT.drag) ev.preventDefault(); });
+  // 터치 화면의 슬라이더 모양(style.css)이 쓰는 채운 길이
+  document.querySelectorAll('input[type=range]').forEach(syncRange);
+  document.addEventListener('input', ev => { if (ev.target.type === 'range') syncRange(ev.target); });
+  bindRangeTouch();
+}
+function syncRange(el) {
+  const lo = +el.min || 0, hi = +el.max || 100;
+  el.style.setProperty('--f', ((+el.value - lo) / ((hi - lo) || 1)).toFixed(4));
+}
+// 터치 화면 슬라이더: 가로로 끌거나 탭하면 값이 바뀌고, 세로로 밀면 페이지만 스크롤된다.
+// (브라우저 기본 슬라이더는 손가락이 닿기만 해도 그 자리로 값이 튀고, 스크롤하는 동안에도 따라 움직임)
+// style.css 가 (pointer: coarse)일 때 슬라이더를 pointer-events: none 으로 두므로 둘레 .sl / .scrub 이 손가락을 받는다
+const coarse = typeof matchMedia === 'function' ? matchMedia('(pointer: coarse)') : { matches: false };
+function bindRangeTouch() {
+  const RT = { el: null, id: -1, x0: 0, y0: 0, on: false };
+  const setFromX = (el, x) => {   // 손잡이 26px — 가운데가 양 끝 13px 안쪽까지 움직임
+    const r = el.getBoundingClientRect(), lo = +el.min, hi = +el.max, st = +el.step || 1;
+    const f = Math.min(1, Math.max(0, (x - r.left - 13) / Math.max(1, r.width - 26)));
+    const v = String(Math.round(f * (hi - lo) / st) * st + lo);
+    if (el.value !== v) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }
+  };
+  for (const box of document.querySelectorAll('.sl, .scrub')) {
+    const el = box.querySelector('input[type=range]');
+    if (!el) continue;
+    box.addEventListener('pointerdown', ev => {
+      if (!coarse.matches || el.disabled) return;
+      const r = el.getBoundingClientRect();
+      if (ev.clientY < r.top - 4 || ev.clientY > r.bottom + 4 || ev.clientX < r.left - 8 || ev.clientX > r.right + 8) return;
+      Object.assign(RT, { el, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, on: ev.pointerType === 'mouse' });
+      if (RT.on) { box.setPointerCapture(ev.pointerId); setFromX(el, ev.clientX); }
+    });
+    box.addEventListener('pointermove', ev => {
+      if (ev.pointerId !== RT.id || RT.el !== el) return;
+      const dx = Math.abs(ev.clientX - RT.x0), dy = Math.abs(ev.clientY - RT.y0);
+      if (!RT.on && dx >= 6 && dx > dy) RT.on = true;
+      if (RT.on) setFromX(el, ev.clientX);
+    });
+    const end = ev => {
+      if (ev.pointerId !== RT.id || RT.el !== el) return;
+      if (ev.type === 'pointerup') {
+        if (!RT.on && Math.hypot(ev.clientX - RT.x0, ev.clientY - RT.y0) < 10) { RT.on = true; setFromX(el, ev.clientX); }   // 탭
+        if (RT.on) el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      RT.el = null; RT.id = -1;   // pointercancel = 세로 스크롤로 넘어감 → 값은 그대로
+    };
+    box.addEventListener('pointerup', end);
+    box.addEventListener('pointercancel', end);
+  }
+}
+
+// ===================================================================
+//  그리기
+// ===================================================================
+function lerpPt(a, b, f) { return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; }
+function renderAll(force) {
+  const t = S.t, rec = S.sem, b = S.bong, L = S.line, B = S.bline;
+  const P = S.getP(t), W = wx(P), dl = daylight(t);
+  const st = semState(t), bs = bongState(t);
+  const running = S.started && t > S.t0;
+
+  // --- 지도 ---
+  for (let i = 0; i < L.N; i++) {
+    let cls = 'st';
+    if (st.wait[i] === 'night') cls += ' night';
+    else if (st.wait[i] === 'fog' && st.logged[i] < rec.M) cls += ' fogw';
+    else if (st.logged[i] === rec.M && (st.disp[i] === rec.M - 1 || i === L.N - 1)) cls += ' done';
+    else if (st.logged[i] > 0) cls += ' on';
+    if (st.wrong[i]) cls += ' bad';
+    if (M.st[i].getAttribute('class') !== cls) M.st[i].setAttribute('class', cls);
+  }
+  for (let h = 1; h < L.N; h++) M.semFog[h - 1].setAttribute('opacity', ((1 - semHopP(h, t)) * 0.9).toFixed(2));
+  for (let h = 1; h < B.N; h++) M.bongFog[h - 1].setAttribute('opacity', ((1 - bongHopP(h, t)) * 0.75).toFixed(2));
+  for (let i = 0; i < B.N; i++) { const c = b.lit[i] <= t ? 'bongst lit' : 'bongst'; if (M.bongSt[i].getAttribute('class') !== c) M.bongSt[i].setAttribute('class', c); }
+  const doneSem = running && t >= rec.tAllArrive;
+  if (running && st.head >= 0) {
+    const tail = Math.max(0, st.tail);
+    const segPts = L.pts.slice(tail, st.head + 1);
+    M.msgSeg.setAttribute('d', segPts.length > 1 ? ptsD(segPts, false) : '');
+    M.donePath.setAttribute('d', doneSem ? ptsD(L.pts, false) : (st.tail > 0 ? ptsD(L.pts.slice(0, st.tail + 1), false) : ''));
+    const hp = L.pts[st.head];
+    M.head.setAttribute('cx', PX(hp[0])); M.head.setAttribute('cy', PY(hp[1])); M.head.setAttribute('opacity', 1);
+    M.headRing.setAttribute('cx', PX(hp[0])); M.headRing.setAttribute('cy', PY(hp[1])); M.headRing.setAttribute('opacity', doneSem ? 0 : 1);
+  } else { M.msgSeg.setAttribute('d', ''); M.donePath.setAttribute('d', ''); M.head.setAttribute('opacity', 0); M.headRing.setAttribute('opacity', 0); }
+  if (running && bs.last >= 0) {
+    M.bongDone.setAttribute('d', bs.last > 0 ? ptsD(B.pts.slice(0, bs.last + 1), false) : '');
+    const p = B.pts[bs.last];
+    M.bhead.setAttribute('cx', PX(p[0])); M.bhead.setAttribute('cy', PY(p[1])); M.bhead.setAttribute('opacity', 1);
+  } else { M.bongDone.setAttribute('d', ''); M.bhead.setAttribute('opacity', 0); }
+  const runs = running ? st.runners.map(r => lerpPt(L.pts[r.from], L.pts[r.from + 1], r.f)).concat(bs.runners.map(r => lerpPt(B.pts[r.from], B.pts[r.from + 1], r.f))) : [];
+  M.runners.forEach((c, i) => { if (i < runs.length) { c.setAttribute('cx', PX(runs[i][0])); c.setAttribute('cy', PY(runs[i][1])); c.setAttribute('opacity', 1); } else c.setAttribute('opacity', 0); });
+  M.nightOv.setAttribute('opacity', (0.42 * (1 - dl)).toFixed(3));
+  M.hazeOv.setAttribute('opacity', Math.min(0.32, P.fog * 0.38).toFixed(3));
+  $('rainFx').style.opacity = Math.min(0.7, 0.15 + W.R / 18).toFixed(3) * (W.R >= 0.05 ? 1 : 0);
+  // HUD
+  $('hudSj').textContent = sijin(t);
+  $('hudHm').textContent = hhmm(t) + (t >= 86400 ? ` · ${dayLabel(t)}` : '');
+  $('hudWx').textContent = `시정 ${W.V >= 10 ? W.V.toFixed(0) : W.V.toFixed(1)} km · ${visLabel(W.V)}${W.R >= 0.05 ? ' · ' + rainLabel(W.R) : ''} · ${dl > 0.9 ? '낮' : dl > 0.05 ? '박명' : '밤'}`;
+
+  // 선두 역이 지금 건 신호
+  const sig = $('hudSig');
+  if (running && st.head >= 0 && st.disp[st.head] >= 0 && t < rec.tDone) {
+    const i = st.head, k = st.disp[i], v = st.dispV[i];
+    let what;
+    if (k === 0) what = '始 — 전문 시작';
+    else if (k === rec.M - 1) what = '終 — 전문 끝';
+    else { const c = Math.floor((k - 1) / 2), [pp, ll] = MSG_CODES[c]; what = `‘${CODEBOOK[pp].lines[ll]}’의 ${k % 2 ? '쪽' : '줄'} 부호`; }
+    const key = i + ':' + k + ':' + v;
+    if (sig.dataset.key !== key) {
+      sig.dataset.key = key;
+      sig.innerHTML = `${armPic(v, 34)}<span>${i === L.N - 1 ? '목멱산' : i + '번 역'}이 건 ${k + 1}/16 신호<small>${what}${v !== MSG[k] ? ' · <b style="color:var(--crit)">잘못 읽힌 모양</b>' : ''}</small></span>`;
+    }
+    sig.hidden = false;
+  } else sig.hidden = true;
+
+  // --- 노선 단면 ---
+  const perSym = 2.6;
+  for (let i = 0; i < L.N; i++) {
+    let cls = 'tick';
+    if (st.wait[i] === 'night') cls += ' night';
+    else if (st.wait[i] === 'fog' && st.logged[i] < rec.M) cls += ' fogw';
+    else if (st.wait[i] === 'gap') cls += ' gap';
+    else if (st.logged[i] === rec.M && (st.disp[i] === rec.M - 1 || i === L.N - 1)) cls += ' done';
+    else if (st.logged[i] > 0) cls += ' on';
+    if (T.tick[i].getAttribute('class') !== cls) T.tick[i].setAttribute('class', cls);
+    const good = st.logged[i] - st.wrong[i];
+    T.lg[i].setAttribute('height', (good * perSym).toFixed(1));
+    T.lb[i].setAttribute('y', (57 + good * perSym).toFixed(1));
+    T.lb[i].setAttribute('height', (st.wrong[i] * perSym).toFixed(1));
+  }
+  for (let h = 1; h < L.N; h++) T.vis[h - 1].setAttribute('opacity', ((1 - semHopP(h, t)) * 0.85).toFixed(2));
+  for (let h = 1; h < B.N; h++) T.bvis[h - 1].setAttribute('opacity', ((1 - bongHopP(h, t)) * 0.85).toFixed(2));
+  for (let i = 0; i < B.N; i++) {
+    const c = b.lit[i] <= t && running ? 'bt lit' : (running && i === bs.last + 1) ? 'bt obs' : 'bt';
+    if (T.bt[i].getAttribute('class') !== c) T.bt[i].setAttribute('class', c);
+  }
+  T.night.setAttribute('opacity', (0.9 * (1 - dl)).toFixed(2));
+  const sr = running ? st.runners : [], br = running ? bs.runners : [];
+  T.srun.forEach((c, i) => { if (i < sr.length) { const r = sr[i]; c.setAttribute('cx', T.sx((L.x[r.from] + (L.x[r.from + 1] - L.x[r.from]) * r.f) / L.L)); c.setAttribute('opacity', 1); } else c.setAttribute('opacity', 0); });
+  T.brun.forEach((c, i) => { if (i < br.length) { const r = br[i]; c.setAttribute('cx', T.sx((B.x[r.from] + (B.x[r.from + 1] - B.x[r.from]) * r.f) / B.L)); c.setAttribute('opacity', 1); } else c.setAttribute('opacity', 0); });
+
+  // --- 상태 글 ---
+  const el = t - S.t0;
+  $('liveClock').textContent = `${dayLabel(t)} ${sijin(t)} ${hhmm(t)}`;
+  let semChip = ['idle', '발신 전'], semTxt = '';
+  if (!running) { semTxt = `${L.N}역 · ${Math.round(L.L)} km`; }
+  else if (t < rec.t0 + A.encodeSec) semChip = ['go', '동래부 부호화'];
+  else if (t >= rec.tDone) { const bad = rec.semanticWrong; semChip = bad ? ['bad', `도착 · 틀린 구절 ${bad}`] : ['ok', '도착 · 정확']; semTxt = `${durTxt(rec.tDone - rec.t0)} 만에 병조 도착`; }
+  else if (t >= rec.tAllArrive) { semChip = ['go', '병조 해독 중']; semTxt = '16신호 모두 수신'; }
+  else {
+    const anyNight = st.wait.some((w, i) => w === 'night' && st.logged[i - 1 >= 0 ? i - 1 : 0] > st.logged[i]);
+    const fogN = st.wait.filter((w, i) => w === 'fog' && i > 0 && st.logged[i - 1] > st.logged[i]).length;
+    const handoff = rec.runners.some(r => (r.t0 > t && r.t0 - t < 240) || (r.t1 <= t && t - r.t1 < 240));
+    if (st.runners.length) semChip = ['run', `주자 ${st.runners.length}명 달리는 중`];
+    else if (handoff) semChip = ['run', '주자 인계 중'];
+    else if (anyNight) semChip = ['wait', '야간 대기 · 여명까지'];
+    else if (fogN) semChip = ['wait', `안개 대기 ${fogN}구간`];
+    else semChip = ['go', '전송 중'];
+    semTxt = `선두 ${st.head}/${L.N - 1}역 · ${L.x[Math.max(0, st.head)].toFixed(0)} km`;
+  }
+  const chip = (id, c) => { const e = $(id); e.className = 'chip ' + c[0]; e.textContent = c[1]; };
+  chip('semChip', semChip); $('semTxt').textContent = semTxt;
+  let bChip = ['idle', '발신 전'], bTxt = `${B.N}곳 · ${Math.round(B.L)} km`;
+  if (running) {
+    if (t >= b.tDone) { bChip = b.correct ? ['ok', `도착 · ${b.levelAtEnd}거`] : ['bad', `도착 · ${b.levelAtEnd}거 (오독)`]; bTxt = `${durTxt(b.tDone - S.t0)} 만에 목멱산`; }
+    else {
+      if (bs.runners.length) bChip = ['run', '봉수군 달리는 중'];
+      else if (bs.wait === 'fog' || (bs.last < B.N - 1 && bongHopP(bs.last + 1, t) < 0.25)) bChip = ['wait', '다음 봉수대가 못 봄'];
+      else bChip = ['go', dl > 0.5 ? '연기로 전달 중' : '횃불로 전달 중'];
+      bTxt = `${Math.max(0, bs.last)}/${B.N - 1}곳 · ${B.x[Math.max(0, bs.last)].toFixed(0)} km`;
+    }
+  }
+  chip('bongChip', bChip); $('bongTxt').textContent = bTxt;
+  $('cElapsed').innerHTML = running ? durTxt(el).replace(/(\d+)/g, '$1') : '—';
+  $('cMis').textContent = running ? countUpTo(rec.misreads, t) : 0;
+  $('cCor').textContent = running ? countUpTo(rec.corrections, t) : 0;
+  $('cRun').textContent = running ? rec.runners.filter(r => r.t0 <= t).length + b.runners.filter(r => r.t0 <= t).length : 0;
+  let wsum = 0;
+  if (running) for (const w of rec.waits) for (const x of w) if (x.t0 < t && x.why !== 'gap') wsum += Math.min(t, x.t1) - x.t0;
+  $('cWait').textContent = running ? Math.round(wsum / 60).toLocaleString() : 0;
+  // 재생 막대
+  const scrub = $('scrub'), sv = Math.round((t - S.t0) / Math.max(1, S.tEnd - S.t0) * 1000);
+  if (+scrub.value !== sv) { scrub.value = sv; syncRange(scrub); }
+  $('scrubL').textContent = `${sijin(S.t0)} ${hhmm(S.t0)} 발신`;
+  $('scrubR').textContent = `${durTxt(S.tEnd - S.t0)} 뒤 ${hhmm(S.tEnd)}${S.tEnd >= 86400 ? ` (${dayLabel(S.tEnd)})` : ''}`;
+  if (running || force) renderMessage(running ? t : S.t0 - 1);
+  renderErrChart(running ? t : S.t0, force);
+  if (force) renderCompare();
+}
+
+// ---------- 재생 루프 ----------
+function curSpeed() {
+  if (S.speed !== 'auto') return +S.speed;
+  const el = S.t - S.t0;
+  if (S.t < S.sem.tDone && el < 3 * 3600) return 90;
+  if (el < 30 * 3600) return 1500;
+  return 6000;
+}
+function advance(dtReal) {
+  S.t = Math.min(S.tEnd, S.t + dtReal * curSpeed());
+  if (S.t >= S.tEnd) { S.playing = false; updatePlayBtn(); }
+}
+// 한 시계로 두 경로를 몬다: 평소엔 requestAnimationFrame, 그것이 멈춘 창(숨은 탭·일부 임베드)에서는 타이머
+let lastTick = 0;
+function tick() {
+  const now = performance.now();
+  const dt = lastTick ? Math.min(0.25, (now - lastTick) / 1000) : 0;
+  lastTick = now;
+  if (S.playing) { advance(dt); renderAll(false); }
+}
+function frame() { tick(); requestAnimationFrame(frame); }
+setInterval(() => { if (performance.now() - lastTick > 180) tick(); }, 100);
+
+// ---------- 시작 ----------
+function init() {
+  rebuildLines();
+  resetRun();
+  buildMap();
+  buildStrip();
+  bindControls();
+  updateLabels();
+  renderAll(true);
+  scheduleMC();
+  requestAnimationFrame(frame);
+}
+init();
+window.__app = { S, advance, renderAll, setParams, setStructural, setView, semState, bongState };
+
+// 로컬 점검용: ?t=분&view=corr&theme=light&fog=0.3 … (아티팩트에서는 쿼리가 전달되지 않아 무시됨)
+(function devHook() {
+  let q;
+  try { q = new URLSearchParams(location.search); } catch (e) { return; }
+  if (![...q.keys()].length) return;
+  if (q.get('theme')) document.documentElement.setAttribute('data-theme', q.get('theme'));
+  const patch = {};
+  for (const k of ['fog', 'rain', 'err']) if (q.has(k)) patch[k] = +q.get(k);
+  if (q.has('shift')) patch.shiftH = +q.get('shift');
+  if (q.has('verify')) patch.verify = q.get('verify') === '1';
+  if (q.has('lamps')) patch.lamps = q.get('lamps') === '1';
+  if (q.has('start') || q.has('space') || q.has('seed')) setStructural(() => {
+    if (q.has('start')) S.startTod = +q.get('start') * 3600;
+    if (q.has('space')) S.spacing = +q.get('space');
+    if (q.has('seed')) S.seed = +q.get('seed');
+  });
+  if (Object.keys(patch).length) setParams(patch);
+  if (q.has('view')) setView(q.get('view'), true);
+  if (q.has('t')) { S.started = true; S.t = Math.min(S.tEnd, S.t0 + +q.get('t') * 60); updatePlayBtn(); renderAll(true); }
+  if (q.has('adv')) $('adv').open = true;
+})();
+
+</script>
+</body>
+</html>

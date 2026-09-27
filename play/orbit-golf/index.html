@@ -1,0 +1,1809 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"><meta name="theme-color" content="#1a2350"></head><body>
+<title>궤도 골프</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --night: #1a2350;
+    --deep: #0f1433;
+    --paper: #f4ead5;
+    --paper-dim: rgba(244, 234, 213, .72);
+    --pink: #ff4f9a;
+    --sun: #ffc93c;
+    --mint: #43d9ad;
+    --tangerine: #ff7a3d;
+    --lilac: #a99bff;
+    --f-display: 'Bagel Fat One', 'Black Han Sans', 'Arial Black', system-ui, sans-serif;
+    --f-body: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+    --f-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--night); color: var(--paper);
+    font-family: var(--f-body); font-size: 14px;
+    overflow: hidden; overscroll-behavior: none; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; outline: none; }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 2;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 0;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    pointer-events: none;
+  }
+  .holeinfo { display: grid; gap: 2px; min-width: 0; }
+  .eyebrow {
+    font: 600 11px/1 var(--f-mono); letter-spacing: .14em; color: var(--sun);
+  }
+  .holename {
+    font: 400 clamp(22px, 3.2vw, 32px)/1.05 var(--f-display); color: var(--paper);
+    text-shadow: 2px 2px 0 var(--pink); letter-spacing: .01em; margin: 2px 0 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .holename.pop { animation: pop .5s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes pop { from { transform: translateY(-6px) scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+  .meta { display: flex; gap: 14px; flex-wrap: wrap; font: 500 12px/1.3 var(--f-mono); color: var(--paper-dim); letter-spacing: .04em; }
+  .meta b { color: var(--paper); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tools { display: flex; gap: 10px; pointer-events: auto; flex-shrink: 0; }
+
+  .btn {
+    font: 600 13px/1 var(--f-body); color: var(--night); background: var(--paper);
+    border: 0; border-radius: 999px; padding: 9px 14px; cursor: pointer;
+    box-shadow: 3px 3px 0 var(--pink);
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--pink); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--pink); }
+  .btn:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
+  .btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .btn.big { font-size: 16px; padding: 13px 22px; box-shadow: 4px 4px 0 var(--pink); }
+  .btn.ghost { background: transparent; color: var(--night); box-shadow: inset 0 0 0 2px var(--night); }
+  .btn.ghost:hover { box-shadow: inset 0 0 0 2px var(--night), 3px 3px 0 var(--pink); }
+  #btnSound[aria-pressed="false"] .wave { display: none; }
+  #btnSound[aria-pressed="true"] .mute { display: none; }
+
+  #hint {
+    position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); z-index: 2;
+    text-align: center; font: 500 12px/1.4 var(--f-mono); color: var(--paper-dim); letter-spacing: .04em;
+    pointer-events: none; font-variant-numeric: tabular-nums;
+  }
+
+  #toast {
+    position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 96px); z-index: 3;
+    transform: translate(-50%, -8px); max-width: min(560px, calc(100% - 32px));
+    background: var(--paper); color: var(--night); padding: 9px 16px; border-radius: 4px;
+    font: 600 13px/1.45 var(--f-body); text-align: center;
+    box-shadow: 3px 3px 0 var(--lilac); opacity: 0; pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- result stamp ---------- */
+  #stamp {
+    position: fixed; left: 50%; top: 46%; z-index: 4; pointer-events: none;
+    font: 400 clamp(56px, 13vmin, 130px)/1 var(--f-display); white-space: nowrap;
+    transform: translate(-50%, -50%) rotate(-7deg); color: var(--paper);
+    text-shadow: 5px 5px 0 var(--pink);
+  }
+  #stamp[data-ink="gold"] { color: var(--sun); }
+  #stamp[data-ink="mint"] { color: var(--mint); text-shadow: 5px 5px 0 var(--night), 8px 8px 0 var(--sun); }
+  #stamp[data-ink="pink"] { color: var(--pink); text-shadow: 5px 5px 0 var(--paper); }
+  #stamp.show { animation: stamp .42s cubic-bezier(.2, 1.5, .45, 1) both; }
+  @keyframes stamp {
+    from { transform: translate(-50%, -50%) rotate(-18deg) scale(2.3); opacity: 0; }
+    to { transform: translate(-50%, -50%) rotate(-7deg) scale(1); opacity: 1; }
+  }
+
+  /* ---------- sheets ---------- */
+  .sheet {
+    position: fixed; inset: 0; z-index: 5; display: grid; place-items: center;
+    padding: 16px; background: rgba(15, 20, 51, .55);
+  }
+  .panel {
+    position: relative; overflow: hidden;
+    width: min(440px, 100%); max-height: calc(100% - 8px); overflow-y: auto;
+    background: var(--paper); color: var(--night);
+    padding: 26px 26px 24px; border-radius: 6px; box-shadow: 8px 8px 0 var(--pink);
+    user-select: text; -webkit-user-select: text; touch-action: auto;
+  }
+  .panel::before {
+    /* halftone corner, like a riso print */
+    content: ''; position: absolute; right: -30px; top: -30px; width: 170px; height: 170px;
+    background-image: radial-gradient(circle, var(--sun) 1.6px, transparent 1.9px);
+    background-size: 8px 8px; transform: rotate(15deg);
+    -webkit-mask-image: radial-gradient(circle at 70% 30%, #000 20%, transparent 68%);
+    mask-image: radial-gradient(circle at 70% 30%, #000 20%, transparent 68%);
+    pointer-events: none;
+  }
+  .panel > * { position: relative; }
+  .kicker { font: 600 11px/1 var(--f-mono); letter-spacing: .16em; color: var(--pink); margin: 0 0 10px; }
+  .title {
+    font: 400 clamp(44px, 12vw, 62px)/.95 var(--f-display); margin: 0 0 12px;
+    color: var(--night); text-shadow: 3px 3px 0 var(--pink); text-wrap: balance;
+  }
+  .lede { font-size: 15px; line-height: 1.6; margin: 0 0 18px; max-width: 34em; }
+  .howto { list-style: none; padding: 0; margin: 0 0 22px; display: grid; gap: 10px; }
+  .howto li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; font-size: 13.5px; line-height: 1.5; }
+  .howto .sw { width: 16px; height: 16px; border-radius: 50%; margin-top: 2px; box-shadow: 2px 1.5px 0 var(--night); }
+  .howto b { font-weight: 600; }
+  .keys { font: 500 11.5px/1.5 var(--f-mono); color: rgba(26, 35, 80, .7); margin: -8px 0 20px; }
+  kbd {
+    font: 600 11px/1 var(--f-mono); background: var(--night); color: var(--paper);
+    padding: 3px 5px; border-radius: 3px; margin: 0 1px;
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+  #resTitle { font: 400 44px/1 var(--f-display); margin: 0 0 8px; text-shadow: 3px 3px 0 var(--pink); }
+  #resTitle[data-ink="gold"] { color: #d98f00; }
+  #resTitle[data-ink="mint"] { color: #13966f; }
+  #resTitle[data-ink="pink"] { color: #e0307d; text-shadow: 3px 3px 0 var(--sun); }
+  #resLine { font: 500 13px/1.5 var(--f-mono); margin: 0 0 16px; font-variant-numeric: tabular-nums; }
+  .dots { display: flex; gap: 7px; margin: 0 0 22px; flex-wrap: wrap; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--night); }
+  .dot.gold { background: var(--sun); } .dot.mint { background: var(--mint); }
+  .dot.paper { background: #fff9ea; box-shadow: inset 0 0 0 2px var(--night), inset 0 0 0 5px #fff9ea, inset 0 0 0 7px var(--night); }
+  .dot.pink { background: var(--pink); }
+  .dot.cur { outline: 2px solid var(--pink); outline-offset: 2px; }
+
+  .tablewrap { overflow-x: auto; margin: 0 0 14px; }
+  table.sc { border-collapse: collapse; font: 500 13px/1 var(--f-mono); font-variant-numeric: tabular-nums; min-width: 100%; }
+  table.sc th, table.sc td { padding: 8px 5px; text-align: center; border-bottom: 1.5px dashed rgba(26, 35, 80, .25); }
+  table.sc th[scope="row"] { text-align: left; font: 600 12px/1 var(--f-body); padding-right: 10px; white-space: nowrap; }
+  table.sc thead th { font-weight: 600; color: var(--pink); }
+  table.sc td.empty { color: rgba(26, 35, 80, .35); }
+  .chip { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-weight: 600; }
+  .chip.gold { background: var(--sun); } .chip.mint { background: var(--mint); }
+  .chip.paper { box-shadow: inset 0 0 0 1.5px var(--night); } .chip.pink { background: var(--pink); color: var(--paper); }
+  #cardTitle { font: 400 30px/1.1 var(--f-display); margin: 0 0 14px; text-shadow: 2px 2px 0 var(--pink); text-wrap: balance; }
+  #cardNote { font-size: 14px; line-height: 1.55; margin: 0 0 18px; }
+
+  @media (max-width: 560px) {
+    .meta { gap: 10px; font-size: 11px; }
+    .btn .lbl { display: none; }
+    .btn { padding: 9px 11px; }
+    .btn.big .lbl, .panel .btn .lbl { display: inline; }
+    #toast { top: calc(env(safe-area-inset-top, 0px) + 84px); font-size: 12.5px; }
+    .panel { padding: 22px 20px 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .holename.pop, #stamp.show { animation: none; }
+    #toast { transition: none; }
+  }
+
+  /* ---------- phones ---------- */
+  #hud { padding-left: calc(16px + env(safe-area-inset-left, 0px)); padding-right: calc(16px + env(safe-area-inset-right, 0px)); }
+  @media (hover: none) and (pointer: coarse) {
+    .btn { min-height: 44px; min-width: 44px; justify-content: center; }
+    .keys { display: none; }
+    .eyebrow, .kicker, .meta { font-size: 12px; }
+  }
+  /* phone held sideways: a wider, tighter sheet so the intro and its button fit without scrolling */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .sheet { padding: 8px 16px; }
+    .panel { width: min(720px, 100%); padding: 16px 24px 18px; }
+    .kicker { margin-bottom: 6px; }
+    .title { font-size: 40px; margin-bottom: 8px; }
+    .lede { font-size: 14px; line-height: 1.5; margin-bottom: 10px; }
+    .howto { gap: 6px; margin-bottom: 14px; }
+    .howto li { font-size: 13px; line-height: 1.45; }
+    #resTitle { font-size: 36px; }
+    .dots { margin-bottom: 14px; }
+    #cardTitle { margin-bottom: 8px; }
+  }
+</style>
+
+<canvas id="c" tabindex="0" aria-label="궤도 골프 코스. 끌어서 조준하고 놓아서 샷"></canvas>
+
+<header id="hud">
+  <div class="holeinfo">
+    <div class="eyebrow">HOLE <span id="hNum">01</span> / 09</div>
+    <div class="holename" id="hName">첫 발자국</div>
+    <div class="meta">
+      <span>PAR <b id="hPar">2</b></span>
+      <span>타수 <b id="hStrokes">0</b></span>
+      <span>합계 <b id="hTotal">±0</b></span>
+    </div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="btnSound" type="button" aria-pressed="true" aria-label="소리 켜기/끄기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z" fill="currentColor"/>
+        <path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.5a8 8 0 0 1 0 11"/>
+        <path class="mute" d="M16 9.5l5 5M21 9.5l-5 5"/>
+      </svg>
+      <span class="lbl">소리 켬</span>
+    </button>
+    <button class="btn" id="btnScore" type="button" aria-label="스코어카드">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+        <rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 10v10M15 10v10"/>
+      </svg>
+      <span class="lbl">스코어카드</span>
+    </button>
+  </div>
+</header>
+
+<div id="hint"></div>
+<div id="toast" hidden></div>
+<div id="stamp" hidden></div>
+
+<section class="sheet" id="intro" aria-labelledby="introTitle">
+  <div class="panel">
+    <p class="kicker">ORBIT GOLF · 9 HOLES · PAR 29</p>
+    <h1 class="title" id="introTitle">궤도 골프</h1>
+    <p class="lede">행성 아홉 곳에 깃발 아홉 개. 중력을 빌려 공을 휘게 해서 컵에 넣으세요. 행성들은 전부 공만 쳐다보고 있어요.</p>
+    <ul class="howto">
+      <li><span class="sw" style="background:#fffaf0;box-shadow:inset 0 0 0 1.5px var(--night),2px 1.5px 0 var(--pink)"></span><span><b>끌었다 놓기</b> — 새총처럼 뒤로 당긴 만큼 세게 날아가요. 점선은 처음 1초 남짓만 보여줍니다.</span></li>
+      <li><span class="sw" style="background:var(--mint)"></span><span><b>재질이 달라요</b> — 하늘색 얼음은 미끄럽고, 초록 이끼는 붙잡고, 분홍 젤리는 튕겨요.</span></li>
+      <li><span class="sw" style="background:var(--pink)"></span><span><b>1벌타</b> — 블랙홀에 빠지거나, 우주 밖으로 나가거나, 11초 동안 아무것도 못 닿으면.</span></li>
+    </ul>
+    <p class="keys">키보드: <kbd>←</kbd><kbd>→</kbd> 방향 · <kbd>↑</kbd><kbd>↓</kbd> 세기 · <kbd>Shift</kbd> 크게 · <kbd>Space</kbd> 샷</p>
+    <div class="row"><button class="btn big" id="btnStart" type="button"><span class="lbl">티오프</span></button></div>
+  </div>
+</section>
+
+<section class="sheet" id="result" hidden aria-live="polite">
+  <div class="panel">
+    <p class="kicker">홀 결과</p>
+    <h2 id="resTitle">파</h2>
+    <p id="resLine"></p>
+    <div class="dots" id="resDots" aria-label="홀별 결과"></div>
+    <div class="row">
+      <button class="btn big" id="btnNext" type="button">다음 홀 →</button>
+      <button class="btn ghost" id="btnRetry" type="button">이 홀 다시</button>
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="card" hidden aria-labelledby="cardTitle">
+  <div class="panel">
+    <p class="kicker">SCORECARD</p>
+    <h2 id="cardTitle">스코어카드</h2>
+    <div id="cardBody"></div>
+    <p id="cardNote"></p>
+    <div class="row">
+      <button class="btn big" id="btnRestart" type="button" hidden>처음부터 다시</button>
+      <button class="btn" id="btnCardClose" type="button">닫기</button>
+    </div>
+  </div>
+</section>
+
+<script>/* Orbit Golf — physics + course data. Pure, deterministic, no DOM.
+   Shared by the game page and tools/solve.mjs (node). */
+(function (root) {
+  'use strict';
+
+  const H = 1 / 240;          // fixed physics step (s)
+  const BALL_R = 7;
+  const MAX_POW = 820;         // px/s
+  const MIN_POW = 30;
+  const GP = 1.5;              // gravity falloff exponent: a = g * (r/d)^GP
+  const D2R = Math.PI / 180;
+  const MARGIN = 420;          // how far past the course edge before the ball is lost
+  const DRIFT_LIMIT = 11;      // seconds without touching anything
+  const CUP_CATCH = 13, CUP_ROLL = 175, CUP_DUNK = 260, CUP_PULL_R = 44;
+
+  // e: bounce, roll: rolling friction (1/s), grip: tangential loss on impact
+  const MAT = {
+    rock:   { e: 0.42, roll: 1.9,  grip: 0.22 },
+    ice:    { e: 0.30, roll: 0.42, grip: 0.03 },
+    moss:   { e: 0.08, roll: 7.5,  grip: 0.70 },
+    jelly:  { e: 0.93, roll: 2.2,  grip: 0.08 },
+    star:   { e: 0.70, roll: 2.0,  grip: 0.15 },
+    pebble: { e: 0.55, roll: 2.4,  grip: 0.18 },
+  };
+
+  // ---------------------------------------------------------------- course
+  // angles in degrees, screen convention: 0 = right, -90 = up, 90 = down
+  const LEVELS = [
+    {
+      name: '첫 발자국', par: 2, preview: 1.7,
+      tip: '화면을 뒤로 끌었다가 놓으면 반대쪽으로 날아가요.',
+      bodies: [
+        { x: 380, y: 640, r: 115, g: 420, mat: 'rock', ink: 'tangerine' },
+        { x: 1200, y: 460, r: 135, g: 420, mat: 'rock', ink: 'pink' },
+      ],
+      tee: { b: 0, a: -50 }, hole: { b: 1, a: -120 },
+    },
+    {
+      name: '새총', par: 3, preview: 1.3,
+      tip: '큰 행성의 중력을 빌려 휘어 돌아가 보세요.',
+      bodies: [
+        { x: 230, y: 790, r: 95, g: 420, mat: 'rock', ink: 'mint' },
+        { x: 790, y: 470, r: 200, g: 560, mat: 'rock', ink: 'tangerine' },
+        { x: 1380, y: 220, r: 95, g: 420, mat: 'rock', ink: 'pink' },
+      ],
+      tee: { b: 0, a: -70 }, hole: { b: 2, a: 115 },
+    },
+    {
+      name: '얼음과 이끼', par: 3, preview: 1.2,
+      tip: '하늘색 얼음은 미끄럽고, 초록 이끼는 공을 붙잡고, 분홍 젤리는 튕겨요.',
+      bodies: [
+        { x: 290, y: 300, r: 105, g: 400, mat: 'ice', ink: 'ice' },
+        { x: 800, y: 730, r: 95, g: 380, mat: 'jelly', ink: 'pink' },
+        { x: 1310, y: 380, r: 125, g: 430, mat: 'moss', ink: 'mint' },
+      ],
+      tee: { b: 0, a: -30 }, hole: { b: 2, a: 40 },
+    },
+    {
+      name: '달 타이밍', par: 3, preview: 1.1,
+      tip: '달이 행성 주위를 돕니다. 깃발은 늘 바깥쪽을 향해요.',
+      bodies: [
+        { x: 250, y: 520, r: 105, g: 420, mat: 'rock', ink: 'sun' },
+        { x: 1060, y: 500, r: 140, g: 460, mat: 'rock', ink: 'tangerine' },
+        { x: 0, y: 0, r: 56, g: 300, mat: 'moss', ink: 'mint', lock: true,
+          orbit: { around: 1, R: 300, period: 9, phase: 180 } },
+      ],
+      tee: { b: 0, a: 0 }, hole: { b: 2, a: 180 },
+    },
+    {
+      name: '사건의 지평선', par: 3, preview: 1.1,
+      tip: '블랙홀에 빠지면 1벌타. 위아래 작은 행성을 쿠션으로 쓰세요.',
+      bodies: [
+        { x: 200, y: 500, r: 95, g: 420, mat: 'rock', ink: 'mint' },
+        { x: 800, y: 150, r: 62, g: 360, mat: 'jelly', ink: 'pink' },
+        { x: 800, y: 850, r: 62, g: 360, mat: 'jelly', ink: 'pink' },
+        { x: 1400, y: 500, r: 105, g: 430, mat: 'rock', ink: 'sun' },
+      ],
+      blackholes: [{ x: 800, y: 500, mu: 2.4e7, hr: 24 }],
+      tee: { b: 0, a: 0 }, hole: { b: 3, a: -55 },
+    },
+    {
+      name: '웜홀', par: 3, preview: 1.1,
+      tip: '보라색 고리로 들어가면 짝 고리로 나옵니다. 속도는 그대로.',
+      bodies: [
+        { x: 230, y: 740, r: 100, g: 420, mat: 'rock', ink: 'sun' },
+        { x: 800, y: 150, r: 165, g: 300, mat: 'rock', ink: 'tangerine' },
+        { x: 800, y: 500, r: 165, g: 300, mat: 'rock', ink: 'tangerine' },
+        { x: 800, y: 850, r: 165, g: 300, mat: 'rock', ink: 'tangerine' },
+        { x: 1360, y: 390, r: 95, g: 420, mat: 'moss', ink: 'mint' },
+      ],
+      portals: [{ a: { x: 420, y: 330 }, b: { x: 1230, y: 800 }, r: 30 }],
+      tee: { b: 0, a: -40 }, hole: { b: 4, a: 65 },
+    },
+    {
+      name: '반발성', par: 3, preview: 1.1,
+      tip: '하얀 별은 공을 밀어냅니다. 성질이 고약해요.',
+      bodies: [
+        { x: 240, y: 260, r: 95, g: 420, mat: 'rock', ink: 'pink' },
+        { x: 830, y: 360, r: 62, g: -300, mat: 'star', ink: 'paper' },
+        { x: 1310, y: 680, r: 115, g: 440, mat: 'rock', ink: 'tangerine' },
+      ],
+      tee: { b: 0, a: 20 }, hole: { b: 2, a: -150 },
+    },
+    {
+      name: '소행성대', par: 4, preview: 1.0,
+      tip: '작은 돌멩이들은 중력이 약하지만 잘 튕깁니다.',
+      bodies: [
+        { x: 190, y: 820, r: 92, g: 420, mat: 'rock', ink: 'mint' },
+        { x: 1400, y: 260, r: 120, g: 440, mat: 'rock', ink: 'pink' },
+        { x: 820, y: 520, r: 70, g: 380, mat: 'jelly', ink: 'pink' },
+        // belt (generated below)
+      ],
+      belt: { seed: 7, n: 26, x0: 470, y0: 80, x1: 1150, y1: 930, width: 170, rmin: 13, rmax: 30 },
+      tee: { b: 0, a: -45 }, hole: { b: 1, a: 160 },
+    },
+    {
+      name: '대미', par: 5, preview: 1.0,
+      tip: '지금까지 배운 걸 전부 쓰세요.',
+      bodies: [
+        { x: 170, y: 190, r: 82, g: 420, mat: 'ice', ink: 'ice' },
+        { x: 420, y: 640, r: 80, g: 380, mat: 'jelly', ink: 'pink' },
+        { x: 1250, y: 430, r: 125, g: 460, mat: 'rock', ink: 'tangerine' },
+        { x: 0, y: 0, r: 50, g: 300, mat: 'moss', ink: 'mint', lock: true,
+          orbit: { around: 2, R: 255, period: 8, phase: 90 } },
+      ],
+      blackholes: [{ x: 780, y: 560, mu: 2.0e7, hr: 24 }],
+      portals: [{ a: { x: 700, y: 120 }, b: { x: 1480, y: 860 }, r: 30 }],
+      tee: { b: 0, a: 30 }, hole: { b: 3, a: 90 },
+    },
+  ];
+
+  // small deterministic PRNG for asteroid belts
+  function mulberry(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function genBelt(def, bodies) {
+    const B = def.belt, rnd = mulberry(B.seed);
+    const dx = B.x1 - B.x0, dy = B.y1 - B.y0, L = Math.hypot(dx, dy);
+    const nx = -dy / L, ny = dx / L;
+    let tries = 0;
+    const out = [];
+    while (out.length < B.n && tries++ < 4000) {
+      const u = rnd(), v = (rnd() - 0.5) * B.width;
+      const r = B.rmin + (B.rmax - B.rmin) * Math.pow(rnd(), 1.6);
+      const x = B.x0 + dx * u + nx * v, y = B.y0 + dy * u + ny * v;
+      let ok = true;
+      for (const o of bodies.concat(out)) {
+        if (Math.hypot(o.x - x, o.y - y) < o.r + r + 26) { ok = false; break; }
+      }
+      if (ok) out.push({ x, y, r, g: 70, mat: 'pebble', ink: 'rock' });
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------- world
+  function makeWorld(def) {
+    let defs = def.bodies.slice();
+    if (def.belt) defs = defs.concat(genBelt(def, defs));
+    const w = {
+      def, name: def.name, par: def.par, preview: def.preview || 1.2, tip: def.tip || '',
+      W: def.W || 1600, H: def.H || 1000,
+      bodies: [], blackholes: [], portals: [],
+      tee: def.tee, hole: def.hole, moving: false,
+    };
+    defs.forEach((b, i) => {
+      let orbit = null;
+      if (b.orbit) {
+        const p = defs[b.orbit.around];
+        orbit = { cx: p.x, cy: p.y, R: b.orbit.R, om: (2 * Math.PI / b.orbit.period) * (b.orbit.dir || 1),
+                  ph: (b.orbit.phase || 0) * D2R, period: b.orbit.period, around: b.orbit.around };
+        w.moving = true;
+      }
+      w.bodies.push({
+        i, x: b.x, y: b.y, r: b.r, g: b.g, mu: b.g * Math.pow(b.r, GP),
+        mat: b.mat || 'rock', ink: b.ink || 'rock', orbit, lock: !!b.lock,
+        face: b.r >= 38,
+      });
+    });
+    (def.blackholes || []).forEach(h => w.blackholes.push({ x: h.x, y: h.y, mu: h.mu, hr: h.hr || 24 }));
+    (def.portals || []).forEach(p => w.portals.push({ a: { x: p.a.x, y: p.a.y }, b: { x: p.b.x, y: p.b.y }, r: p.r || 30 }));
+    return w;
+  }
+
+  // kinematic body state at time t -> out {x,y,vx,vy,rot}
+  function bodyAt(b, t, out) {
+    out = out || {};
+    const o = b.orbit;
+    if (!o) { out.x = b.x; out.y = b.y; out.vx = 0; out.vy = 0; out.rot = 0; return out; }
+    const a = o.ph + o.om * t, c = Math.cos(a), s = Math.sin(a);
+    out.x = o.cx + o.R * c; out.y = o.cy + o.R * s;
+    out.vx = -o.R * o.om * s; out.vy = o.R * o.om * c;
+    out.rot = b.lock ? a - o.ph : 0;
+    return out;
+  }
+
+  const _p = {}, _q = {};
+
+  // where the cup is at time t: centre of a ball sitting in it, plus outward normal
+  function cupAt(w, t, out) {
+    out = out || {};
+    const b = w.bodies[w.hole.b];
+    bodyAt(b, t, _q);
+    const a = w.hole.a * D2R + _q.rot;
+    out.nx = Math.cos(a); out.ny = Math.sin(a);
+    out.sx = _q.x + out.nx * b.r; out.sy = _q.y + out.ny * b.r;       // surface point
+    out.x = _q.x + out.nx * (b.r + BALL_R); out.y = _q.y + out.ny * (b.r + BALL_R);
+    out.vx = _q.vx; out.vy = _q.vy; out.ang = a;
+    return out;
+  }
+
+  // ---------------------------------------------------------------- ball
+  function newBall() {
+    return { x: 0, y: 0, vx: 0, vy: 0, mode: 'rest', ab: 0, al: 0, restT: 0, freeT: 0, flyT: 0,
+             contact: -1, portalLock: -1, lastRest: null };
+  }
+
+  function attach(w, s, bi, localAng, t) {
+    s.mode = 'rest'; s.ab = bi; s.al = localAng;
+    s.restT = 0; s.contact = bi;
+    placeAttached(w, s, t);
+    s.lastRest = { b: bi, a: localAng };
+  }
+
+  function placeAttached(w, s, t) {
+    const b = w.bodies[s.ab];
+    bodyAt(b, t, _p);
+    const a = s.al + _p.rot, d = b.r + BALL_R;
+    s.x = _p.x + Math.cos(a) * d; s.y = _p.y + Math.sin(a) * d;
+    s.vx = _p.vx; s.vy = _p.vy;
+  }
+
+  function teeBall(w, t) {
+    const s = newBall();
+    attach(w, s, w.tee.b, w.tee.a * D2R, t || 0);
+    return s;
+  }
+
+  function shoot(w, s, t, ang, pow) {
+    placeAttached(w, s, t);
+    pow = Math.max(MIN_POW, Math.min(MAX_POW, pow));
+    s.vx += Math.cos(ang) * pow; s.vy += Math.sin(ang) * pow;
+    s.mode = 'fly'; s.flyT = 0; s.freeT = 0; s.restT = 0; s.contact = -1; s.portalLock = -1;
+  }
+
+  function accel(w, x, y, t, out) {
+    let ax = 0, ay = 0;
+    const bs = w.bodies;
+    for (let i = 0; i < bs.length; i++) {
+      const b = bs[i];
+      bodyAt(b, t, _p);
+      const dx = _p.x - x, dy = _p.y - y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1e-6;
+      const dd = d < b.r ? b.r : d;
+      const a = b.mu / Math.pow(dd, GP);
+      ax += a * dx / d; ay += a * dy / d;
+    }
+    const hs = w.blackholes;
+    for (let i = 0; i < hs.length; i++) {
+      const h = hs[i];
+      const dx = h.x - x, dy = h.y - y;
+      const d2 = dx * dx + dy * dy, d = Math.sqrt(d2) || 1e-6;
+      const a = h.mu / Math.max(d2, h.hr * h.hr);
+      ax += a * dx / d; ay += a * dy / d;
+    }
+    out.ax = ax; out.ay = ay;
+    return out;
+  }
+
+  const _a = {}, _c = {};
+
+  function lose(s, why, ev) {
+    s.mode = why === 'bh' ? 'dead' : 'lost';
+    if (ev) ev.push({ type: why === 'bh' ? 'bh' : 'lost', why, x: s.x, y: s.y });
+  }
+
+  // advance ball by one fixed step; t = time at start of step. Pushes events to ev (may be null).
+  function step(w, s, t, ev) {
+    if (s.mode === 'rest') { placeAttached(w, s, t + H); return; }
+    if (s.mode !== 'fly') return;
+    const t1 = t + H;
+
+    accel(w, s.x, s.y, t, _a);
+    s.vx += _a.ax * H; s.vy += _a.ay * H;
+    s.x += s.vx * H; s.y += s.vy * H;
+    s.flyT += H;
+
+    // black holes
+    for (let i = 0; i < w.blackholes.length; i++) {
+      const h = w.blackholes[i];
+      if (Math.hypot(s.x - h.x, s.y - h.y) < h.hr) { s.bh = i; lose(s, 'bh', ev); return; }
+    }
+
+    // portals (bidirectional; must leave the exit ring before re-entering)
+    if (s.portalLock >= 0) {
+      const pl = w.portals[s.portalLock >> 1], end = (s.portalLock & 1) ? pl.b : pl.a;
+      if (Math.hypot(s.x - end.x, s.y - end.y) > pl.r + 4) s.portalLock = -1;
+    }
+    if (s.portalLock < 0) {
+      for (let i = 0; i < w.portals.length; i++) {
+        const p = w.portals[i];
+        for (let k = 0; k < 2; k++) {
+          const from = k ? p.b : p.a, to = k ? p.a : p.b;
+          if (Math.hypot(s.x - from.x, s.y - from.y) < p.r * 0.7) {
+            const ox = s.x - from.x, oy = s.y - from.y;
+            s.x = to.x + ox; s.y = to.y + oy;
+            s.portalLock = i * 2 + (k ? 0 : 1);
+            if (ev) ev.push({ type: 'portal', i, fx: from.x, fy: from.y, tx: to.x, ty: to.y });
+            break;
+          }
+        }
+        if (s.portalLock >= 0) break;
+      }
+    }
+
+    // collisions
+    let contact = -1, cvx = 0, cvy = 0;
+    for (let i = 0; i < w.bodies.length; i++) {
+      const b = w.bodies[i];
+      bodyAt(b, t1, _p);
+      let dx = s.x - _p.x, dy = s.y - _p.y;
+      const minD = b.r + BALL_R, d2 = dx * dx + dy * dy;
+      if (d2 >= minD * minD) continue;
+      const d = Math.sqrt(d2) || 1e-6;
+      const nx = dx / d, ny = dy / d, tx = -ny, ty = nx;
+      s.x = _p.x + nx * minD; s.y = _p.y + ny * minD;
+      const rvx = s.vx - _p.vx, rvy = s.vy - _p.vy;
+      let vn = rvx * nx + rvy * ny, vt = rvx * tx + rvy * ty;
+      const m = MAT[b.mat];
+      if (vn < 0) {
+        const imp = -vn;
+        vt *= 1 - m.grip * Math.min(1, imp / 300);
+        vn = imp > 45 ? imp * m.e : 0;
+        if (imp > 45 && ev) ev.push({ type: 'bounce', b: i, speed: imp, x: s.x - nx * BALL_R, y: s.y - ny * BALL_R, nx, ny });
+      }
+      vt *= Math.exp(-m.roll * H);
+      s.vx = _p.vx + nx * vn + tx * vt; s.vy = _p.vy + ny * vn + ty * vt;
+      contact = i; cvx = _p.vx; cvy = _p.vy;
+    }
+    s.contact = contact;
+
+    // cup
+    cupAt(w, t1, _c);
+    const cd = Math.hypot(s.x - _c.x, s.y - _c.y);
+    if (contact === w.hole.b && cd < CUP_PULL_R && cd > 0.5) {
+      // the green slopes gently into the cup
+      const k = (40 + 170 * (1 - cd / CUP_PULL_R)) * H;
+      s.vx += (_c.x - s.x) / cd * k; s.vy += (_c.y - s.y) / cd * k;
+    }
+    // rolling balls faster than CUP_ROLL skip over the lip; a clean dunk from the air gets a bit more slack
+    if (cd < CUP_CATCH && Math.hypot(s.vx - _c.vx, s.vy - _c.vy) < (contact === w.hole.b ? CUP_ROLL : CUP_DUNK)) {
+      s.mode = 'sunk';
+      if (ev) ev.push({ type: 'sink', x: _c.x, y: _c.y });
+      return;
+    }
+
+    // settle
+    if (contact >= 0) {
+      s.freeT = 0;
+      const rel = Math.hypot(s.vx - cvx, s.vy - cvy);
+      s.restT = rel < 9 ? s.restT + H : 0;
+      if (s.restT > 0.3) {
+        bodyAt(w.bodies[contact], t1, _p);
+        attach(w, s, contact, Math.atan2(s.y - _p.y, s.x - _p.x) - _p.rot, t1);
+        if (ev) ev.push({ type: 'rest', b: contact });
+        return;
+      }
+    } else {
+      s.restT = 0; s.freeT += H;
+    }
+
+    if (s.x < -MARGIN || s.x > w.W + MARGIN || s.y < -MARGIN || s.y > w.H + MARGIN) return lose(s, 'oob', ev);
+    if (s.freeT > DRIFT_LIMIT) return lose(s, 'drift', ev);
+    if (s.flyT > 40) {
+      if (contact >= 0) {
+        bodyAt(w.bodies[contact], t1, _p);
+        attach(w, s, contact, Math.atan2(s.y - _p.y, s.x - _p.x) - _p.rot, t1);
+        if (ev) ev.push({ type: 'rest', b: contact });
+      } else lose(s, 'drift', ev);
+    }
+  }
+
+  // run a whole shot to completion (for the solver). Returns {mode, t, steps, ball}
+  function runShot(w, s, t0, maxSteps) {
+    let t = t0, n = 0;
+    maxSteps = maxSteps || 12000;
+    while (s.mode === 'fly' && n < maxSteps) { step(w, s, t, null); t += H; n++; }
+    return { mode: s.mode, t, steps: n };
+  }
+
+  const OG = { H, BALL_R, MAX_POW, MIN_POW, GP, D2R, MAT, LEVELS, MARGIN,
+               makeWorld, bodyAt, cupAt, newBall, attach, placeAttached, teeBall, shoot, step, runShot, accel };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = OG;
+  else root.OG = OG;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* Orbit Golf — rendering, input, audio, flow. Depends on window.OG (sim.js). */
+(function () {
+  'use strict';
+  const OG = window.OG;
+  const H = OG.H, D2R = OG.D2R;
+  const TAU = Math.PI * 2;
+
+  const INK = {
+    night: '#1a2350', deep: '#0f1433', paper: '#f4ead5', pink: '#ff4f9a', sun: '#ffc93c',
+    mint: '#43d9ad', tangerine: '#ff7a3d', lilac: '#a99bff', ice: '#9fe3ff', rock: '#c9b8a6',
+  };
+  // planet base ink + the ink that peeks out from a slightly misregistered second pass
+  const PAL = {
+    tangerine: { base: INK.tangerine, off: INK.pink },
+    pink: { base: '#ff62a8', off: INK.sun },
+    mint: { base: INK.mint, off: INK.sun },
+    sun: { base: INK.sun, off: INK.tangerine },
+    ice: { base: INK.ice, off: INK.lilac },
+    paper: { base: INK.paper, off: INK.sun },
+    rock: { base: INK.rock, off: INK.tangerine },
+  };
+  const MAX_STROKES = 10;
+
+  // ------------------------------------------------------------ dom
+  const $ = id => document.getElementById(id);
+  const canvas = $('c'), ctx = canvas.getContext('2d');
+  const el = {
+    hud: $('hud'), num: $('hNum'), name: $('hName'), par: $('hPar'), strokes: $('hStrokes'), total: $('hTotal'),
+    hint: $('hint'), toast: $('toast'), stamp: $('stamp'),
+    intro: $('intro'), result: $('result'), card: $('card'),
+    resTitle: $('resTitle'), resLine: $('resLine'), resDots: $('resDots'), btnNext: $('btnNext'), btnRetry: $('btnRetry'),
+    cardBody: $('cardBody'), cardTitle: $('cardTitle'), cardNote: $('cardNote'), btnCardClose: $('btnCardClose'), btnRestart: $('btnRestart'),
+    btnStart: $('btnStart'), btnSound: $('btnSound'), btnScore: $('btnScore'),
+  };
+  const coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ------------------------------------------------------------ state
+  const S = {
+    li: 0, world: null, ball: null, t: 0, acc: 0, time: 0, levelT: 0,
+    phase: 'intro', phaseT: 0, strokes: 0, scores: [],
+    aim: { drag: false, kb: false, sx: 0, sy: 0, cx: 0, cy: 0, ang: 0, pow: 0, valid: false },
+    trail: [], trailFade: 0, parts: [], faces: [], shake: 0,
+    ev: [], sinkFrom: null, bhFrom: null, cup: {},
+  };
+  const V = { cw: 1280, ch: 720, dpr: 1, sc: 1, rot: false, ox: 640, oy: 360 };
+  let sprites = [], bg = null, grain = null, twinkles = [];
+
+  // ------------------------------------------------------------ view transform
+  function w2s(x, y, o) {
+    let u = x - S.world.W / 2, v = y - S.world.H / 2;
+    if (V.rot) { const t = u; u = -v; v = t; }
+    o = o || {};
+    o.x = V.ox + u * V.sc; o.y = V.oy + v * V.sc;
+    return o;
+  }
+  function s2wVec(a, b) { return V.rot ? { x: b, y: -a } : { x: a, y: b }; }
+  function w2sVec(u, v) { return V.rot ? { x: -v, y: u } : { x: u, y: v }; }
+
+  function layout() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    let cw = canvas.clientWidth || window.innerWidth, ch = canvas.clientHeight || window.innerHeight;
+    if (!cw || !ch) { cw = 1280; ch = 720; }
+    V.cw = cw; V.ch = ch; V.dpr = dpr;
+    canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+    const hudB = el.hud.getBoundingClientRect().bottom;
+    const top = Math.max(60, Math.min(ch * 0.25, (hudB || 70) + 4));
+    const bot = coarse ? 30 : 38;
+    const aw = cw - 20, ah = ch - top - bot;
+    const W = S.world.W, Hh = S.world.H;
+    V.rot = ah > aw * 1.12;
+    const ww = V.rot ? Hh : W, wh = V.rot ? W : Hh;
+    V.sc = Math.min(aw / ww, ah / wh);
+    V.ox = cw / 2; V.oy = top + ah / 2;
+    buildSprites(); buildBg();
+  }
+
+  // ------------------------------------------------------------ seeded rng (visual only)
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0; let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function mkCanvas(w, h) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); return c; }
+
+  // ------------------------------------------------------------ planet sprites (risograph print)
+  function buildSprites() {
+    sprites = S.world.bodies.map((b, i) => {
+      const R = Math.max(3, b.r * V.sc), pad = Math.max(4, R * 0.08) + 3;
+      const k = V.dpr, size = (R + pad) * 2;
+      const cv = mkCanvas(size * k, size * k), g = cv.getContext('2d');
+      g.scale(k, k);
+      const c = R + pad, pal = PAL[b.ink] || PAL.rock, r = rng(1000 * (S.li + 1) + i * 17);
+      const off = Math.max(1.2, R * 0.035);
+      // second ink pass, misregistered
+      g.fillStyle = pal.off; g.beginPath(); g.arc(c + off, c + off * 0.8, R, 0, TAU); g.fill();
+      g.fillStyle = pal.base; g.beginPath(); g.arc(c, c, R, 0, TAU); g.fill();
+      g.save(); g.beginPath(); g.arc(c, c, R, 0, TAU); g.clip();
+
+      if (b.mat === 'rock' || b.mat === 'pebble') {
+        const n = b.mat === 'pebble' ? 3 : 4 + Math.floor(r() * 4);
+        for (let j = 0; j < n; j++) {
+          const a = r() * TAU, d = Math.sqrt(r()) * R * 0.78, cr = R * (0.08 + r() * 0.16);
+          const x = c + Math.cos(a) * d, y = c + Math.sin(a) * d;
+          g.fillStyle = 'rgba(26,35,80,.20)'; g.beginPath(); g.arc(x, y, cr, 0, TAU); g.fill();
+          g.strokeStyle = 'rgba(244,234,213,.35)'; g.lineWidth = Math.max(0.8, cr * 0.18);
+          g.beginPath(); g.arc(x + cr * 0.12, y + cr * 0.12, cr, Math.PI * 0.95, Math.PI * 1.75); g.stroke();
+        }
+      } else if (b.mat === 'ice') {
+        g.strokeStyle = 'rgba(244,234,213,.85)'; g.lineWidth = Math.max(1, R * 0.018);
+        for (let j = 0; j < 5; j++) {
+          let a = r() * TAU, x = c + Math.cos(a) * R * r() * 0.5, y = c + Math.sin(a) * R * r() * 0.5;
+          g.beginPath(); g.moveTo(x, y);
+          for (let s = 0; s < 4; s++) { a += (r() - 0.5) * 1.4; x += Math.cos(a) * R * 0.22; y += Math.sin(a) * R * 0.22; g.lineTo(x, y); }
+          g.stroke();
+        }
+        g.fillStyle = 'rgba(244,234,213,.45)';
+        g.beginPath(); g.ellipse(c - R * 0.35, c - R * 0.42, R * 0.34, R * 0.12, -0.6, 0, TAU); g.fill();
+      } else if (b.mat === 'moss') {
+        for (let j = 0; j < R * 3.2; j++) {
+          const a = r() * TAU, d = Math.sqrt(r()) * R, s = 0.8 + r() * Math.max(1, R * 0.035);
+          g.fillStyle = r() < 0.6 ? 'rgba(18,110,80,.55)' : 'rgba(255,201,60,.55)';
+          g.beginPath(); g.arc(c + Math.cos(a) * d, c + Math.sin(a) * d, s, 0, TAU); g.fill();
+        }
+      } else if (b.mat === 'jelly') {
+        for (let j = 0; j < 6; j++) {
+          const a = r() * TAU, d = Math.sqrt(r()) * R * 0.7, s = R * (0.05 + r() * 0.08);
+          g.strokeStyle = 'rgba(244,234,213,.7)'; g.lineWidth = Math.max(0.8, s * 0.25);
+          g.beginPath(); g.arc(c + Math.cos(a) * d, c + Math.sin(a) * d, s, 0, TAU); g.stroke();
+        }
+        g.fillStyle = 'rgba(244,234,213,.65)';
+        g.beginPath(); g.ellipse(c - R * 0.38, c - R * 0.45, R * 0.28, R * 0.14, -0.7, 0, TAU); g.fill();
+      } else if (b.mat === 'star') {
+        g.strokeStyle = 'rgba(255,201,60,.9)'; g.lineWidth = Math.max(1, R * 0.05);
+        for (let j = 1; j <= 3; j++) { g.beginPath(); g.arc(c, c, R * (0.28 * j), 0, TAU); g.stroke(); }
+      }
+
+      // halftone shading: dots of night ink on the side away from the light, on a rotated grid
+      if (b.mat !== 'star') {
+        const sp = Math.max(3.1, R / 13), rot = 0.33, cs = Math.cos(rot), sn = Math.sin(rot);
+        const L = [-0.52, -0.62, 0.59];
+        g.fillStyle = 'rgba(26,35,80,.78)';
+        for (let gy = -R - sp; gy <= R + sp; gy += sp) {
+          for (let gx = -R - sp; gx <= R + sp; gx += sp) {
+            const px = gx * cs - gy * sn, py = gx * sn + gy * cs;
+            const nx = px / R, ny = py / R, q = 1 - nx * nx - ny * ny;
+            if (q <= 0) continue;
+            const lam = nx * L[0] + ny * L[1] + Math.sqrt(q) * L[2];
+            const dark = Math.min(1, Math.max(0, 0.5 - lam) * 1.25);
+            if (dark < 0.04) continue;
+            g.beginPath(); g.arc(c + px, c + py, sp * 0.62 * Math.sqrt(dark), 0, TAU); g.fill();
+          }
+        }
+      }
+      g.restore();
+      // highlight nick
+      if (R > 10) {
+        g.strokeStyle = 'rgba(244,234,213,.7)'; g.lineWidth = Math.max(1, R * 0.03); g.lineCap = 'round';
+        g.beginPath(); g.arc(c, c, R * 0.84, Math.PI * 1.08, Math.PI * 1.3); g.stroke();
+      }
+      return { cv, R, pad, size };
+    });
+    S.faces = S.world.bodies.map((b, i) => S.faces[i] && S.facesLevel === S.li ? S.faces[i] : {
+      blink: 0, nextBlink: 1 + Math.random() * 4, squint: 0, wobT: 9, wobA: 0, lx: 0, ly: 0,
+    });
+    S.facesLevel = S.li;
+  }
+
+  // ------------------------------------------------------------ background (stars, nebula, registration marks)
+  function buildBg() {
+    const k = V.dpr, cw = V.cw, ch = V.ch;
+    bg = mkCanvas(cw * k, ch * k);
+    const g = bg.getContext('2d'); g.scale(k, k);
+    g.fillStyle = INK.night; g.fillRect(0, 0, cw, ch);
+    const vg = g.createRadialGradient(cw / 2, ch * 0.45, Math.min(cw, ch) * 0.2, cw / 2, ch / 2, Math.max(cw, ch) * 0.75);
+    vg.addColorStop(0, 'rgba(15,20,51,0)'); vg.addColorStop(1, 'rgba(15,20,51,.85)');
+    g.fillStyle = vg; g.fillRect(0, 0, cw, ch);
+    const r = rng(77 + S.li * 13);
+    // halftone nebulae
+    const nebInk = ['rgba(169,155,255,', 'rgba(255,79,154,', 'rgba(67,217,173,'];
+    for (let n = 0; n < 3; n++) {
+      const nx = r() * cw, ny = r() * ch, nr = Math.min(cw, ch) * (0.25 + r() * 0.3), ink = nebInk[(n + S.li) % 3];
+      const sp = 7;
+      for (let y = ny - nr; y < ny + nr; y += sp) for (let x = nx - nr; x < nx + nr; x += sp) {
+        const d = Math.hypot(x - nx, y - ny) / nr;
+        if (d >= 1) continue;
+        const wob = 0.5 + 0.5 * Math.sin(x * 0.013 + y * 0.009 + n * 3);
+        const s = (1 - d) * (1 - d) * wob * 2.1;
+        if (s < 0.25) continue;
+        g.fillStyle = ink + '.22)'; g.beginPath(); g.arc(x, y, s, 0, TAU); g.fill();
+      }
+    }
+    // stars
+    twinkles = [];
+    const nStars = Math.round(cw * ch / 5200);
+    for (let i = 0; i < nStars; i++) {
+      const x = r() * cw, y = r() * ch, s = 0.4 + Math.pow(r(), 3) * 1.6, t = r();
+      g.fillStyle = t < 0.06 ? INK.sun : t < 0.1 ? INK.pink : t < 0.13 ? INK.mint : INK.paper;
+      g.globalAlpha = 0.25 + r() * 0.6; g.beginPath(); g.arc(x, y, s, 0, TAU); g.fill();
+      if (i % 9 === 0) twinkles.push({ x, y, s: 1 + r() * 1.5, ph: r() * TAU, sp: 0.6 + r() * 1.6 });
+    }
+    g.globalAlpha = 1;
+    // registration marks at the course corners + print slug
+    const W = S.world.W, Hh = S.world.H;
+    const corners = [[0, 0], [W, 0], [0, Hh], [W, Hh]];
+    g.strokeStyle = 'rgba(244,234,213,.22)'; g.lineWidth = 1;
+    const p = {};
+    for (const [x, y] of corners) {
+      w2s(x, y, p);
+      g.beginPath(); g.arc(p.x, p.y, 7, 0, TAU); g.moveTo(p.x - 12, p.y); g.lineTo(p.x + 12, p.y); g.moveTo(p.x, p.y - 12); g.lineTo(p.x, p.y + 12); g.stroke();
+    }
+    w2s(0, Hh, p);
+    g.fillStyle = 'rgba(244,234,213,.28)'; g.font = '500 10px "IBM Plex Mono", ui-monospace, monospace';
+    g.textBaseline = 'top';
+    const slug = `ORBIT GOLF · HOLE ${String(S.li + 1).padStart(2, '0')} · PAR ${S.world.par} · C M Y K`;
+    if (!V.rot && !coarse) g.fillText(slug, p.x + 16, p.y + 6);   // on phones this corner is where the touch hint sits
+    // orbits + gravity contours
+    for (const b of S.world.bodies) {
+      if (b.orbit) {
+        w2s(b.orbit.cx, b.orbit.cy, p);
+        g.setLineDash([5, 7]); g.strokeStyle = 'rgba(244,234,213,.22)';
+        g.beginPath(); g.arc(p.x, p.y, b.orbit.R * V.sc, 0, TAU); g.stroke(); g.setLineDash([]);
+        continue;
+      }
+      if (b.mat === 'pebble') continue;
+      w2s(b.x, b.y, p);
+      const ga = Math.abs(b.g);
+      for (const a of [90, 34]) {
+        const d = Math.min(b.r * 3.4, b.r * Math.pow(ga / a, 1 / OG.GP));
+        if (d < b.r * 1.15) continue;
+        g.setLineDash([1.2, 5.5]); g.lineCap = 'round'; g.lineWidth = 1.2;
+        g.strokeStyle = b.g < 0 ? 'rgba(255,79,154,.35)' : 'rgba(244,234,213,.16)';
+        g.beginPath(); g.arc(p.x, p.y, d * V.sc, 0, TAU); g.stroke();
+      }
+      g.setLineDash([]);
+    }
+    if (!grain) {
+      grain = mkCanvas(180, 180);
+      const gg = grain.getContext('2d'), gr = rng(5);
+      for (let i = 0; i < 2600; i++) {
+        gg.fillStyle = gr() < 0.5 ? 'rgba(244,234,213,.10)' : 'rgba(10,12,30,.16)';
+        gg.fillRect(gr() * 180, gr() * 180, 1, 1);
+      }
+      grain.pattern = ctx.createPattern(grain, 'repeat');
+    }
+  }
+
+  // ------------------------------------------------------------ audio (all synthesized)
+  const AU = { ctx: null, master: null, dly: null, on: true, nextTw: 0 };
+  try { AU.on = localStorage.getItem('orbitgolf.sound') !== 'off'; } catch (e) { /* storage blocked */ }
+
+  function audioInit() {
+    if (AU.ctx) { if (AU.ctx.state === 'suspended') AU.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const a = new AC();
+    const comp = a.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
+    const master = a.createGain(); master.gain.value = AU.on ? 0.75 : 0;
+    master.connect(comp); comp.connect(a.destination);
+    const dly = a.createDelay(1); dly.delayTime.value = 0.34;
+    const fb = a.createGain(); fb.gain.value = 0.38;
+    const dlp = a.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 2400;
+    dly.connect(dlp); dlp.connect(fb); fb.connect(dly); dlp.connect(master);
+    AU.ctx = a; AU.master = master; AU.dly = dly; AU.nextTw = a.currentTime + 1.5;
+  }
+
+  function tone(f0, dur, o) {
+    if (!AU.ctx) return;
+    o = o || {};
+    const a = AU.ctx, t = a.currentTime + (o.when || 0);
+    const osc = a.createOscillator(), g = a.createGain();
+    osc.type = o.type || 'sine';
+    osc.frequency.setValueAtTime(f0, t);
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + (o.glide || dur));
+    const v = o.vol == null ? 0.3 : o.vol;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v, t + (o.att || 0.005));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let node = osc;
+    if (o.lp) { const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(o.lp, t); if (o.lpTo) f.frequency.exponentialRampToValueAtTime(o.lpTo, t + dur); osc.connect(f); node = f; }
+    node.connect(g); g.connect(AU.master);
+    if (o.echo) { const e = a.createGain(); e.gain.value = o.echo; g.connect(e); e.connect(AU.dly); }
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+
+  let noiseBuf = null;
+  function noise(dur, o) {
+    if (!AU.ctx) return;
+    o = o || {};
+    const a = AU.ctx, t = a.currentTime + (o.when || 0);
+    if (!noiseBuf) {
+      noiseBuf = a.createBuffer(1, a.sampleRate * 0.5, a.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const src = a.createBufferSource(); src.buffer = noiseBuf;
+    const f = a.createBiquadFilter(); f.type = o.ft || 'bandpass'; f.frequency.value = o.f || 2000; f.Q.value = o.q || 1;
+    const g = a.createGain(); const v = o.vol == null ? 0.3 : o.vol;
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(AU.master);
+    src.start(t); src.stop(t + dur + 0.02);
+  }
+
+  const sfx = {
+    hit(p) { noise(0.05, { f: 2600, q: 1.3, vol: 0.25 + p * 0.35 }); tone(150 + p * 60, 0.12, { to: 60, vol: 0.35 + p * 0.2 }); },
+    bounce(speed, b) {
+      const v = Math.min(1, speed / 600);
+      if (v < 0.08) return;
+      const size = Math.sqrt(90 / b.r);
+      if (b.mat === 'jelly') tone(170 * size, 0.22, { to: 560 * size, glide: 0.16, vol: 0.18 + v * 0.25, type: 'sine' });
+      else if (b.mat === 'ice') { tone(1500 * size, 0.18, { vol: 0.08 + v * 0.12, echo: 0.3 }); tone(2250 * size, 0.12, { vol: 0.05 + v * 0.08 }); }
+      else if (b.mat === 'moss') noise(0.09, { f: 380, q: 0.8, vol: 0.12 + v * 0.3, ft: 'lowpass' });
+      else if (b.mat === 'star') tone(900, 0.14, { to: 260, type: 'square', vol: 0.05 + v * 0.07, lp: 2400 });
+      else { tone(260 * size, 0.09, { to: 150 * size, type: 'triangle', vol: 0.12 + v * 0.3 }); noise(0.03, { f: 1800, vol: 0.05 + v * 0.12 }); }
+    },
+    sink(hio) {
+      tone(620, 0.08, { to: 300, vol: 0.3, type: 'triangle' });
+      const seq = hio ? [523, 659, 784, 1047, 1319, 1568] : [523, 659, 784, 1047];
+      seq.forEach((f, i) => tone(f, 0.32, { when: 0.12 + i * 0.085, type: 'triangle', vol: 0.16, echo: 0.35 }));
+    },
+    bh() { tone(320, 1.2, { to: 28, type: 'sawtooth', vol: 0.18, lp: 1800, lpTo: 90 }); noise(1.0, { f: 300, q: 0.6, vol: 0.12, ft: 'lowpass' }); },
+    portal() { tone(300, 0.16, { to: 1400, vol: 0.14 }); tone(1400, 0.2, { to: 300, vol: 0.12, when: 0.12, echo: 0.3 }); },
+    lost() { tone(392, 0.22, { type: 'triangle', vol: 0.16 }); tone(277, 0.4, { type: 'triangle', vol: 0.16, when: 0.2 }); },
+    tick() { tone(1800, 0.03, { vol: 0.04 }); },
+  };
+
+  function musicTick() {
+    if (!AU.ctx || !AU.on) return;
+    const a = AU.ctx;
+    if (a.currentTime < AU.nextTw) return;
+    const scale = [0, 2, 4, 7, 9, 12, 14, 16, 19];
+    const root = 523.25;
+    const n = scale[Math.floor(Math.random() * scale.length)];
+    tone(root * Math.pow(2, n / 12), 1.4, { vol: 0.035, att: 0.01, echo: 0.6 });
+    if (Math.random() < 0.3) tone(root * Math.pow(2, (n + 7) / 12) / 2, 1.8, { vol: 0.025, when: 0.18, echo: 0.6 });
+    AU.nextTw = a.currentTime + 1.6 + Math.random() * 2.8;
+  }
+
+  function setSound(on) {
+    AU.on = on;
+    try { localStorage.setItem('orbitgolf.sound', on ? 'on' : 'off'); } catch (e) { /* ignore */ }
+    if (AU.master) AU.master.gain.setTargetAtTime(on ? 0.75 : 0, AU.ctx.currentTime, 0.05);
+    el.btnSound.setAttribute('aria-pressed', on ? 'true' : 'false');
+    el.btnSound.querySelector('.lbl').textContent = on ? '소리 켬' : '소리 끔';
+  }
+
+  // ------------------------------------------------------------ flow
+  function loadLevel(i, keepScore) {
+    S.li = i;
+    S.world = OG.makeWorld(OG.LEVELS[i]);
+    S.t = 0; S.acc = 0; S.levelT = 0;
+    S.ball = OG.teeBall(S.world, 0);
+    S.strokes = 0; S.trail = []; S.parts = []; S.sinkFrom = null; S.bhFrom = null;
+    if (!keepScore) S.scores[i] = undefined;
+    S.aim.drag = false; S.aim.kb = false; S.aim.valid = false;
+    setPhase(S.phase === 'intro' ? 'intro' : 'aim');
+    if (S.phase === 'intro') S.levelT = 5; // course already laid out behind the title card
+    layout();
+    updateHud();
+    el.name.classList.remove('pop'); void el.name.offsetWidth; el.name.classList.add('pop');
+    if (S.phase !== 'intro') toast(S.world.tip, 4.5);
+  }
+
+  function setPhase(p) { S.phase = p; S.phaseT = 0; updateHint(); }
+
+  function totalDiff() {
+    let d = 0, any = false;
+    S.scores.forEach((s, i) => { if (s != null) { d += s - OG.LEVELS[i].par; any = true; } });
+    return any ? d : 0;
+  }
+  function fmtDiff(d) { return d === 0 ? '±0' : (d > 0 ? '+' + d : '−' + Math.abs(d)); }
+
+  function updateHud() {
+    el.num.textContent = String(S.li + 1).padStart(2, '0');
+    el.name.textContent = S.world.name;
+    el.par.textContent = S.world.par;
+    el.strokes.textContent = S.strokes;
+    el.total.textContent = fmtDiff(totalDiff());
+  }
+
+  function updateHint() {
+    let h = '';
+    if (S.phase === 'aim') {
+      if (S.aim.valid) h = `세기 ${Math.round(S.aim.pow / OG.MAX_POW * 100)}% · 방향 ${Math.round(((-S.aim.ang / D2R) % 360 + 360) % 360)}°` + (S.aim.kb ? ' · Space로 샷' : ' · 놓으면 샷');
+      else h = coarse ? '공 반대쪽으로 끌었다가 놓기' : '끌었다가 놓아서 샷 · ←→ 방향 ↑↓ 세기 Space 샷';
+    } else if (S.phase === 'fly') {
+      const left = 11 - S.ball.freeT;
+      h = S.ball.freeT > 6 ? `우주 미아까지 ${left.toFixed(1)}초` : '비행 중…';
+    } else if (S.phase === 'intro') h = '';
+    if (el.hint.textContent !== h) el.hint.textContent = h;
+  }
+
+  let toastTimer = 0;
+  function toast(msg, secs) {
+    if (!msg) return;
+    el.toast.textContent = msg;
+    el.toast.hidden = false;
+    el.toast.classList.remove('show'); void el.toast.offsetWidth; el.toast.classList.add('show');
+    toastTimer = secs || 2.5;
+  }
+
+  function resultName(strokes, par) {
+    const d = strokes - par;
+    if (strokes === 1) return { t: '홀인원!', cls: 'gold' };
+    if (d <= -3) return { t: '알바트로스!', cls: 'gold' };
+    if (d === -2) return { t: '이글!', cls: 'gold' };
+    if (d === -1) return { t: '버디!', cls: 'mint' };
+    if (d === 0) return { t: '파', cls: 'paper' };
+    if (d === 1) return { t: '보기', cls: 'pink' };
+    if (d === 2) return { t: '더블 보기', cls: 'pink' };
+    if (d === 3) return { t: '트리플 보기', cls: 'pink' };
+    return { t: '+' + d, cls: 'pink' };
+  }
+
+  function showStamp(txt, cls) {
+    el.stamp.textContent = txt;
+    el.stamp.dataset.ink = cls;
+    el.stamp.setAttribute('data-shadow', txt);
+    el.stamp.hidden = false;
+    el.stamp.classList.remove('show'); void el.stamp.offsetWidth; el.stamp.classList.add('show');
+  }
+
+  function finishHole(gaveUp) {
+    const n = gaveUp ? MAX_STROKES : S.strokes;
+    S.scores[S.li] = n;
+    updateHud();
+    const r = gaveUp ? { t: '다음 기회에', cls: 'pink' } : resultName(n, S.world.par);
+    if (!gaveUp) showStamp(r.t, r.cls);
+    el.resTitle.textContent = r.t;
+    el.resTitle.dataset.ink = r.cls;
+    el.resLine.textContent = gaveUp ? `${MAX_STROKES}타에서 멈췄어요 · 파 ${S.world.par}` : `${n}타 · 파 ${S.world.par} · 합계 ${fmtDiff(totalDiff())}`;
+    renderDots();
+    el.btnNext.textContent = S.li === OG.LEVELS.length - 1 ? '스코어카드 보기' : '다음 홀 →';
+    setPhase('result');
+    setTimeout(() => {
+      if (S.phase !== 'result') return;
+      el.stamp.hidden = true;
+      el.result.hidden = false;
+      el.btnNext.focus({ preventScroll: true });
+    }, gaveUp ? 300 : 1350);
+  }
+
+  function renderDots() {
+    el.resDots.innerHTML = '';
+    OG.LEVELS.forEach((L, i) => {
+      const s = document.createElement('span');
+      const v = S.scores[i];
+      s.className = 'dot' + (v == null ? '' : ' ' + resultName(v, L.par).cls) + (i === S.li ? ' cur' : '');
+      s.title = `${i + 1}번 홀` + (v == null ? '' : ` · ${v}타`);
+      el.resDots.appendChild(s);
+    });
+  }
+
+  function nextHole() {
+    el.result.hidden = true;
+    if (S.li >= OG.LEVELS.length - 1) { openCard(true); return; }
+    loadLevel(S.li + 1);
+  }
+
+  function retryHole() {
+    el.result.hidden = true;
+    loadLevel(S.li);
+  }
+
+  function openCard(final) {
+    const rows = OG.LEVELS.map((L, i) => ({ par: L.par, s: S.scores[i] }));
+    const parTot = rows.reduce((a, r) => a + r.par, 0);
+    const played = rows.filter(r => r.s != null);
+    const sTot = played.reduce((a, r) => a + r.s, 0);
+    let html = '<div class="tablewrap"><table class="sc"><thead><tr><th scope="row">홀</th>';
+    rows.forEach((r, i) => { html += `<th scope="col">${i + 1}</th>`; });
+    html += '<th scope="col">합</th></tr></thead><tbody><tr><th scope="row">파</th>';
+    rows.forEach(r => { html += `<td>${r.par}</td>`; });
+    html += `<td>${parTot}</td></tr><tr><th scope="row">타수</th>`;
+    rows.forEach(r => {
+      html += r.s == null ? '<td class="empty">·</td>' : `<td><span class="chip ${resultName(r.s, r.par).cls}">${r.s}</span></td>`;
+    });
+    html += `<td><b>${played.length ? sTot : '·'}</b></td></tr></tbody></table></div>`;
+    el.cardBody.innerHTML = html;
+    const d = totalDiff();
+    let best = null;
+    if (final && played.length === rows.length) {
+      try {
+        best = parseInt(localStorage.getItem('orbitgolf.best'), 10);
+        if (!(best <= sTot)) { localStorage.setItem('orbitgolf.best', String(sTot)); }
+      } catch (e) { best = null; }
+    }
+    el.cardTitle.textContent = final ? '라운드 끝!' : '스코어카드';
+    if (final) {
+      const verdict = d <= -4 ? '중력을 손바닥 위에 올려놓으셨네요.' : d <= 0 ? '궤도 역학 자격증 발급 완료.' : d <= 6 ? '행성들이 박수를 치고 있어요.' : '우주는 넓고 공은 작았습니다.';
+      el.cardNote.textContent = `합계 ${sTot}타 (${fmtDiff(d)}). ${verdict}` + (best && best < sTot ? ` 최고 기록 ${best}타.` : best == null || isNaN(best) ? '' : best === sTot ? ' 최고 기록 타이!' : ' 새 최고 기록!');
+    } else {
+      el.cardNote.textContent = played.length ? `지금까지 ${played.length}개 홀 · ${fmtDiff(d)}` : '아직 끝낸 홀이 없어요.';
+    }
+    el.btnRestart.hidden = !final;
+    el.btnCardClose.hidden = !!final;
+    el.card.hidden = false;
+    (final ? el.btnRestart : el.btnCardClose).focus({ preventScroll: true });
+    if (final) setPhase('done');
+  }
+
+  function restartAll() {
+    el.card.hidden = true;
+    S.scores = [];
+    S.phase = 'aim';
+    loadLevel(0);
+  }
+
+  // ------------------------------------------------------------ shooting
+  function doShoot(ang, pow) {
+    if (S.phase !== 'aim' || S.ball.mode !== 'rest') return;
+    S.strokes++;
+    OG.shoot(S.world, S.ball, S.t, ang, pow);
+    S.trail = []; S.trailFade = 1;
+    S.aim.drag = false; S.aim.kb = false; S.aim.valid = false;
+    setPhase('fly');
+    sfx.hit(pow / OG.MAX_POW);
+    const p = w2s(S.ball.x, S.ball.y);
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * TAU, v = 30 + Math.random() * 60;
+      S.parts.push({ x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.35, max: 0.35, c: INK.paper, s: 1.5, k: 'dot' });
+    }
+    updateHud();
+  }
+
+  function kbAimInit() {
+    if (S.aim.kb || S.aim.valid) return;
+    const b = S.world.bodies[S.ball.ab];
+    const p = OG.bodyAt(b, S.t);
+    S.aim.ang = Math.atan2(S.ball.y - p.y, S.ball.x - p.x);
+    S.aim.pow = OG.MAX_POW * 0.45;
+    S.aim.kb = true; S.aim.valid = true;
+  }
+
+  // ------------------------------------------------------------ events from physics
+  function onEvent(e) {
+    const W = S.world;
+    if (e.type === 'bounce') {
+      const b = W.bodies[e.b];
+      sfx.bounce(e.speed, b);
+      const f = S.faces[e.b];
+      if (f && e.speed > 90) { f.squint = 0.55; f.wobT = 0; f.wobA = Math.min(0.1, e.speed / 5000) * (b.mat === 'jelly' ? 2.2 : 1); }
+      if (e.speed > 380 && !reduceMotion) S.shake = Math.min(7, e.speed / 120);
+      const p = w2s(e.x, e.y), n = w2sVec(e.nx, e.ny);
+      const pal = PAL[b.ink] || PAL.rock;
+      const cnt = Math.min(10, 2 + Math.floor(e.speed / 80));
+      for (let i = 0; i < cnt; i++) {
+        const a = Math.atan2(n.y, n.x) + (Math.random() - 0.5) * 2.2, v = 40 + Math.random() * e.speed * 0.25;
+        S.parts.push({ x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.45, max: 0.45, c: i % 3 ? pal.base : INK.paper, s: 1.2 + Math.random() * 1.8, k: 'dot' });
+      }
+    } else if (e.type === 'portal') {
+      sfx.portal();
+      for (const q of [[e.fx, e.fy], [e.tx, e.ty]]) {
+        const p = w2s(q[0], q[1]);
+        S.parts.push({ x: p.x, y: p.y, life: 0.5, max: 0.5, c: INK.lilac, s: 30 * V.sc, k: 'ring' });
+      }
+      S.trail.push(null);
+    } else if (e.type === 'sink') {
+      S.sinkFrom = { x: S.ball.x, y: S.ball.y };
+      sfx.sink(S.strokes === 1);
+      const c = OG.cupAt(W, S.t);
+      const p = w2s(c.sx, c.sy), n = w2sVec(c.nx, c.ny);
+      const inks = [INK.pink, INK.sun, INK.mint, INK.paper, INK.lilac, INK.tangerine];
+      const count = S.strokes === 1 ? 140 : 70;
+      for (let i = 0; i < count; i++) {
+        const a = Math.atan2(n.y, n.x) + (Math.random() - 0.5) * 1.9, v = 120 + Math.random() * 380;
+        S.parts.push({ x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1.6 + Math.random(), max: 2.4, c: inks[i % inks.length], s: 3 + Math.random() * 4, k: 'conf', r: Math.random() * TAU, vr: (Math.random() - 0.5) * 14, g: 260 });
+      }
+      S.parts.push({ x: p.x, y: p.y, life: 0.7, max: 0.7, c: INK.sun, s: 60, k: 'ring' });
+      S.faces.forEach(f => { f.happy = 2.8; });
+      setPhase('sinking');
+    } else if (e.type === 'bh') {
+      const h = W.blackholes[S.ball.bh || 0];
+      S.bhFrom = { hx: h.x, hy: h.y, a: Math.atan2(S.ball.y - h.y, S.ball.x - h.x), d: Math.hypot(S.ball.x - h.x, S.ball.y - h.y) + 30 };
+      sfx.bh();
+      S.strokes++;
+      setPhase('bh');
+      toast('블랙홀에 삼켜졌어요 · 1벌타', 2);
+    } else if (e.type === 'lost') {
+      sfx.lost();
+      S.strokes++;
+      setPhase('lost');
+      toast(e.why === 'oob' ? '우주 밖으로 날아갔어요 · 1벌타' : '우주 미아가 됐어요 · 1벌타', 2);
+    } else if (e.type === 'rest') {
+      if (S.strokes >= MAX_STROKES) { finishHole(true); return; }
+      setPhase('aim');
+    }
+    updateHud();
+  }
+
+  function respawn() {
+    const lr = S.ball.lastRest || { b: S.world.tee.b, a: S.world.tee.a * D2R };
+    S.ball = OG.newBall();
+    OG.attach(S.world, S.ball, lr.b, lr.a, S.t);
+    S.trail = [];
+    const p = w2s(S.ball.x, S.ball.y);
+    S.parts.push({ x: p.x, y: p.y, life: 0.4, max: 0.4, c: INK.paper, s: 16, k: 'ring' });
+    if (S.strokes >= MAX_STROKES) { finishHole(true); return; }
+    setPhase('aim');
+    updateHud();
+  }
+
+  // ------------------------------------------------------------ update
+  function update(dt) {
+    S.time += dt; S.levelT += dt; S.phaseT += dt;
+    if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) el.toast.classList.remove('show'); }
+
+    S.acc += dt;
+    let n = 0;
+    while (S.acc >= H && n < 30) {
+      S.ev.length = 0;
+      OG.step(S.world, S.ball, S.t, S.ev);
+      S.t += H; S.acc -= H; n++;
+      for (let i = 0; i < S.ev.length; i++) onEvent(S.ev[i]);
+    }
+    if (n >= 30) S.acc = 0;
+
+    if (S.phase === 'fly') {
+      S.trail.push({ x: S.ball.x, y: S.ball.y });
+      if (S.trail.length > 140) S.trail.shift();
+      if (S.ball.freeT > 6) updateHint();
+    } else if (S.trailFade > 0 && S.phase !== 'fly') {
+      S.trailFade = Math.max(0, S.trailFade - dt * 0.8);
+    }
+    if (S.phase === 'sinking' && S.phaseT > 0.45) finishHole(false);
+    if (S.phase === 'bh' && S.phaseT > 1.1) respawn();
+    if (S.phase === 'lost' && S.phaseT > 1.0) respawn();
+
+    // faces
+    for (const f of S.faces) {
+      f.nextBlink -= dt;
+      if (f.nextBlink <= 0) { f.blink = 0.13; f.nextBlink = 2 + Math.random() * 5; }
+      if (f.blink > 0) f.blink -= dt;
+      if (f.squint > 0) f.squint -= dt;
+      if (f.happy > 0) f.happy -= dt;
+      f.wobT += dt;
+    }
+    // particles
+    for (let i = S.parts.length - 1; i >= 0; i--) {
+      const p = S.parts[i];
+      p.life -= dt;
+      if (p.life <= 0) { S.parts.splice(i, 1); continue; }
+      if (p.vx != null) {
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        const drag = p.k === 'conf' ? 1.6 : 3; p.vx *= Math.exp(-drag * dt); p.vy *= Math.exp(-drag * dt);
+        if (p.g) p.vy += p.g * dt;
+        if (p.vr) p.r += p.vr * dt;
+      }
+    }
+    S.shake *= Math.exp(-dt * 10);
+    musicTick();
+  }
+
+  // ------------------------------------------------------------ drawing
+  const P = {}, Q = {};
+  function easeOutBack(x) { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }
+  function popScale(i) {
+    const x = Math.min(1, Math.max(0, (S.levelT - 0.05 - i * 0.07) / 0.5));
+    return x >= 1 ? 1 : Math.max(0, easeOutBack(x));
+  }
+
+  function draw() {
+    const W = S.world, k = V.dpr;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.drawImage(bg, 0, 0, V.cw, V.ch);
+    if (S.shake > 0.2) ctx.translate((Math.random() - 0.5) * S.shake, (Math.random() - 0.5) * S.shake);
+
+    // twinkles
+    for (const s of twinkles) {
+      const a = 0.5 + 0.5 * Math.sin(S.time * s.sp + s.ph);
+      if (a < 0.6) continue;
+      ctx.globalAlpha = (a - 0.6) * 2;
+      ctx.strokeStyle = INK.paper; ctx.lineWidth = 1;
+      const r = s.s * 2.4 * a;
+      ctx.beginPath(); ctx.moveTo(s.x - r, s.y); ctx.lineTo(s.x + r, s.y); ctx.moveTo(s.x, s.y - r); ctx.lineTo(s.x, s.y + r); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    const ball = S.ball;
+    const bp = w2s(ball.x, ball.y, {});
+
+    // portals
+    W.portals.forEach((q, qi) => {
+      [q.a, q.b].forEach((e, j) => {
+        w2s(e.x, e.y, P);
+        const R = q.r * V.sc * popScale(W.bodies.length + qi);
+        if (R <= 0) return;
+        const gr = ctx.createRadialGradient(P.x, P.y, 0, P.x, P.y, R * 1.6);
+        gr.addColorStop(0, 'rgba(15,20,51,1)'); gr.addColorStop(0.55, 'rgba(169,155,255,.35)'); gr.addColorStop(1, 'rgba(169,155,255,0)');
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(P.x, P.y, R * 1.6, 0, TAU); ctx.fill();
+        ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(S.time * (j ? -1.4 : 1.4));
+        ctx.strokeStyle = INK.lilac; ctx.lineWidth = Math.max(2, R * 0.16); ctx.setLineDash([R * 0.5, R * 0.28]);
+        ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+        for (let m = 0; m < 3; m++) {
+          const a = m * TAU / 3 + S.time * 2.6, rr = R * (0.35 + 0.3 * ((S.time * 0.8 + m / 3) % 1));
+          ctx.fillStyle = INK.paper; ctx.beginPath(); ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, Math.max(1.2, R * 0.06), 0, TAU); ctx.fill();
+        }
+        ctx.restore();
+        ctx.fillStyle = 'rgba(244,234,213,.8)'; ctx.font = `600 ${Math.max(9, Math.round(R * 0.45))}px "IBM Plex Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(j ? 'B' : 'A', P.x, P.y + R * 1.55);
+      });
+    });
+
+    // black holes
+    W.blackholes.forEach((h, hi) => {
+      w2s(h.x, h.y, P);
+      const R = h.hr * V.sc * popScale(hi);
+      if (R <= 0) return;
+      for (let j = 5; j >= 1; j--) {
+        ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(S.time * (0.5 + 1.8 / j) * (j % 2 ? 1 : -1));
+        ctx.strokeStyle = [INK.sun, INK.pink, INK.tangerine, INK.lilac, INK.pink][j - 1];
+        ctx.globalAlpha = 0.25 + 0.12 * (5 - j);
+        ctx.lineWidth = Math.max(1.5, R * 0.14);
+        ctx.setLineDash([R * (0.3 + j * 0.25), R * 0.45]);
+        ctx.beginPath(); ctx.arc(0, 0, R * (1.25 + j * 0.42), 0, TAU); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1; ctx.setLineDash([]);
+      // infalling specks
+      for (let m = 0; m < 26; m++) {
+        const ph = (S.time * 0.35 + m * 0.618) % 1, a = m * 2.39996 + ph * 5, rr = R * (1.2 + 3.6 * (1 - ph));
+        ctx.fillStyle = m % 3 ? INK.paper : INK.sun; ctx.globalAlpha = ph;
+        ctx.beginPath(); ctx.arc(P.x + Math.cos(a) * rr, P.y + Math.sin(a) * rr, Math.max(0.8, R * 0.05), 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#05060f'; ctx.beginPath(); ctx.arc(P.x, P.y, R * 1.05, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(244,234,213,.8)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(P.x, P.y, R * 1.12, 0, TAU); ctx.stroke();
+    });
+
+    // bodies
+    const cup = OG.cupAt(W, S.t, S.cup);
+    W.bodies.forEach((b, i) => {
+      const bs = OG.bodyAt(b, S.t, Q);
+      w2s(bs.x, bs.y, P);
+      const px = P.x, py = P.y; // P is scratch; drawCup/drawTee reuse it
+      const sp = sprites[i], f = S.faces[i];
+      let sc = popScale(i);
+      if (sc <= 0) return;
+      let sx = sc, sy = sc;
+      if (f && f.wobT >= 0 && f.wobT < 1.2 && f.wobA) { const w = f.wobA * Math.sin(f.wobT * 30) * Math.exp(-f.wobT * 5); sx *= 1 + w; sy *= 1 - w; }
+      if (b.mat === 'jelly') { const w = 0.018 * Math.sin(S.time * 2.4 + i); sx *= 1 + w; sy *= 1 - w; }
+      if (b.mat === 'star') drawStarRays(px, py, sp.R * sc, i);
+      const half = sp.size / 2;
+      ctx.save(); ctx.translate(px, py); ctx.scale(sx, sy);
+      ctx.drawImage(sp.cv, -half, -half, sp.size, sp.size);
+      ctx.restore();
+      if (i === W.hole.b && sc >= 1) drawCup(cup);
+      if (b.face && f && sc > 0.6) drawFace(b, px, py, sp.R * Math.min(sx, sy), f, bp, i);
+      if (i === W.tee.b && sc >= 1) drawTee();
+    });
+
+    // flag goes over faces
+    if (popScale(W.bodies.length) > 0.9) drawFlag(cup);
+
+    // trail
+    drawTrail();
+
+    // aim
+    if (S.phase === 'aim' && S.aim.valid) drawAim(bp);
+
+    // ball
+    drawBall(bp);
+
+    // particles
+    for (const p of S.parts) {
+      const a = Math.min(1, p.life / p.max * 1.6);
+      ctx.globalAlpha = a;
+      if (p.k === 'ring') {
+        const t = 1 - p.life / p.max;
+        ctx.strokeStyle = p.c; ctx.lineWidth = 2.5 * (1 - t) + 0.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.s * (0.3 + t), 0, TAU); ctx.stroke();
+      } else if (p.k === 'conf') {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s * 0.3, p.s, p.s * 0.6 * Math.abs(Math.cos(p.r * 1.7)) + 0.6);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, TAU); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    drawOffscreen(bp);
+
+    // paper grain over everything
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (grain && grain.pattern) { ctx.fillStyle = grain.pattern; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+  }
+
+  function drawStarRays(x, y, R, i) {
+    // the repulsor breathes out rings that push things away
+    for (let j = 0; j < 3; j++) {
+      const t = (S.time * 0.45 + j / 3) % 1;
+      ctx.strokeStyle = INK.pink; ctx.globalAlpha = (1 - t) * 0.55; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, R * (1.1 + t * 1.9), 0, TAU); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(S.time * 0.3);
+    ctx.strokeStyle = INK.sun; ctx.lineWidth = Math.max(1.5, R * 0.07); ctx.lineCap = 'round';
+    for (let j = 0; j < 12; j++) {
+      const a = j * TAU / 12, l = R * (1.18 + 0.12 * Math.sin(S.time * 5 + j));
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 1.08, Math.sin(a) * R * 1.08); ctx.lineTo(Math.cos(a) * l, Math.sin(a) * l); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawFace(b, x, y, R, f, bp, i) {
+    if (!(R > 4)) return;
+    const dx = bp.x - x, dy = bp.y - y, d = Math.hypot(dx, dy) || 1;
+    // eyes drift toward the ball
+    const tx = dx / d * Math.min(1, d / (R * 3)), ty = dy / d * Math.min(1, d / (R * 3));
+    f.lx += (tx - f.lx) * 0.18; f.ly += (ty - f.ly) * 0.18;
+    const fx = x + f.lx * R * 0.14, fy = y + f.ly * R * 0.1 - R * 0.06;
+    const ex = R * 0.28, er = Math.max(2, R * 0.12);
+    const near = S.phase === 'fly' && d < R * 2.4 && Math.hypot(S.ball.vx, S.ball.vy) > 150;
+    const grumpy = b.mat === 'star';
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = INK.night; ctx.fillStyle = INK.night;
+    ctx.lineWidth = Math.max(1.4, R * 0.045);
+    const happy = f.happy > 0, squint = f.squint > 0, blink = f.blink > 0;
+    for (const s of [-1, 1]) {
+      const cx = fx + s * ex, cy = fy;
+      if (happy) {
+        ctx.beginPath(); ctx.arc(cx, cy + er * 0.3, er * 0.8, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+      } else if (squint) {
+        ctx.beginPath(); ctx.moveTo(cx - s * er * 0.8, cy - er * 0.6); ctx.lineTo(cx + s * er * 0.5, cy); ctx.lineTo(cx - s * er * 0.8, cy + er * 0.6); ctx.stroke();
+      } else if (blink) {
+        ctx.beginPath(); ctx.moveTo(cx - er * 0.8, cy); ctx.lineTo(cx + er * 0.8, cy); ctx.stroke();
+      } else {
+        const big = near ? 1.25 : 1;
+        ctx.fillStyle = INK.paper; ctx.beginPath(); ctx.ellipse(cx, cy, er * big, er * 1.12 * big, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = INK.night;
+        const px = cx + f.lx * er * 0.45, py = cy + f.ly * er * 0.5;
+        ctx.beginPath(); ctx.arc(px, py, er * 0.58, 0, TAU); ctx.fill();
+        ctx.fillStyle = INK.paper; ctx.beginPath(); ctx.arc(px - er * 0.2, py - er * 0.22, er * 0.17, 0, TAU); ctx.fill();
+        ctx.fillStyle = INK.night;
+      }
+      if (grumpy && !happy) {
+        ctx.beginPath(); ctx.moveTo(cx - s * er * 1.1, cy - er * 1.7); ctx.lineTo(cx + s * er * 0.9, cy - er * 1.15); ctx.stroke();
+      }
+    }
+    // cheeks
+    if (b.ink !== 'pink') {
+      ctx.fillStyle = 'rgba(255,79,154,.45)';
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(fx + s * ex * 1.45, fy + R * 0.16, er * 0.8, er * 0.45, 0, 0, TAU); ctx.fill(); }
+    }
+    // mouth
+    const my = fy + R * 0.24, mw = R * 0.12;
+    ctx.fillStyle = INK.night;
+    if (happy) {
+      ctx.beginPath(); ctx.moveTo(fx - mw * 1.3, my - mw * 0.2); ctx.quadraticCurveTo(fx, my + mw * 1.9, fx + mw * 1.3, my - mw * 0.2); ctx.closePath(); ctx.fill();
+    } else if (near || squint) {
+      ctx.beginPath(); ctx.ellipse(fx, my + mw * 0.2, mw * 0.45, mw * 0.6, 0, 0, TAU); ctx.fill();
+    } else if (grumpy) {
+      ctx.beginPath(); ctx.moveTo(fx - mw, my + mw * 0.3); ctx.quadraticCurveTo(fx, my - mw * 0.4, fx + mw, my + mw * 0.3); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(fx, my - mw * 0.5, mw, Math.PI * 0.2, Math.PI * 0.8); ctx.stroke();
+    }
+  }
+
+  function drawCup(c) {
+    w2s(c.sx, c.sy, P);
+    const n = w2sVec(c.nx, c.ny), a = Math.atan2(n.y, n.x);
+    const r = Math.max(4, 11 * V.sc);
+    ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(a + Math.PI / 2);
+    ctx.fillStyle = INK.deep; ctx.beginPath(); ctx.ellipse(0, r * 0.15, r, r * 0.55, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(244,234,213,.6)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(0, r * 0.15, r, r * 0.55, 0, Math.PI, TAU); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawFlag(c) {
+    w2s(c.sx, c.sy, P);
+    const n = w2sVec(c.nx, c.ny), tn = { x: -n.y, y: n.x };
+    // flag hangs to whichever side reads as "down-screen"
+    const side = tn.y >= 0 ? 1 : -1;
+    const L = Math.max(26, 52 * V.sc), fw = Math.max(13, 24 * V.sc), fh = Math.max(9, 16 * V.sc);
+    const top = { x: P.x + n.x * L, y: P.y + n.y * L };
+    ctx.strokeStyle = INK.paper; ctx.lineWidth = Math.max(1.5, 2.2 * V.sc); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(P.x + n.x * 3, P.y + n.y * 3); ctx.lineTo(top.x, top.y); ctx.stroke();
+    const wv = Math.sin(S.time * 6) * 0.25, wv2 = Math.sin(S.time * 6 - 1.2) * 0.3;
+    const bx = top.x - n.x * fh, by = top.y - n.y * fh;
+    const tipx = top.x - n.x * fh * 0.5 + tn.x * side * fw, tipy = top.y - n.y * fh * 0.5 + tn.y * side * fw;
+    const mx = (top.x + tipx) / 2 + n.x * fh * wv, my = (top.y + tipy) / 2 + n.y * fh * wv;
+    const mx2 = (bx + tipx) / 2 + n.x * fh * wv2, my2 = (by + tipy) / 2 + n.y * fh * wv2;
+    const drawTri = (ox, oy, col) => {
+      ctx.fillStyle = col; ctx.beginPath();
+      ctx.moveTo(top.x + ox, top.y + oy); ctx.quadraticCurveTo(mx + ox, my + oy, tipx + ox, tipy + oy);
+      ctx.quadraticCurveTo(mx2 + ox, my2 + oy, bx + ox, by + oy); ctx.closePath(); ctx.fill();
+    };
+    drawTri(1.6, 1.3, INK.sun);
+    drawTri(0, 0, INK.pink);
+    ctx.fillStyle = INK.paper;
+    ctx.beginPath(); ctx.arc(top.x, top.y, Math.max(1.6, 2.4 * V.sc), 0, TAU); ctx.fill();
+  }
+
+  function drawTee() {
+    const W = S.world, b = W.bodies[W.tee.b];
+    const bs = OG.bodyAt(b, S.t, Q), a = W.tee.a * D2R + bs.rot;
+    const sx = bs.x + Math.cos(a) * b.r, sy = bs.y + Math.sin(a) * b.r;
+    w2s(sx, sy, P);
+    const n = w2sVec(Math.cos(a), Math.sin(a)), t = { x: -n.y, y: n.x };
+    const L = Math.max(5, 8 * V.sc), wd = Math.max(3, 6 * V.sc);
+    ctx.strokeStyle = INK.paper; ctx.lineWidth = Math.max(1.5, 2 * V.sc); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(P.x, P.y); ctx.lineTo(P.x + n.x * L, P.y + n.y * L);
+    ctx.moveTo(P.x + n.x * L - t.x * wd, P.y + n.y * L - t.y * wd); ctx.lineTo(P.x + n.x * L + t.x * wd, P.y + n.y * L + t.y * wd);
+    ctx.globalAlpha = 0.7; ctx.stroke(); ctx.globalAlpha = 1;
+  }
+
+  function drawTrail() {
+    const tr = S.trail;
+    if (!tr.length) return;
+    const fade = S.phase === 'fly' ? 1 : S.trailFade;
+    if (fade <= 0) return;
+    ctx.fillStyle = INK.paper;
+    for (let i = 0; i < tr.length; i += 2) {
+      const p = tr[i];
+      if (!p) continue;
+      w2s(p.x, p.y, P);
+      const a = (i / tr.length) * 0.55 * fade;
+      ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.arc(P.x, P.y, Math.max(1, OG.BALL_R * V.sc * 0.35), 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawAim(bp) {
+    const W = S.world, A = S.aim;
+    // preview a slice of the real trajectory
+    const s2 = Object.assign({}, S.ball);
+    OG.shoot(W, s2, S.t, A.ang, A.pow);
+    const steps = Math.round(W.preview * 240);
+    let t = S.t;
+    const pts = [];
+    for (let i = 0; i < steps && s2.mode === 'fly'; i++) {
+      OG.step(W, s2, t, null); t += H;
+      if (i % 7 === 6) pts.push(w2s(s2.x, s2.y, {}));
+    }
+    pts.forEach((p, i) => {
+      const u = 1 - i / pts.length;
+      ctx.globalAlpha = 0.25 + 0.75 * u;
+      ctx.fillStyle = i % 2 ? INK.sun : INK.paper;
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(1.3, 3.2 * V.sc * (0.5 + u * 0.6)), 0, TAU); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    // rubber band (drag) — shows where you're pulling from
+    const dir = w2sVec(Math.cos(A.ang), Math.sin(A.ang));
+    const frac = A.pow / OG.MAX_POW;
+    const band = 16 + frac * 70;
+    ctx.strokeStyle = INK.pink; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(bp.x, bp.y); ctx.lineTo(bp.x - dir.x * band, bp.y - dir.y * band); ctx.stroke();
+    ctx.fillStyle = INK.pink; ctx.beginPath(); ctx.arc(bp.x - dir.x * band, bp.y - dir.y * band, 4.5, 0, TAU); ctx.fill();
+    // power ring
+    const rr = Math.max(14, OG.BALL_R * V.sc + 10);
+    ctx.strokeStyle = 'rgba(244,234,213,.18)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(bp.x, bp.y, rr, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = frac > 0.85 ? INK.pink : INK.sun;
+    ctx.beginPath(); ctx.arc(bp.x, bp.y, rr, -Math.PI / 2, -Math.PI / 2 + frac * TAU); ctx.stroke();
+  }
+
+  function drawBall(bp) {
+    const ph = S.phase;
+    let x = bp.x, y = bp.y, r = Math.max(4, OG.BALL_R * V.sc), alpha = 1;
+    if (ph === 'result' || ph === 'done') return;
+    if (ph === 'sinking') {
+      const c = S.cup; w2s(c.sx, c.sy, P);
+      const t = Math.min(1, S.phaseT / 0.45);
+      x = bp.x + (P.x - bp.x) * t; y = bp.y + (P.y - bp.y) * t; r *= 1 - t * 0.85;
+    } else if (ph === 'bh' && S.bhFrom) {
+      const b = S.bhFrom, t = Math.min(1, S.phaseT / 1.0);
+      const a = b.a + t * t * 14, d = b.d * (1 - t) * (1 - t);
+      w2s(b.hx + Math.cos(a) * d, b.hy + Math.sin(a) * d, P);
+      x = P.x; y = P.y; r *= 1 - t; alpha = 1 - t * 0.5;
+    } else if (ph === 'lost') return;
+    if (r <= 0.3) return;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = INK.pink; ctx.beginPath(); ctx.arc(x + r * 0.22, y + r * 0.18, r, 0, TAU); ctx.fill();
+    ctx.fillStyle = INK.paper; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(26,35,80,.25)';
+    for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.6; ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 0.45, y + Math.sin(a) * r * 0.45, r * 0.14, 0, TAU); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    if (ph === 'aim' && !S.aim.valid && S.levelT > 0.9) {
+      const t = (S.time * 0.9) % 1;
+      ctx.strokeStyle = INK.paper; ctx.globalAlpha = (1 - t) * 0.7; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, y, r + 4 + t * 16, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawOffscreen(bp) {
+    const m = 18;
+    if (bp.x >= 0 && bp.x <= V.cw && bp.y >= 0 && bp.y <= V.ch) return;
+    if (S.phase !== 'fly') return;
+    const cx = V.cw / 2, cy = V.ch / 2, dx = bp.x - cx, dy = bp.y - cy;
+    const s = Math.min((V.cw / 2 - m) / Math.abs(dx || 1e-6), (V.ch / 2 - m) / Math.abs(dy || 1e-6));
+    const x = cx + dx * s, y = cy + dy * s, a = Math.atan2(dy, dx);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.fillStyle = INK.pink; ctx.beginPath(); ctx.moveTo(12, 2); ctx.lineTo(-6, -7); ctx.lineTo(-6, 11); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = INK.paper; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-8, -9); ctx.lineTo(-8, 9); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // ------------------------------------------------------------ input
+  function pointerAim(e) {
+    const A = S.aim;
+    const dx = A.sx - A.cx, dy = A.sy - A.cy, len = Math.hypot(dx, dy);
+    const full = Math.max(140, Math.min(V.cw, V.ch) * 0.34);
+    if (len < 12) { A.valid = false; updateHint(); return; }
+    const v = s2wVec(dx, dy);
+    A.ang = Math.atan2(v.y, v.x);
+    const np = Math.min(1, (len - 12) / full);
+    const newPow = OG.MIN_POW + (OG.MAX_POW - OG.MIN_POW) * np;
+    if (Math.abs(newPow - A.pow) > OG.MAX_POW * 0.1 && A.valid) sfx.tick();
+    A.pow = newPow; A.valid = true;
+    updateHint();
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    if (S.phase !== 'aim' || S.ball.mode !== 'rest') return;
+    audioInit();
+    canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+    const A = S.aim;
+    A.drag = true; A.kb = false; A.sx = A.cx = e.clientX; A.sy = A.cy = e.clientY; A.valid = false;
+    e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', e => {
+    const A = S.aim;
+    if (!A.drag) return;
+    A.cx = e.clientX; A.cy = e.clientY;
+    pointerAim(e);
+  });
+  const endDrag = e => {
+    const A = S.aim;
+    if (!A.drag) return;
+    A.drag = false;
+    if (A.valid && e.type === 'pointerup') doShoot(A.ang, A.pow);
+    else { A.valid = false; updateHint(); }
+  };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  window.addEventListener('keydown', e => {
+    if (e.target && (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') && (e.key === ' ' || e.key === 'Enter')) return;
+    if (S.phase === 'result' && !el.result.hidden && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); nextHole(); return; }
+    if (S.phase !== 'aim' || S.aim.drag) return;
+    const A = S.aim, fine = e.shiftKey ? 5 : 1;
+    let handled = true;
+    switch (e.key) {
+      case 'ArrowLeft': kbAimInit(); A.ang -= fine * D2R * (V.rot ? -1 : 1); break;
+      case 'ArrowRight': kbAimInit(); A.ang += fine * D2R * (V.rot ? -1 : 1); break;
+      case 'ArrowUp': kbAimInit(); A.pow = Math.min(OG.MAX_POW, A.pow + OG.MAX_POW * 0.01 * (e.shiftKey ? 5 : 1.5)); break;
+      case 'ArrowDown': kbAimInit(); A.pow = Math.max(OG.MIN_POW, A.pow - OG.MAX_POW * 0.01 * (e.shiftKey ? 5 : 1.5)); break;
+      case ' ': case 'Enter':
+        audioInit();
+        if (A.valid) doShoot(A.ang, A.pow); else kbAimInit();
+        break;
+      case 'Escape': A.kb = false; A.valid = false; break;
+      default: handled = false;
+    }
+    if (handled) { e.preventDefault(); updateHint(); }
+  });
+
+  el.btnStart.addEventListener('click', () => {
+    audioInit();
+    el.intro.hidden = true;
+    setPhase('aim');
+    S.levelT = 0; // planets pop back in as the round starts
+    toast(S.world.tip, 4.5);
+    canvas.focus({ preventScroll: true });
+  });
+  el.btnNext.addEventListener('click', nextHole);
+  el.btnRetry.addEventListener('click', retryHole);
+  el.btnSound.addEventListener('click', () => { audioInit(); setSound(!AU.on); });
+  el.btnScore.addEventListener('click', () => { if (S.phase !== 'done') openCard(false); });
+  el.btnCardClose.addEventListener('click', () => { el.card.hidden = true; });
+  el.btnRestart.addEventListener('click', restartAll);
+
+  let resizeT = 0;
+  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(layout, 80); });
+
+  // ------------------------------------------------------------ loop
+  let last = 0, lastFrame = 0;
+  function frame() {
+    // one clock for both the rAF path and the interval fallback, so dt can never run backwards
+    const now = performance.now();
+    const dt = last ? Math.min(0.05, Math.max(0, (now - last) / 1000)) : 1 / 60;
+    last = now; lastFrame = performance.now();
+    try { update(dt); draw(); }
+    catch (err) { if (!frame.warned) { frame.warned = true; console.error('orbit-golf frame error', err && err.stack || err); } }
+  }
+  function rafLoop() { frame(); requestAnimationFrame(rafLoop); }
+  // some embedded views starve rAF; keep ticking anyway
+  setInterval(() => { if (performance.now() - lastFrame > 250) frame(); }, 120);
+
+  // ------------------------------------------------------------ boot
+  function start(data) {
+    data = data || {};
+    if (Array.isArray(data.scores)) S.scores = data.scores;
+    const li = Number.isInteger(data.li) ? Math.min(OG.LEVELS.length - 1, Math.max(0, data.li)) : 0;
+    setSound(AU.on);
+    // local debug hooks: ?h=3&aim=-30,500&shot=-30,500&adv=1.2
+    const q = new URLSearchParams(location.search);
+    if (q.has('h') || data.li != null) S.phase = 'aim';
+    loadLevel(q.has('h') ? Math.max(0, Math.min(8, (+q.get('h') || 1) - 1)) : li, true);
+    if (S.phase === 'aim') el.intro.hidden = true;
+    if (q.has('adv')) { const n = Math.round(+q.get('adv') * 60); for (let i = 0; i < n; i++) update(1 / 60); }
+    if (q.has('shot')) { const [a, p] = q.get('shot').split(',').map(Number); doShoot(a * D2R, p); const n = Math.round((+q.get('fly') || 1) * 60); for (let i = 0; i < n; i++) update(1 / 60); }
+    if (q.has('aim')) { const [a, p] = q.get('aim').split(',').map(Number); S.aim.ang = a * D2R; S.aim.pow = p; S.aim.valid = true; updateHint(); }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => layout());
+    frame();
+    requestAnimationFrame(rafLoop);
+  }
+
+  window.__og = { S, V, OG, frame, update, draw, doShoot, loadLevel, layout };
+
+  const hot = window.claude && window.claude.hot;
+  if (hot && typeof hot.snapshot === 'function') {
+    try { hot.snapshot(() => ({ li: S.li, scores: S.scores })); } catch (e) { /* optional */ }
+  }
+  if (hot && typeof hot.ready === 'function') hot.ready(start);
+  else start((hot && hot.data) || {});
+})();
+</script>
+
+</body></html>

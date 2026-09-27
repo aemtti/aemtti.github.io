@@ -1,0 +1,3067 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head><body>
+<title>쓸모없는 기계</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Do+Hyeon&family=Gaegu:wght@400;700&family=Gowun+Dodum&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ground: #163a36;
+    --ground-2: #1e4843;
+    --cream: #fbf3df;
+    --cream-dim: rgba(251, 243, 223, .68);
+    --ink: #1c1a22;
+    --pen: #2f4a78;
+    --butter: #f2c14e;
+    --amber: #ff9a3c;
+    --tomato: #ff5a4e;
+    --mint: #6fd3a8;
+    --lilac: #b7a6ff;
+    --rose: #ff8fb1;
+    --slate: #9fb3c6;
+    --rule: rgba(70, 120, 185, .2);
+    --margin: rgba(255, 90, 78, .38);
+    --f-display: 'Do Hyeon', 'Black Han Sans', 'Malgun Gothic', sans-serif;
+    --f-hand: 'Gaegu', 'Nanum Pen Script', 'Malgun Gothic', cursive;
+    --f-body: 'Gowun Dodum', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+    --f-mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+  [hidden] { display: none !important; }
+  html { background: var(--ground); }
+  body {
+    margin: 0; background: radial-gradient(1200px 500px at 20% -10%, var(--ground-2), var(--ground) 70%);
+    color: var(--cream); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+    min-height: 100%;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding-inline: 16px; padding-block: 22px 36px; display: grid; gap: 14px; }
+
+  /* ---------- header ---------- */
+  .top { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .tag {
+    margin: 0 0 6px; font: 500 11px/1 var(--f-mono); letter-spacing: .12em; color: var(--butter);
+  }
+  h1 { margin: 0; font: 400 clamp(36px, 7vw, 52px)/1 var(--f-display); letter-spacing: -.01em; text-wrap: balance; }
+  .lede { margin: 8px 0 0; color: var(--cream-dim); max-width: 36em; }
+  .btn {
+    font: 700 14px/1 var(--f-body); color: var(--ink); background: var(--cream);
+    border: 0; border-radius: 999px; padding: 10px 16px; cursor: pointer;
+    box-shadow: 3px 3px 0 #0c2623; display: inline-flex; gap: 8px; align-items: center;
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #0c2623; }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #0c2623; }
+  .btn:focus-visible { outline: 3px solid var(--butter); outline-offset: 3px; }
+  .btn svg { width: 16px; height: 16px; }
+  #btnSound[aria-pressed="false"] .wave { display: none; }
+  #btnSound[aria-pressed="true"] .mute { display: none; }
+
+  /* ---------- stage ---------- */
+  .stagewrap {
+    position: relative; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 0 0 3px #0e2a27, 0 22px 50px rgba(0, 0, 0, .38);
+    max-width: 100%;
+  }
+  #stage { display: block; width: 100%; aspect-ratio: 724 / 446; height: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .swlayer { position: absolute; inset: 0; pointer-events: none; }
+  .swbtn { position: absolute; background: transparent; border: 0; padding: 0; border-radius: 12px; pointer-events: none; }
+  .swbtn:focus-visible { outline: 3px solid var(--butter); outline-offset: -2px; background: rgba(242, 193, 78, .12); }
+  .howto { margin: 0; font: 500 12px/1.6 var(--f-mono); color: var(--cream-dim); letter-spacing: .02em; }
+  .howto kbd { font: inherit; background: rgba(251, 243, 223, .12); border-radius: 4px; padding: 1px 6px; color: var(--cream); }
+
+  /* ---------- panels ---------- */
+  .panels { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  @media (max-width: 760px) { .panels { grid-template-columns: minmax(0, 1fr); } }
+
+  .notebook {
+    position: relative; color: var(--ink); background-color: var(--cream);
+    background-image:
+      linear-gradient(90deg, transparent 40px, var(--margin) 40px, var(--margin) 41.5px, transparent 41.5px),
+      repeating-linear-gradient(180deg, transparent 0 29px, var(--rule) 29px 30px);
+    padding: 16px 18px 20px 56px; border-radius: 4px 10px 10px 4px;
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, .22);
+  }
+  .notebook::before {
+    /* binder holes */
+    content: ''; position: absolute; left: 12px; top: 18px; bottom: 18px; width: 14px;
+    background: radial-gradient(circle at 7px 7px, var(--ground) 5px, transparent 5.5px) 0 0 / 14px 52px repeat-y;
+  }
+  .nbhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .notebook h2 { margin: 0; font: 700 28px/1.1 var(--f-hand); }
+  .status { margin: 0; font: 700 20px/1.2 var(--f-hand); color: var(--pen); }
+  .meters { display: grid; gap: 8px; margin: 12px 0 6px; }
+  .meter { display: grid; grid-template-columns: 5.2em minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+  .meter small { grid-column: 2 / -1; margin-top: -4px; font: 700 15px/1 var(--f-hand); color: var(--pen); }
+  .mlabel { font: 700 18px/1 var(--f-hand); }
+  .meter b { font: 500 12px/1 var(--f-mono); font-variant-numeric: tabular-nums; min-width: 7.2em; text-align: right; }
+  .track { height: 12px; border-radius: 6px; background: rgba(28, 26, 34, .1); box-shadow: inset 0 0 0 1.5px rgba(28, 26, 34, .55); overflow: hidden; }
+  .track i { display: block; height: 100%; width: 0; background: var(--mint); transition: width .15s linear, background-color .3s; }
+  .track i[data-band="grumpy"] { background: var(--butter); }
+  .track i[data-band="angry"] { background: var(--amber); }
+  .track i[data-band="furious"] { background: var(--tomato); }
+  .track.t2 i { background: var(--pen); transition: none; }
+  .nbsub { margin: 14px 0 6px; font: 700 19px/1.2 var(--f-hand); color: var(--pen); }
+
+  .plan { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 20px; }
+  .plan .empty { font: 700 18px/1.3 var(--f-hand); color: rgba(28, 26, 34, .55); }
+  .chip {
+    position: relative; display: inline-flex; flex-direction: column; gap: 1px;
+    padding: 4px 10px 5px; border-radius: 6px; border: 2px solid var(--ink);
+    font: 700 18px/1.05 var(--f-hand); background: #fff;
+  }
+  .chip:not(:last-child)::after {
+    content: '→'; position: absolute; right: -17px; top: 50%; transform: translateY(-50%);
+    font: 700 16px/1 var(--f-hand); color: rgba(28, 26, 34, .5);
+  }
+  .chip .sub { font: 500 10px/1.2 var(--f-mono); letter-spacing: .02em; color: rgba(28, 26, 34, .7); }
+  .chip.g-emerge { background: #e4ddff; } .chip.g-pre { background: #ffd9e4; } .chip.g-off { background: #fbe2a3; }
+  .chip.g-post { background: #cdeedf; } .chip.g-retreat { background: #dce5ee; } .chip.g-react { background: #ffd0cb; }
+  .chip.st-done { opacity: .5; }
+  .chip.st-done .lbl::before { content: '✓ '; }
+  .chip.st-skip { opacity: .4; }
+  .chip.st-skip .lbl { text-decoration: line-through; }
+  .chip.st-doing { box-shadow: 3px 3px 0 var(--ink); transform: rotate(-2deg) scale(1.05); animation: wig .5s ease-in-out infinite alternate; }
+  @keyframes wig { from { transform: rotate(-2deg) scale(1.05); } to { transform: rotate(1.5deg) scale(1.05); } }
+  .reasons { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+  .reasons li { font: 700 17px/1.45 var(--f-hand); color: var(--pen); padding-left: 1em; text-indent: -1em; }
+  .reasons li::before { content: '– '; }
+
+  .dexcard { background: var(--ink); border-radius: 10px; padding: 16px 18px 18px; box-shadow: 6px 8px 0 rgba(0, 0, 0, .22); display: grid; gap: 10px; }
+  .dexhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .dexcard h2 { margin: 0; font: 400 24px/1 var(--f-display); }
+  .dexhead p { margin: 0; font: 500 12px/1 var(--f-mono); color: var(--cream-dim); font-variant-numeric: tabular-nums; }
+  .dexhead b { color: var(--butter); font-weight: 500; }
+  .dexbar { height: 6px; border-radius: 3px; background: rgba(251, 243, 223, .1); overflow: hidden; }
+  .dexbar i { display: block; height: 100%; width: 0; background: var(--butter); transition: width .4s ease; }
+  .dex { display: grid; gap: 8px; }
+  .dexrow { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .dexg { font: 500 10.5px/1 var(--f-mono); letter-spacing: .08em; width: 3.6em; flex-shrink: 0; }
+  .dexg.g-emerge { color: var(--lilac); } .dexg.g-pre { color: var(--rose); } .dexg.g-off { color: var(--butter); }
+  .dexg.g-post { color: var(--mint); } .dexg.g-retreat { color: var(--slate); } .dexg.g-react { color: var(--tomato); }
+  .dexchip {
+    font: 12.5px/1.2 var(--f-body); padding: 3px 8px; border-radius: 5px;
+    border: 1px dashed rgba(251, 243, 223, .22); color: rgba(251, 243, 223, .32);
+  }
+  .dexchip.seen { border-style: solid; color: var(--ink); }
+  .dexchip.seen.g-emerge { background: var(--lilac); border-color: var(--lilac); }
+  .dexchip.seen.g-pre { background: var(--rose); border-color: var(--rose); }
+  .dexchip.seen.g-off { background: var(--butter); border-color: var(--butter); }
+  .dexchip.seen.g-post { background: var(--mint); border-color: var(--mint); }
+  .dexchip.seen.g-retreat { background: var(--slate); border-color: var(--slate); }
+  .dexchip.seen.g-react { background: var(--tomato); border-color: var(--tomato); }
+  .dexnote { margin: 2px 0 0; font-size: 13px; color: var(--cream-dim); }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 500 12px/1.5 var(--f-mono); color: var(--cream-dim); font-variant-numeric: tabular-nums; }
+  .stats b { color: var(--cream); font-weight: 500; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chip.st-doing { animation: none; }
+    .track i, .dexbar i { transition: none; }
+  }
+
+  /* ---------- phones ---------- */
+  .wrap { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  .touch-only { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    .touch-only { display: inline; }
+    .mouse-only { display: none; }
+    .btn { min-height: 44px; padding-inline: 18px; }
+  }
+  @media (max-width: 480px) {
+    /* a wider stage = bigger switches to tap */
+    .wrap { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+  }
+  @media (max-width: 760px), (pointer: coarse) {
+    .tag, .chip .sub, .dexg { font-size: 12px; }
+  }
+  /* phone held sideways: title row on top, the stage sized to the screen height, everything else below */
+  @media (orientation: landscape) and (max-height: 540px) {
+    .wrap { grid-template-columns: minmax(0, 1fr) auto; padding-block: 8px 28px; gap: 10px 14px; }
+    .top, .top > div { display: contents; }
+    .tag { display: none; }
+    h1 { grid-column: 1; grid-row: 1; align-self: center; font-size: 28px; }
+    #btnSound { grid-column: 2; grid-row: 1; align-self: center; }
+    .stagewrap {
+      grid-column: 1 / -1; grid-row: 2; justify-self: center;
+      width: min(100%, calc((100vh - 72px) * 724 / 446));
+      width: min(100%, calc((100svh - 72px) * 724 / 446));
+    }
+    .lede { grid-column: 1 / -1; grid-row: 3; margin: 0; }
+    .howto, .panels, .stats { grid-column: 1 / -1; }
+  }
+</style>
+
+<main class="wrap">
+  <header class="top">
+    <div>
+      <p class="tag">MODEL MK-6 · 턱시도 로봇 고양이 1기 탑재</p>
+      <h1>쓸모없는 기계</h1>
+      <p class="lede">스위치를 켜면 안에 사는 로봇 고양이가 전선을 달고 나와서 도로 끕니다. 이 기계가 하는 일은 그게 전부예요.</p>
+    </div>
+    <button class="btn" id="btnSound" type="button" aria-pressed="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z" fill="currentColor"/>
+        <path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.5a8 8 0 0 1 0 11"/>
+        <path class="mute" d="M16 9.5l5 5M21 9.5l-5 5"/>
+      </svg>
+      <span class="lbl">소리 켬</span>
+    </button>
+  </header>
+
+  <div class="stagewrap">
+    <canvas id="stage" role="img" aria-label="노란 상자 위에 토글 스위치 여섯 개가 있고, 안에 전선으로 연결된 턱시도 로봇 고양이가 산다"></canvas>
+    <div id="switches" class="swlayer"></div>
+  </div>
+  <p class="howto"><span class="mouse-only">스위치를 클릭하거나 숫자 키 <kbd>1</kbd>–<kbd>6</kbd> · 밖에 나온 고양이를 클릭하면 쓰다듬기</span><span class="touch-only">스위치를 탭해서 켜기 · 밖에 나온 고양이를 탭하면 쓰다듬기</span> (기분 좋을 때만 통함) · 가슴·꼬리·안테나 LED가 기분을 알려 줘요</p>
+
+  <div class="panels">
+    <section class="notebook" aria-labelledby="nbTitle">
+      <div class="nbhead">
+        <h2 id="nbTitle">고양이 머릿속</h2>
+        <p class="status" id="status" aria-live="polite">상자 안에서 쉬는 중</p>
+      </div>
+      <div class="meters">
+        <div class="meter">
+          <span class="mlabel">짜증</span>
+          <div class="track"><i id="moodFill"></i></div>
+          <b id="moodLbl">평온 8%</b>
+        </div>
+        <div class="meter" id="timerRow" hidden>
+          <span class="mlabel">등장까지</span>
+          <div class="track t2"><i id="timerFill"></i></div>
+          <b><span id="timerNum">0.0</span>초</b>
+          <small>기다리는 동안 더 켜면 뒤로 밀려요</small>
+        </div>
+      </div>
+      <h3 class="nbsub">지금 계획</h3>
+      <ol class="plan" id="plan"></ol>
+      <h3 class="nbsub">왜 그렇게 생각했냐면</h3>
+      <ul class="reasons" id="reasons"></ul>
+    </section>
+
+    <section class="dexcard" aria-labelledby="dexTitle">
+      <div class="dexhead"><h2 id="dexTitle">동작 도감</h2><p><b id="dexCount">0</b> / <span id="dexTotal">0</span> 발견</p></div>
+      <div class="dexbar"><i id="dexFill"></i></div>
+      <div id="dex" class="dex"></div>
+      <p class="dexnote">동작은 미리 만든 애니메이션이 아니라, 켜진 스위치 조합·짜증·고양이 위치를 보고 그때그때 조립돼요.</p>
+    </section>
+  </div>
+
+  <footer class="stats">
+    <span>켠 횟수 <b id="stFlips">0</b></span>
+    <span>고양이 출동 <b id="stSorties">0</b></span>
+    <span>고양이가 끈 스위치 <b id="stOffs">0</b></span>
+    <span>최고 짜증 <b id="stMax">0%</b></span>
+    <span>가만히 두면 짜증은 가라앉아요</span>
+  </footer>
+</main>
+
+<script>/* Useless Machine — DOM-free core.
+   Geometry, springs, the cat rig (kinematics + gait), coroutine actions, the planner
+   and the machine itself. Shared by the page and tools/sim.mjs (node). */
+(function (root) {
+  'use strict';
+
+  const D2R = Math.PI / 180, TAU = Math.PI * 2;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut = t => 1 - (1 - t) * (1 - t);
+  const easeIn = t => t * t;
+
+  // ------------------------------------------------------------------ geometry (world units)
+  const G = {
+    W: 820, H: 520,
+    deskY: 452,
+    boxL: 100, boxR: 720, backY: 236, frontTop: 280,
+    laneY: 246,                       // where the cat's feet rest on the lid/top
+    hatchL: 348, hatchR: 472, hatchCX: 410, hatchBack: 238, hatchFront: 262,
+    swX: [155, 257, 359, 461, 563, 665],
+    swBaseY: 272, leverLen: 38, onDeg: 26, offDeg: -26,
+    inside: 150,                      // lift when the cat is fully inside
+  };
+  function leverTip(i, deg) {
+    const a = (deg == null ? G.onDeg : deg) * D2R;
+    return { x: G.swX[i] + Math.sin(a) * G.leverLen, y: G.swBaseY - Math.cos(a) * G.leverLen };
+  }
+
+  // ------------------------------------------------------------------ rng
+  function makeRng(seed) {
+    let a = (seed >>> 0) || 1;
+    const r = () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    r.range = (lo, hi) => lo + (hi - lo) * r();
+    r.pick = arr => arr[Math.floor(r() * arr.length)];
+    r.weighted = obj => {
+      let tot = 0;
+      for (const k in obj) tot += Math.max(0, obj[k]);
+      let x = r() * tot;
+      for (const k in obj) { x -= Math.max(0, obj[k]); if (x <= 0 && obj[k] > 0) return k; }
+      for (const k in obj) if (obj[k] > 0) return k;
+      return Object.keys(obj)[0];
+    };
+    return r;
+  }
+
+  // ------------------------------------------------------------------ springs (exact critically damped)
+  function Ch(v, w) { return { v, vel: 0, t: v, w, w0: w }; }
+  function stepCh(c, dt) {
+    const w = c.w, x0 = c.v - c.t, v0 = c.vel, e = Math.exp(-w * dt);
+    const k = (v0 + w * x0) * dt;
+    c.v = c.t + (x0 + k) * e;
+    c.vel = (v0 - w * k) * e;
+  }
+
+  // ------------------------------------------------------------------ the cat
+  const BODY = { L: 60, stand: 37, thigh: 22, shin: 21, upper: 21, fore: 19, headR: 21, tailSeg: 8.4, tailN: 9 };
+
+  // channel: [rest value, responsiveness]
+  const CH_DEF = {
+    x: [G.hatchCX, 11], lift: [G.inside, 10], face: [1, 16],
+    crouch: [0, 10], rear: [0, 9], sit: [0, 8], arch: [0, 8], puff: [0, 6], stretch: [1, 10], squash: [0, 20],
+    neckDip: [0, 10], armS: [1, 12], legS: [1, 12],
+    headTilt: [0, 9], earBack: [0, 12], earPerk: [0, 12],
+    eyeOpen: [0.75, 20], brow: [0, 12], happy: [0, 12], pupil: [0.4, 10],
+    mouthOpen: [0, 18], mouthCurve: [0.3, 10], fang: [0, 14], tongue: [0, 12], blush: [0, 6],
+    tailUp: [0.7, 6], tailCurl: [0.45, 6], tailLash: [0.1, 5],
+    p0w: [0, 14], p0x: [0, 26], p0y: [0, 26],
+    p1w: [0, 14], p1x: [0, 26], p1y: [0, 26],
+    kw: [0, 16], kx: [0, 26], ky: [0, 26],
+    tw: [0, 12], tx: [0, 22], ty: [0, 22],
+    lookX: [G.hatchCX, 14], lookY: [300, 14], gaze: [0, 9],
+    shake: [0, 12],
+  };
+
+  function makeCat() {
+    const ch = {};
+    for (const k in CH_DEF) ch[k] = Ch(CH_DEF[k][0], CH_DEF[k][1]);
+    const cat = {
+      ch, faceSign: 1, t: 0, tailPhase: 0, air: false,
+      blink: 0, nextBlink: 2.5, earTwitch: 0, nextTwitch: 3,
+      feet: null, R: null, cursor: { x: 410, y: 120 },
+    };
+    rig(cat);
+    cat.feet = [0, 1, 2, 3].map(k => ({ x: cat.R.legs[k].jx, y: G.laneY + G.inside, stepping: false, t: 0, dur: 0.15, sx: 0, ex: 0 }));
+    return cat;
+  }
+
+  // Resting face/body for a mood (anger 0..1). Actions override, then relax() goes back here.
+  function moodPose(a) {
+    return {
+      eyeOpen: a < 0.35 ? 0.76 - a * 0.4 : 0.62 + (a - 0.35) * 0.62,
+      brow: clamp((a - 0.12) * 1.45, 0, 1),
+      earBack: clamp((a - 0.22) * 1.35, 0, 1),
+      mouthCurve: 0.35 - a * 1.25,
+      puff: clamp((a - 0.62) * 1.6, 0, 0.6),
+      tailUp: 0.78 - a * 0.55, tailCurl: 0.5 - a * 0.65, tailLash: 0.08 + a * 0.9,
+      pupil: 0.3 + a * 0.35,
+    };
+  }
+  const BODY_NEUTRAL = {
+    crouch: 0, rear: 0, sit: 0, arch: 0, stretch: 1, squash: 0, neckDip: 0, armS: 1, legS: 1,
+    headTilt: 0, earPerk: 0, happy: 0, mouthOpen: 0, fang: 0, tongue: 0, blush: 0, shake: 0,
+    p0w: 0, p1w: 0, kw: 0, tw: 0, gaze: 0,
+  };
+  function pose(cat, o, w) {
+    for (const k in o) { const c = cat.ch[k]; c.t = o[k]; if (w) c.w = w; }
+  }
+  function relax(M, keep) {
+    const cat = M.cat;
+    const o = Object.assign({}, BODY_NEUTRAL, moodPose(M.anger));
+    for (const k in o) {
+      if (keep && keep.includes(k)) continue;
+      const c = cat.ch[k]; c.t = o[k]; c.w = c.w0;
+    }
+    for (const k of ['p0x', 'p0y', 'p1x', 'p1y', 'kx', 'ky', 'tx', 'ty', 'x', 'lift']) cat.ch[k].w = cat.ch[k].w0;
+  }
+
+  // 2-bone IK. bend = +1/-1 picks which side the knee goes.
+  function ik2(rx, ry, fx, fy, a, b, bend) {
+    let dx = fx - rx, dy = fy - ry, d = Math.hypot(dx, dy) || 1e-4;
+    const dMax = a + b - 0.3, dMin = Math.abs(a - b) + 0.3;
+    if (d > dMax) { fx = rx + dx / d * dMax; fy = ry + dy / d * dMax; dx = fx - rx; dy = fy - ry; d = dMax; }
+    if (d < dMin) { fx = rx + dx / d * dMin; fy = ry + dy / d * dMin; dx = fx - rx; dy = fy - ry; d = dMin; }
+    const ca = clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1);
+    const ang = Math.atan2(dy, dx) + bend * Math.acos(ca);
+    return { kx: rx + Math.cos(ang) * a, ky: ry + Math.sin(ang) * a, fx, fy };
+  }
+
+  // Full skeleton from the channels. Local frame: +x = forward, y down, origin on the ground under the body.
+  function rig(cat) {
+    const C = cat.ch, B = BODY;
+    const fsgn = cat.faceSign, fs = fsgn * Math.max(0.3, Math.min(1, Math.abs(C.face.v)));
+    const X = C.x.v + Math.sin(cat.t * 63) * C.shake.v * 1.8;
+    const baseY = G.laneY + C.lift.v;
+    const sq = C.squash.v;
+    const crouch = C.crouch.v, sit = C.sit.v, rear = C.rear.v;
+    const L = B.L * C.stretch.v * (1 + sq * 0.12) * (1 - 0.28 * sit);   // the spine curls when sitting
+    const hMul = 1 - sq * 0.3;
+    const hipH = Math.max(5, B.stand * (1 - 0.42 * crouch) * (1 - 0.74 * sit) * hMul + Math.max(0, -rear) * 6);
+    const shH = Math.max(6, (B.stand * (1 - 0.3 * crouch) + rear * 30 + sit * 12) * hMul);
+    const hipX = -L / 2 + sit * 19 + Math.max(0, rear) * 7;
+    const sn = clamp((shH - hipH) / L, -0.9, 0.95), cs = Math.sqrt(1 - sn * sn);
+    const hip = { x: hipX, y: -hipH };
+    const sh = { x: hipX + L * cs, y: -hipH - L * sn };
+    const nx = -sn, ny = -cs;                    // body "up" normal
+    const bulge = 3 + C.arch.v * 17 - crouch * 1.5;
+    const ctrl = { x: (hip.x + sh.x) / 2 + nx * bulge * 2, y: (hip.y + sh.y) / 2 + ny * bulge * 2 };
+    const neck = { x: sh.x + cs * 4 + nx * 8, y: sh.y - sn * 4 + ny * 8 };
+    const dip = C.neckDip.v;
+    const head = {
+      x: neck.x + cs * 11 + nx * 11 * (1 - dip) + dip * 14,
+      y: neck.y - sn * 11 + ny * 11 * (1 - dip) + dip * 30,
+    };
+    const toW = p => ({ x: X + p.x * fs, y: baseY + p.y });
+    const hipW = toW(hip), shW = toW(sh), headW = toW(head);
+
+    // gaze → head yaw / pitch (world terms: +yaw = looking right on screen)
+    const g = C.gaze.v;
+    const lx = C.lookX.v - headW.x, ly = C.lookY.v - headW.y;
+    const yaw = clamp(lx / 85, -1, 1) * (1 - g);
+    const pitch = clamp(ly / 90, -1, 1) * (1 - g) * 0.8;
+    const cur = cat.cursor;
+    const pdx = (1 - g) * clamp(lx / 55, -1, 1) + g * clamp((cur.x - headW.x) / 420, -0.35, 0.35);
+    const pdy = (1 - g) * clamp(ly / 55, -1, 1) + g * clamp((cur.y - headW.y) / 420, -0.3, 0.3);
+
+    // legs: 0 near-front, 1 far-front, 2 near-hind, 3 far-hind
+    const aS = C.armS.v, lS = C.legS.v;
+    const joints = [
+      toW({ x: sh.x - 3, y: sh.y + 6 }), toW({ x: sh.x, y: sh.y + 5 }),
+      toW({ x: hip.x + 3, y: hip.y + 4 }), toW({ x: hip.x + 6, y: hip.y + 3 }),
+    ];
+    const sa = 1 + 0.2 * sit;   // front legs straighten out when sitting
+    const lens = [[B.upper * aS * sa, B.fore * aS * sa], [B.upper * aS * sa, B.fore * aS * sa], [B.thigh * lS, B.shin * lS], [B.thigh * lS, B.shin * lS]];
+    const feet = cat.feet || joints.map(j => ({ x: j.x, y: baseY }));
+    const reach = [
+      [C.p0w.v, C.p0x.v, C.p0y.v], [C.p1w.v, C.p1x.v, C.p1y.v], [C.kw.v, C.kx.v, C.ky.v], [0, 0, 0],
+    ];
+    const legs = joints.map((j, k) => {
+      const w = clamp(reach[k][0], 0, 1);
+      const fx = lerp(feet[k].x, reach[k][1], w), fy = lerp(feet[k].y, reach[k][2], w);
+      // hind knees fold forward when sitting, everything else bends backward
+      const bend = k >= 2 && sit > 0.5 ? -fsgn : fsgn;
+      const s = ik2(j.x, j.y, fx, fy, lens[k][0], lens[k][1], bend);
+      return { jx: j.x, jy: j.y, kx: s.kx, ky: s.ky, fx: s.fx, fy: s.fy, reach: w };
+    });
+
+    // tail: animated chain, optionally pulled toward (tx,ty) with FABRIK
+    const tb = { x: hip.x - 5, y: hip.y - 5 };
+    let a = Math.PI + C.tailUp.v * 1.2;
+    const lash = C.tailLash.v, ph = cat.tailPhase;
+    const pts = [toW(tb)];
+    let px = tb.x, py = tb.y;
+    for (let k = 1; k <= B.tailN; k++) {
+      a += C.tailCurl.v * 0.2 + lash * Math.sin(ph - k * 0.6) * 0.24 * (0.35 + k / B.tailN);
+      px += Math.cos(a) * B.tailSeg; py += Math.sin(a) * B.tailSeg;
+      pts.push(toW({ x: px, y: py }));
+    }
+    const tw = clamp(C.tw.v, 0, 1);
+    if (tw > 0.01) {
+      const q = pts.map(p => ({ x: p.x, y: p.y }));
+      const base = { x: q[0].x, y: q[0].y };
+      for (let it = 0; it < 6; it++) {
+        q[q.length - 1] = { x: C.tx.v, y: C.ty.v };
+        for (let k = q.length - 2; k >= 0; k--) {
+          const dx = q[k].x - q[k + 1].x, dy = q[k].y - q[k + 1].y, d = Math.hypot(dx, dy) || 1e-4;
+          q[k] = { x: q[k + 1].x + dx / d * B.tailSeg, y: q[k + 1].y + dy / d * B.tailSeg };
+        }
+        q[0] = { x: base.x, y: base.y };
+        for (let k = 1; k < q.length; k++) {
+          const dx = q[k].x - q[k - 1].x, dy = q[k].y - q[k - 1].y, d = Math.hypot(dx, dy) || 1e-4;
+          q[k] = { x: q[k - 1].x + dx / d * B.tailSeg, y: q[k - 1].y + dy / d * B.tailSeg };
+        }
+      }
+      for (let k = 0; k < pts.length; k++) { pts[k].x = lerp(pts[k].x, q[k].x, tw); pts[k].y = lerp(pts[k].y, q[k].y, tw); }
+    }
+
+    cat.R = {
+      fs, fsgn, X, baseY, L, sn, cs, hip, sh, ctrl, hipW, shW, headW, yaw, pitch, pdx: clamp(pdx, -1, 1), pdy: clamp(pdy, -1, 1),
+      legs, tail: pts, eyeY: headW.y - 1,
+    };
+    return cat.R;
+  }
+
+  // procedural gait. Each foot lands a little ahead of its hip/shoulder (predicted from the body's speed) and
+  // steps again once it has trailed behind; diagonal pairs alternate at a walk, all four go at a run.
+  function updateGait(M, cat, dt) {
+    const R = cat.R, C = cat.ch;
+    const grounded = !cat.air && Math.abs(C.lift.v) < 3;
+    const vx = C.x.vel, speed = Math.abs(vx), sitting = C.sit.v > 0.45;
+    const baseY = R.baseY;
+    if (cat.lastSign !== R.fsgn) cat.lastSign = R.fsgn;
+    const dur = clamp(0.19 - speed * 0.0003, 0.085, 0.19);
+    const gallop = speed > 180;
+    for (let k = 0; k < 4; k++) {
+      const f = cat.feet[k], L = R.legs[k];
+      const reach = k < 2 ? 40 * C.armS.v : 43 * C.legS.v;
+      if (!grounded) {
+        f.stepping = false; f.replant = null;
+        f.x = lerp(f.x, L.jx + R.fsgn * (k < 2 ? 5 : -3), 1 - Math.exp(-dt * 18));
+        f.y = L.jy + (k < 2 ? 36 : 39) * (k < 2 ? C.armS.v : C.legS.v) * 0.95;
+        f.wasAir = true;
+        continue;
+      }
+      let home = L.jx + (k < 2 ? 2 : -2) * R.fsgn;
+      if (sitting && k >= 2) home = R.hipW.x + R.fsgn * 12;
+      if (Math.abs(C.face.v) < 0.85) {
+        // turning round: gather the feet under the body (a little pivot hop) so no leg gets dragged across
+        f.stepping = false; f.replant = null;
+        f.x = lerp(f.x, L.jx, 1 - Math.exp(-dt * 30));
+        f.y = baseY - 3;
+        continue;
+      }
+      const legLen = k < 2 ? 40 * C.armS.v * (1 + 0.2 * C.sit.v) : 43 * C.legS.v;
+      if (baseY - L.jy > legLen * 0.93) {
+        // rearing up: this paw is off the ground, so let it hang softly bent
+        f.stepping = false; f.replant = null;
+        f.x = lerp(f.x, L.jx + R.fsgn * 7, 1 - Math.exp(-dt * 14));
+        f.y = lerp(f.y, L.jy + legLen * 0.8, 1 - Math.exp(-dt * 14));
+        f.tucked = true;
+        continue;
+      }
+      if (f.tucked) { f.tucked = false; f.stepping = true; f.t = 0; f.dur = 0.12; f.sx = f.x; }
+      if (f.wasAir) { f.wasAir = false; f.x = home; f.y = baseY; f.stepping = false; f.replant = null; }
+      if (f.replant != null) f.replant -= dt;
+      if (f.stepping) {
+        f.t += dt;
+        const u = Math.min(1, f.t / f.dur);
+        const ex = home + vx * f.dur * 0.5;                 // aim where the joint will be, a touch ahead
+        f.x = lerp(f.sx, ex, u * u * (3 - 2 * u));
+        f.y = baseY - Math.sin(Math.PI * u) * (5 + Math.min(6, speed * 0.03));
+        if (u >= 1) { f.stepping = false; f.y = baseY; if (M && speed > 20) M.events.push({ type: 'sfx', name: 'step', v: Math.min(1, speed / 200) }); }
+      } else {
+        f.y = baseY;
+        const drift = Math.abs(f.x - home);
+        const thr = 8 + speed * dur * 0.55;
+        const other = (k === 0 || k === 3) ? [1, 2] : [0, 3];
+        const blocked = !gallop && other.some(o => cat.feet[o].stepping);
+        const emergency = Math.abs(f.x - L.jx) > reach * 0.62;
+        const replant = f.replant != null && f.replant <= 0;
+        if ((drift > thr && !blocked) || emergency || replant) {
+          f.stepping = true; f.t = 0; f.replant = null;
+          f.dur = emergency ? dur * 0.7 : dur;
+          f.sx = f.x;
+        }
+      }
+    }
+  }
+
+  function updateCat(M, dt) {
+    const cat = M.cat, C = cat.ch;
+    for (const k in C) stepCh(C[k], dt);
+    if (Math.abs(C.face.v) > 0.02) cat.faceSign = Math.sign(C.face.v);
+    cat.t += dt;
+    cat.tailPhase += dt * (2 + C.tailLash.v * 7);
+    cat.nextBlink -= dt;
+    if (cat.nextBlink <= 0) { cat.blink = 0.13; cat.nextBlink = 1.8 + M.rng() * 4; }
+    if (cat.blink > 0) cat.blink -= dt;
+    cat.nextTwitch -= dt;
+    if (cat.nextTwitch <= 0) { cat.earTwitch = 0.25; cat.nextTwitch = 2 + M.rng() * 5; }
+    if (cat.earTwitch > 0) cat.earTwitch -= dt;
+    rig(cat);
+    updateGait(M, cat, dt);
+  }
+
+  // ------------------------------------------------------------------ coroutine helpers (yield returns dt)
+  function* wait(s) { let t = 0; while (t < s) t += (yield) || 0; }
+  function* until(pred, max) { let t = 0; max = max == null ? 5 : max; while (!pred() && t < max) t += (yield) || 0; }
+  function* tween(dur, fn) { let t = 0; fn(0); while (t < dur) { t += (yield) || 0; fn(Math.min(1, t / dur)); } }
+  function* all(...gens) {
+    let live = gens.filter(Boolean), dt = 0;
+    while (true) {
+      live = live.filter(g => !g.next(dt).done);
+      if (!live.length) return;
+      dt = (yield) || 0;
+    }
+  }
+
+  // ------------------------------------------------------------------ events
+  const say = (M, text, dur, kind) => M.events.push({ type: 'bubble', text, dur: dur || 1.1, kind: kind || 'say' });
+  const sfx = (M, name, o) => M.events.push(Object.assign({ type: 'sfx', name }, o || {}));
+  const fx = (M, kind, x, y, n, o) => M.events.push(Object.assign({ type: 'fx', kind, x, y, n: n || 1 }, o || {}));
+
+  // ------------------------------------------------------------------ small behaviours
+  function lookAt(cat, x, y, w) { cat.ch.lookX.t = x; cat.ch.lookY.t = y; cat.ch.gaze.t = 0; if (w) { cat.ch.lookX.w = w; cat.ch.lookY.w = w; } }
+  function lookUser(cat, g) { cat.ch.gaze.t = g == null ? 1 : g; }
+  function lookSwitch(cat, i) { const p = leverTip(i); lookAt(cat, p.x, p.y); }
+  function reachPaw(cat, k, x, y, w) {
+    const C = cat.ch, p = ['p0', 'p1', 'k'][k];
+    C[p + 'x'].t = x; C[p + 'y'].t = y; if (w != null) C[p + 'w'].t = w;
+  }
+  function snapPaw(cat, k) {
+    // start a reach from where the paw currently is, so it doesn't fly in from (0,0)
+    const C = cat.ch, p = ['p0', 'p1', 'k'][k], L = cat.R.legs[k];
+    if (C[p + 'w'].v < 0.05) { C[p + 'x'].v = L.fx; C[p + 'y'].v = L.fy; C[p + 'x'].vel = C[p + 'y'].vel = 0; }
+  }
+  function pawSpeed(cat, k, w) {
+    const C = cat.ch, p = ['p0', 'p1', 'k'][k];
+    C[p + 'x'].w = w; C[p + 'y'].w = w;
+  }
+  function snapTail(cat) {
+    const C = cat.ch, tip = cat.R.tail[cat.R.tail.length - 1];
+    if (C.tw.v < 0.05) { C.tx.v = tip.x; C.ty.v = tip.y; C.tx.vel = C.ty.vel = 0; }
+  }
+
+  function* faceDir(M, dir) {
+    const C = M.cat.ch;
+    if (!dir || (C.face.t === dir && M.cat.faceSign === dir && Math.abs(C.face.v) > 0.9)) return;
+    C.face.t = dir;
+    yield* until(() => Math.abs(C.face.v - dir) < 0.25, 0.4);
+  }
+
+  function catOff(M, i, how) {
+    const s = M.sw[i];
+    if (!s.on) return false;
+    s.on = false; s.kick = -1;
+    M.stats.catOffs++;
+    const tip = leverTip(i);
+    sfx(M, 'click', { pitch: 0.9 + i * 0.05 + (how === 'sweep' ? M.sweepN++ * 0.12 : 0), how, i });
+    fx(M, 'spark', tip.x, tip.y, 5);
+    return true;
+  }
+  const anyOn = M => M.sw.some(s => s.on);
+  const onList = M => M.sw.map((s, i) => (s.on ? i : -1)).filter(i => i >= 0);
+
+  // hop (used by travel and by the stomp)
+  // whatever happens to an airborne action, the cat ends up back on its feet
+  function land(M) {
+    const cat = M.cat, C = cat.ch;
+    if (!cat.air && C.lift.t >= 0) return;
+    cat.air = false; C.lift.t = 0; C.lift.w = C.lift.w0; C.x.w = C.x.w0; C.x.t = C.x.v;
+  }
+
+  function* hop(M, tx, h) {
+    try { yield* hopInner(M, tx, h); } finally { land(M); }
+  }
+  function* hopInner(M, tx, h) {
+    const cat = M.cat, C = cat.ch, x0 = C.x.v, dist = Math.abs(tx - x0);
+    pose(cat, { crouch: 0.85, squash: 0.35 }); yield* wait(0.12);
+    pose(cat, { crouch: 0, squash: -0.3 }); sfx(M, 'hop');
+    cat.air = true;
+    h = h || 24 + dist * 0.12;
+    const dur = 0.28 + dist * 0.0011;
+    C.x.w = 40;
+    yield* tween(dur, u => {
+      C.x.t = lerp(x0, tx, u);
+      C.lift.v = C.lift.t = -h * 4 * u * (1 - u); C.lift.vel = 0;
+      C.squash.t = u < 0.5 ? -0.3 : 0.05;
+    });
+    C.lift.v = C.lift.t = 0; C.lift.vel = 0; cat.air = false;
+    pose(cat, { squash: 0.5 }); fx(M, 'dust', tx, G.laneY, 6); sfx(M, 'land');
+    yield* wait(0.08); pose(cat, { squash: 0 }); C.x.w = C.x.w0;
+    yield* wait(0.05);
+  }
+
+  const X_MIN = G.boxL + 46, X_MAX = G.boxR - 46;
+  const roomAt = x => x >= X_MIN && x <= X_MAX;
+
+  function* travel(M, tx, mode) {
+    const cat = M.cat, C = cat.ch;
+    tx = clamp(tx, X_MIN, X_MAX);
+    const dist = Math.abs(tx - C.x.v);
+    if (dist < 2) return;
+    const dir = Math.sign(tx - C.x.v);
+    yield* faceDir(M, dir);
+    if (mode === 'hop' && dist > 50) { yield* hop(M, tx); return; }
+    const speed = mode === 'run' ? 270 : 62 + M.anger * 95;
+    C.x.w = mode === 'run' ? 18 : 11;
+    let x = C.x.v, dustT = 0;
+    if (mode === 'run') { pose(cat, { crouch: 0.35, earBack: 1, stretch: 1.12 }); }
+    while (Math.abs(tx - x) > 0.5) {
+      const dt = (yield) || 0;
+      x += dir * Math.min(speed * dt, Math.abs(tx - x));
+      C.x.t = x;
+      if (mode === 'run' && (dustT += dt) > 0.07) { dustT = 0; fx(M, 'dust', C.x.v - dir * 30, G.laneY, 1); }
+    }
+    C.x.t = tx;
+    yield* until(() => Math.abs(C.x.v - tx) < 1.5, 0.45);
+    C.x.w = C.x.w0;
+    if (mode === 'run') pose(cat, { crouch: 0, stretch: 1 });
+  }
+
+  // ------------------------------------------------------------------ techniques (turning switches off)
+  const TECH = {};
+
+  function standFor(M, i, side) {
+    // root x so the shoulder sits just beside the lever tip, facing the lever; switch sides if there's no room
+    const tip = leverTip(i), C = M.cat.ch;
+    const opt = fr => { const dir = fr ? -1 : 1; const sx = tip.x + (fr ? 16 : -18); return { x: sx - dir * BODY.L / 2, dir, tip, fromRight: fr }; };
+    let o = opt(side != null ? side > 0 : C.x.v > tip.x);
+    if (!roomAt(o.x)) o = opt(!o.fromRight);
+    return o;
+  }
+
+  TECH.swat = function* (M, mv) {
+    const cat = M.cat, C = cat.ch, i = mv.ids[0];
+    const st = standFor(M, i);
+    yield* travel(M, st.x, mv.travel);
+    yield* faceDir(M, st.dir);
+    lookAt(cat, st.tip.x, st.tip.y);
+    snapPaw(cat, 0);
+    const a = M.anger;
+    pose(cat, { rear: 0.25, earBack: Math.min(1, a + 0.3), brow: Math.min(1, a + 0.2) });
+    reachPaw(cat, 0, st.tip.x + (st.fromRight ? 18 : 6), st.tip.y - 30, 1);
+    sfx(M, 'servo');
+    yield* wait(0.26 - a * 0.1);
+    pawSpeed(cat, 0, 60);
+    reachPaw(cat, 0, st.tip.x - 15, st.tip.y + 3);
+    sfx(M, 'whoosh');
+    yield* wait(0.05);
+    catOff(M, i, 'swat');
+    pose(cat, { squash: 0.15 });
+    yield* wait(0.14);
+    pawSpeed(cat, 0, CH_DEF.p0x[1]);
+    pose(cat, { p0w: 0, rear: 0, squash: 0 });
+    yield* wait(0.16);
+  };
+
+  // both paws at once on two neighbours, with cartoon noodle-arms
+  TECH.double = function* (M, mv) {
+    const cat = M.cat, C = cat.ch, [i, j] = mv.ids;
+    const a = leverTip(i), b = leverTip(j);
+    const mid = (a.x + b.x) / 2;
+    const dir = C.x.v > mid ? -1 : 1;
+    yield* travel(M, mid - dir * (BODY.L / 2 - 4), mv.travel);
+    yield* faceDir(M, dir);
+    lookAt(cat, mid, a.y);
+    snapPaw(cat, 0); snapPaw(cat, 1);
+    pose(cat, { rear: 1, stretch: 1.05, earBack: 1, brow: 1, mouthOpen: 0.4, fang: 0.6 });
+    const nearT = dir > 0 ? b : a, farT = dir > 0 ? a : b;
+    reachPaw(cat, 0, nearT.x + 6, nearT.y - 60, 1); reachPaw(cat, 1, farT.x + 6, farT.y - 60, 1);
+    sfx(M, 'servo', { pitch: 0.8 });
+    yield* wait(0.36);
+    pose(cat, { armS: 1.9, rear: 0.35 }, 30);
+    pawSpeed(cat, 0, 55); pawSpeed(cat, 1, 55);
+    reachPaw(cat, 0, nearT.x - 12, nearT.y + 4); reachPaw(cat, 1, farT.x - 12, farT.y + 4);
+    yield* wait(0.07);
+    catOff(M, i, 'double'); catOff(M, j, 'double');
+    sfx(M, 'thud'); fx(M, 'stars', mid, a.y, 6); M.shake = Math.max(M.shake, 3);
+    say(M, '쾅!', 0.7, 'shout');
+    yield* wait(0.3);
+    pawSpeed(cat, 0, CH_DEF.p0x[1]); pawSpeed(cat, 1, CH_DEF.p1x[1]);
+    pose(cat, { p0w: 0, p1w: 0, armS: 1, rear: 0, mouthOpen: 0, fang: 0 });
+    C.armS.w = C.armS.w0;
+    yield* wait(0.2);
+  };
+
+  // lazy belly-flop across two neighbours
+  TECH.flop = function* (M, mv) { try { yield* TECH['_flop'](M, mv); } finally { land(M); } };
+  TECH._flop = function* (M, mv) {
+    const cat = M.cat, C = cat.ch, [i, j] = mv.ids;
+    const a = leverTip(i), b = leverTip(j), mid = (a.x + b.x) / 2;
+    const dir = C.x.v > mid ? -1 : 1;
+    yield* travel(M, mid - dir * 70, mv.travel);
+    yield* faceDir(M, dir);
+    lookAt(cat, mid, a.y);
+    say(M, '에잇', 0.7);
+    yield* wait(0.2);
+    pose(cat, { crouch: 0.9, squash: 0.3 }); yield* wait(0.14);
+    cat.air = true; sfx(M, 'hop');
+    const x0 = C.x.v; C.x.w = 40;
+    yield* tween(0.34, u => {
+      C.x.t = lerp(x0, mid, u);
+      C.lift.v = C.lift.t = -26 * 4 * u * (1 - u); C.lift.vel = 0;
+      C.stretch.t = 1 + u * 0.55; C.crouch.t = u * 0.9;
+    });
+    C.lift.v = C.lift.t = -4; cat.air = false;
+    pose(cat, { crouch: 1, stretch: 1.55, squash: 0.6, happy: 1, eyeOpen: 0.1 });
+    catOff(M, i, 'flop'); catOff(M, j, 'flop');
+    sfx(M, 'thud'); fx(M, 'dust', mid, G.laneY, 10);
+    say(M, '털썩', 0.9);
+    yield* wait(0.75);
+    C.lift.t = 0;
+    pose(cat, { crouch: 0, stretch: 1, squash: 0, happy: 0 });
+    C.x.w = C.x.w0;
+    yield* wait(0.3);
+  };
+
+  // run of 3+: drag a paw across them right-to-left
+  TECH.sweep = function* (M, mv, fast) {
+    const cat = M.cat, C = cat.ch;
+    let ids = mv.ids.slice().sort((p, q) => p - q);
+    if (!roomAt(leverTip(ids[ids.length - 1]).x + 20 + BODY.L / 2)) {
+      const last = ids[ids.length - 1];
+      yield* TECH.swat(M, { kind: 'swat', ids: [last], travel: fast ? 'run' : mv.travel });
+      ids = ids.filter(i => i !== last && M.sw[i].on);
+      if (!ids.length) return;
+    }
+    const rTip = leverTip(ids[ids.length - 1]), lTip = leverTip(ids[0]);
+    yield* travel(M, rTip.x + 20 + BODY.L / 2, fast ? 'run' : mv.travel);
+    yield* faceDir(M, -1);
+    lookAt(cat, rTip.x, rTip.y);
+    snapPaw(cat, 0);
+    pose(cat, { crouch: 0.3, earBack: fast ? 1 : 0.4, tongue: fast ? 0 : 1, brow: fast ? 1 : 0.3 });
+    reachPaw(cat, 0, rTip.x + 8, rTip.y - 12, 1);
+    yield* wait(0.22);
+    reachPaw(cat, 0, rTip.x + 6, rTip.y + 2);
+    yield* wait(0.08);
+    M.sweepN = 0;
+    const speed = fast ? 230 : 105;
+    C.x.w = 20; pawSpeed(cat, 0, 45);
+    let x = C.x.v;
+    const stop = lTip.x - 18;
+    while (true) {
+      const dt = (yield) || 0;
+      x -= speed * dt; C.x.t = x;
+      const shoulder = cat.R.shW.x;
+      const px = shoulder - 14;
+      reachPaw(cat, 0, px, lTip.y + 2);
+      lookAt(cat, px - 50, lTip.y);
+      const paw = cat.R.legs[0].fx;
+      for (const i of ids) { const tx = leverTip(i).x; if (M.sw[i].on && paw < tx - 2 && paw > tx - 26) catOff(M, i, 'sweep'); }
+      if (paw < stop || x < X_MIN) break;
+    }
+    C.x.t = C.x.v; C.x.w = C.x.w0; pawSpeed(cat, 0, CH_DEF.p0x[1]);
+    pose(cat, { p0w: 0, crouch: 0, tongue: 0 });
+    yield* wait(0.2);
+  };
+
+  TECH.zoomies = function* (M, mv) {
+    say(M, '우다다다!!', 1.1, 'shout');
+    yield* TECH.sweep(M, mv, true);
+    pose(M.cat, { puff: 0.8 });
+    fx(M, 'dust', M.cat.ch.x.v, G.laneY, 8);
+  };
+
+  // lever just behind us: flick it with the tail without looking
+  TECH.tail = function* (M, mv) {
+    const cat = M.cat, C = cat.ch, i = mv.ids[0], tip = leverTip(i);
+    const behind = (tip.x - C.x.v) * cat.faceSign < 0;
+    if (!behind || Math.abs(cat.R.hipW.x - tip.x) > 62) {
+      // walk on past the lever so it ends up ~35px behind the hips, then flick without turning round
+      let dir = behind ? -cat.faceSign : (Math.sign(tip.x - C.x.v) || cat.faceSign);
+      if (!roomAt(tip.x + dir * (BODY.L / 2 + 34))) dir = -dir;
+      yield* travel(M, tip.x + dir * (BODY.L / 2 + 34), mv.travel);
+      yield* faceDir(M, dir);
+    }
+    lookUser(cat, 0.8);
+    pose(cat, { eyeOpen: 0.4, happy: M.anger < 0.4 ? 0.6 : 0, tailLash: 0 });
+    say(M, M.anger > 0.5 ? '흥' : '…', 0.8);
+    snapTail(cat);
+    C.tw.t = 1; C.tx.t = tip.x + 20; C.ty.t = tip.y - 22;
+    sfx(M, 'servo', { pitch: 1.3 });
+    yield* wait(0.32);
+    C.tx.w = C.ty.w = 50;
+    C.tx.t = tip.x - 16; C.ty.t = tip.y + 3;
+    yield* wait(0.06);
+    catOff(M, i, 'tail');
+    yield* wait(0.22);
+    C.tx.w = C.tx.w0; C.ty.w = C.ty.w0; C.tw.t = 0;
+    relax(M);
+    yield* wait(0.1);
+  };
+
+  // donkey kick with a hind paw (only works facing right: the kick goes leftward)
+  TECH.kick = function* (M, mv) {
+    const cat = M.cat, C = cat.ch, i = mv.ids[0], tip = leverTip(i);
+    yield* travel(M, tip.x + BODY.L / 2 + 30, mv.travel);
+    yield* faceDir(M, 1);
+    lookAt(cat, tip.x - 40, tip.y - 30);
+    C.gaze.t = 0.3;
+    snapPaw(cat, 2);
+    pose(cat, { rear: -0.55, legS: 1.35, brow: 1, earBack: 0.8 });
+    sfx(M, 'servo', { pitch: 0.9 });
+    reachPaw(cat, 2, tip.x + 18, tip.y - 14, 1);
+    yield* wait(0.28);
+    pawSpeed(cat, 2, 60);
+    reachPaw(cat, 2, tip.x - 16, tip.y + 2);
+    sfx(M, 'whoosh');
+    yield* wait(0.06);
+    catOff(M, i, 'kick');
+    fx(M, 'dust', tip.x, tip.y, 3);
+    yield* wait(0.2);
+    pawSpeed(cat, 2, CH_DEF.kx[1]);
+    pose(cat, { kw: 0, rear: 0, legS: 1 });
+    yield* wait(0.2);
+  };
+
+  // sit on it
+  TECH.butt = function* (M, mv) {
+    const cat = M.cat, C = cat.ch, i = mv.ids[0], tip = leverTip(i);
+    const dir = C.x.v > tip.x ? 1 : -1;       // walk past it, then back the hips onto it
+    const hipOff = -BODY.L * 0.72 / 2 + 19;   // hip local x when fully sitting
+    yield* travel(M, tip.x - dir * hipOff, mv.travel);
+    yield* faceDir(M, dir);
+    lookUser(cat, 1);
+    pose(cat, { eyeOpen: 0.5, mouthCurve: 0.2 });
+    yield* wait(0.25);
+    C.sit.w = 6; C.sit.t = 1;
+    yield* until(() => C.sit.v > 0.55, 0.8);
+    catOff(M, i, 'butt');
+    sfx(M, 'squish');
+    pose(cat, { happy: 1, blush: 0.6, headTilt: -0.15 * dir });
+    say(M, '흥.', 0.9);
+    yield* wait(0.75);
+    pose(cat, { sit: 0, happy: 0, headTilt: 0 });
+    C.sit.w = C.sit.w0;
+    yield* wait(0.3);
+  };
+
+  // hop up and land on it with both front paws
+  TECH.stomp = function* (M, mv) { try { yield* TECH['_stomp'](M, mv); } finally { land(M); } };
+  TECH._stomp = function* (M, mv) {
+    const cat = M.cat, C = cat.ch, i = mv.ids[0], tip = leverTip(i);
+    let side = C.x.v > tip.x ? 1 : -1;
+    if (!roomAt(tip.x + side * 78)) side = -side;
+    yield* travel(M, tip.x + side * 78, mv.travel);
+    const dir = -side;
+    yield* faceDir(M, dir);
+    lookAt(cat, tip.x, tip.y);
+    pose(cat, { crouch: 0.9, squash: 0.35, earBack: 1, brow: 1 });
+    yield* wait(0.16);
+    snapPaw(cat, 0); snapPaw(cat, 1);
+    cat.air = true; sfx(M, 'hop');
+    const x0 = C.x.v, x1 = tip.x - dir * (BODY.L / 2 - 2);
+    C.x.w = 40;
+    pose(cat, { crouch: 0, squash: -0.3, rear: 0.5 });
+    yield* tween(0.36, u => {
+      C.x.t = lerp(x0, x1, u);
+      C.lift.v = C.lift.t = -40 * 4 * u * (1 - u); C.lift.vel = 0;
+      if (u > 0.45) {
+        C.p0w.t = C.p1w.t = 1; pawSpeed(cat, 0, 40); pawSpeed(cat, 1, 40);
+        reachPaw(cat, 0, tip.x + 3, tip.y + 2); reachPaw(cat, 1, tip.x - 5, tip.y + 2);
+        C.rear.t = 0.1;
+      }
+    });
+    C.lift.v = C.lift.t = 0; cat.air = false;
+    catOff(M, i, 'stomp');
+    pose(cat, { squash: 0.55, crouch: 0.5 });
+    sfx(M, 'thud'); fx(M, 'stars', tip.x, tip.y, 5); fx(M, 'dust', tip.x, G.laneY, 6);
+    M.shake = Math.max(M.shake, 4);
+    say(M, '쿵!', 0.7, 'shout');
+    yield* wait(0.3);
+    pawSpeed(cat, 0, CH_DEF.p0x[1]); pawSpeed(cat, 1, CH_DEF.p1x[1]);
+    pose(cat, { p0w: 0, p1w: 0, squash: 0, crouch: 0, rear: 0 });
+    C.x.w = C.x.w0;
+    yield* wait(0.2);
+  };
+
+  // stare at you while slowly pushing it — the cup-off-the-table move
+  TECH.judgy = function* (M, mv) {
+    const cat = M.cat, C = cat.ch, i = mv.ids[0];
+    const st = standFor(M, i, 1);
+    yield* travel(M, st.x, mv.travel);
+    yield* faceDir(M, st.dir);
+    lookUser(cat, 1);
+    pose(cat, { eyeOpen: 0.42, brow: 0.35, earBack: 0.2, mouthCurve: 0 });
+    say(M, '…', 1.6, 'think');
+    snapPaw(cat, 0);
+    pawSpeed(cat, 0, 3.2);
+    reachPaw(cat, 0, st.tip.x + 9, st.tip.y - 3, 1);
+    yield* wait(1.25);
+    pose(cat, { eyeOpen: 0.2 }); yield* wait(0.25); pose(cat, { eyeOpen: 0.45 });
+    yield* wait(0.35);
+    pawSpeed(cat, 0, 45);
+    reachPaw(cat, 0, st.tip.x - 14, st.tip.y + 3);
+    yield* wait(0.06);
+    catOff(M, i, 'judgy');
+    yield* wait(0.5);
+    pawSpeed(cat, 0, CH_DEF.p0x[1]);
+    pose(cat, { p0w: 0 });
+    yield* wait(0.2);
+  };
+
+  // gentle head bonk
+  TECH.bonk = function* (M, mv) {
+    const cat = M.cat, C = cat.ch, i = mv.ids[0], tip = leverTip(i);
+    let dir = C.x.v > tip.x ? -1 : 1;
+    if (!roomAt(tip.x - dir * 50)) dir = -dir;
+    yield* travel(M, tip.x - dir * 50, mv.travel);
+    yield* faceDir(M, dir);
+    lookAt(cat, tip.x, tip.y);
+    pose(cat, { blush: 0.8, eyeOpen: 0.6 });
+    yield* wait(0.2);
+    pose(cat, { neckDip: 0.62, rear: -0.35, crouch: 0.25, happy: 1 }, 9);
+    yield* wait(0.3);
+    catOff(M, i, 'bonk');
+    say(M, '콩', 0.7);
+    fx(M, 'hearts', tip.x, tip.y - 18, 2);
+    yield* wait(0.35);
+    relax(M, ['blush']);
+    C.blush.t = 0;
+    yield* wait(0.25);
+  };
+
+  // arrived and it's already off
+  TECH.confused = function* (M, i) {
+    const cat = M.cat, C = cat.ch;
+    lookSwitch(cat, i);
+    pose(cat, { headTilt: 0.35, eyeOpen: 1, earPerk: 1 });
+    say(M, '?', 0.8);
+    fx(M, 'sweat', cat.R.headW.x + 18, cat.R.headW.y - 16, 1);
+    yield* wait(0.65);
+    lookUser(cat, 1);
+    pose(cat, { headTilt: 0, eyeOpen: 0.45, brow: 0.6, earPerk: 0 });
+    say(M, '…', 0.8, 'think');
+    yield* wait(0.7);
+    relax(M);
+  };
+
+  // ------------------------------------------------------------------ emerging
+  let EYE_LIFT = 92;
+
+  const EMERGE = {};
+  EMERGE.creep = function* (M, A) {
+    const cat = M.cat, C = cat.ch;
+    M.lid.w = 5; M.lid.t = 24; sfx(M, 'creak');
+    C.lift.w = 5; C.lift.t = EYE_LIFT;
+    pose(cat, { eyeOpen: 1, pupil: 0.9 });
+    yield* wait(0.7);
+    lookAt(cat, G.boxL, 250); yield* wait(0.45);
+    lookAt(cat, G.boxR, 250); yield* wait(0.45);
+    if (A.n) { lookSwitch(cat, A.on[0]); pose(cat, { pupil: 0.3 }); say(M, '…!', 0.7); yield* wait(0.45); }
+    M.lid.w = 9; M.lid.t = 104; sfx(M, 'creak', { v: 0.6 });
+    C.lift.w = 6; C.lift.t = 0;
+    snapPaw(cat, 0); snapPaw(cat, 1);
+    reachPaw(cat, 0, G.hatchCX + 44 * cat.faceSign, G.laneY - 2, 1);
+    reachPaw(cat, 1, G.hatchCX - 30 * cat.faceSign, G.laneY - 2, 1);
+    yield* until(() => C.lift.v < 30, 1.6);
+    pose(cat, { p0w: 0, p1w: 0 });
+    yield* until(() => C.lift.v < 2, 1);
+  };
+  EMERGE.pop = function* (M) { try { yield* EMERGE._pop(M); } finally { land(M); } };
+  EMERGE._pop = function* (M) {
+    const cat = M.cat, C = cat.ch;
+    M.lid.w = 30; M.lid.t = 110; sfx(M, 'bang'); M.shake = Math.max(M.shake, 2);
+    pose(cat, { stretch: 1.15, eyeOpen: 1.05, earBack: 0.6 });
+    const l0 = C.lift.v;
+    cat.air = true;
+    yield* tween(0.2, u => { C.lift.v = C.lift.t = lerp(l0, -40, easeOut(u)); C.lift.vel = 0; });
+    yield* tween(0.18, u => { C.lift.v = C.lift.t = lerp(-40, 0, easeIn(u)); C.lift.vel = 0; });
+    cat.air = false;
+    pose(cat, { squash: 0.5, stretch: 1 }); fx(M, 'dust', C.x.v, G.laneY, 5); sfx(M, 'land');
+    yield* wait(0.1); pose(cat, { squash: 0 });
+    yield* wait(0.08);
+  };
+  EMERGE.grumpy = function* (M) {
+    const cat = M.cat, C = cat.ch;
+    M.lid.w = 7; M.lid.t = 100; sfx(M, 'creak', { v: 0.8 });
+    lookUser(cat, 1);
+    pose(cat, { brow: 1, earBack: 1, eyeOpen: 0.55, mouthCurve: -0.8, tailLash: 0.9 });
+    C.lift.w = 3.6; C.lift.t = 0;
+    yield* until(() => C.lift.v < 60, 1.5);
+    say(M, '…', 1.3, 'think');
+    sfx(M, 'growl');
+    yield* until(() => C.lift.v < 2, 1.6);
+    yield* wait(0.3);
+  };
+  EMERGE.sleepy = function* (M) {
+    const cat = M.cat, C = cat.ch;
+    M.lid.w = 3.5; M.lid.t = 96; sfx(M, 'creak', { v: 0.5 });
+    pose(cat, { eyeOpen: 0.08, earBack: 0.3, tailLash: 0.02 });
+    C.lift.w = 3; C.lift.t = 0;
+    yield* until(() => C.lift.v < 3, 2.4);
+    pose(cat, { mouthOpen: 1, stretch: 1.12, rear: 0.3 }, 5);
+    say(M, '하아암~', 1.2);
+    sfx(M, 'meow', { kind: 'yawn' });
+    yield* wait(0.9);
+    pose(cat, { mouthOpen: 0, stretch: 1, rear: 0 });
+    snapPaw(cat, 0);
+    for (let k = 0; k < 2; k++) {
+      const h = cat.R.headW;
+      reachPaw(cat, 0, h.x + cat.faceSign * 6, h.y + 2, 1); yield* wait(0.22);
+      reachPaw(cat, 0, h.x + cat.faceSign * 12, h.y + 8); yield* wait(0.22);
+    }
+    pose(cat, { p0w: 0, eyeOpen: 0.5 });
+    yield* wait(0.3);
+  };
+  EMERGE.alarm = function* (M) {
+    const cat = M.cat;
+    yield* EMERGE.pop(M);
+    say(M, '!!', 0.8, 'shout');
+    pose(cat, { puff: 0.9, eyeOpen: 1.15, pupil: 0.15, earBack: 0 });
+    for (let k = 0; k < 2; k++) {
+      lookAt(cat, G.boxL, 240, 30); yield* wait(0.16);
+      lookAt(cat, G.boxR, 240, 30); yield* wait(0.16);
+    }
+    cat.ch.lookX.w = cat.ch.lookX.w0; cat.ch.lookY.w = cat.ch.lookY.w0;
+  };
+
+  // ------------------------------------------------------------------ pre-work beats
+  const PRE = {};
+  PRE.count = function* (M, A) {
+    const cat = M.cat;
+    let k = 0;
+    for (const i of A.on) {
+      lookSwitch(cat, i);
+      k++;
+      say(M, String(k), 0.36, 'count');
+      pose(cat, { eyeOpen: 0.8 + k * 0.06, pupil: Math.max(0.1, 0.5 - k * 0.07) });
+      sfx(M, 'tick', { pitch: 1 + k * 0.08 });
+      yield* wait(0.3);
+    }
+    lookUser(cat, 1);
+    say(M, A.n >= 5 ? '…!!!' : '…!!', 0.9, 'shout');
+    pose(cat, { puff: 0.7, earBack: 1, brow: 1 });
+    sfx(M, 'growl');
+    yield* wait(0.8);
+  };
+  PRE.glare = function* (M) {
+    const cat = M.cat;
+    lookUser(cat, 1);
+    pose(cat, { brow: 1, earBack: 1, eyeOpen: 0.55, tailLash: 1, mouthCurve: -0.8 });
+    say(M, '…', 1.1, 'think');
+    if (M.anger > 0.45) sfx(M, 'growl');
+    fx(M, 'vein', 0, 0, 1);
+    yield* wait(1.1);
+  };
+  PRE.hiss = function* (M) {
+    const cat = M.cat;
+    lookUser(cat, 1);
+    pose(cat, { arch: 1, puff: 1, mouthOpen: 1, fang: 1, earBack: 1, brow: 1, crouch: 0.25, tailUp: 1, tailLash: 0.2 });
+    say(M, '캬아악!', 0.95, 'shout');
+    sfx(M, 'hiss');
+    M.shake = Math.max(M.shake, 1.5);
+    yield* wait(0.95);
+    pose(cat, { arch: 0.25, mouthOpen: 0, fang: 0, crouch: 0 });
+    yield* wait(0.2);
+  };
+  PRE.stretch = function* (M) {
+    const cat = M.cat;
+    pose(cat, { rear: -0.8, stretch: 1.28, mouthOpen: 1, eyeOpen: 0.05, earBack: 0.3 }, 5);
+    say(M, '하아암~', 1.1);
+    sfx(M, 'meow', { kind: 'yawn' });
+    yield* wait(1.2);
+    relax(M);
+    yield* wait(0.25);
+  };
+  PRE.sigh = function* (M) {
+    const cat = M.cat;
+    lookUser(cat, 1);
+    pose(cat, { eyeOpen: 0.35, stretch: 0.93, crouch: 0.25, earBack: 0.5, mouthCurve: -0.4 });
+    say(M, '후우…', 1.1, 'think');
+    sfx(M, 'sigh');
+    fx(M, 'steam', 0, 0, 2, { fromNose: true });
+    yield* wait(1.05);
+    relax(M);
+  };
+  PRE.again = function* (M, A) {
+    const cat = M.cat;
+    lookSwitch(cat, A.on[0]); yield* wait(0.3);
+    lookUser(cat, 1); yield* wait(0.22);
+    lookSwitch(cat, A.on[A.on.length - 1]); cat.ch.lookX.w = 30; yield* wait(0.18);
+    lookUser(cat, 1); cat.ch.lookX.w = cat.ch.lookX.w0;
+    pose(cat, { eyeOpen: 1.15, puff: 0.5, earBack: 0.9 });
+    say(M, '또?!', 0.9, 'shout');
+    sfx(M, 'meow', { kind: 'angry' });
+    yield* wait(0.8);
+  };
+
+  // ------------------------------------------------------------------ post-work beats
+  const POST = {};
+  POST.dust = function* (M) {
+    const cat = M.cat;
+    pose(cat, { sit: 0.5 });
+    yield* wait(0.2);
+    snapPaw(cat, 0); snapPaw(cat, 1);
+    for (let k = 0; k < 3; k++) {
+      const s = cat.R.shW, d = cat.faceSign;
+      reachPaw(cat, 0, s.x + d * 16, s.y + 2, 1); reachPaw(cat, 1, s.x + d * 8, s.y + 8, 1);
+      yield* wait(0.12);
+      reachPaw(cat, 0, s.x + d * 8, s.y + 8); reachPaw(cat, 1, s.x + d * 16, s.y + 2);
+      fx(M, 'dust', s.x + d * 12, s.y + 4, 1);
+      sfx(M, 'pat');
+      yield* wait(0.12);
+    }
+    say(M, '탁탁', 0.6);
+    pose(cat, { p0w: 0, p1w: 0, sit: 0 });
+    yield* wait(0.25);
+  };
+  POST.scold = function* (M) {
+    const cat = M.cat;
+    lookUser(cat, 1);
+    pose(cat, { brow: 1, earBack: 0.7, rear: 0.35 });
+    snapPaw(cat, 0);
+    const h = () => cat.R.headW;
+    reachPaw(cat, 0, h().x + cat.faceSign * 20, h().y - 4, 1);
+    pawSpeed(cat, 0, 34);
+    sfx(M, 'servo', { pitch: 1.1 });
+    let t = 0, n = 0;
+    while (t < 1.15) {
+      const dt = (yield) || 0; t += dt;
+      const s = Math.sin(t * 17);
+      reachPaw(cat, 0, h().x + cat.faceSign * (20 + s * 7), h().y - 6 + Math.abs(s) * -3);
+      if (t > n * 0.5) { n++; say(M, n === 1 ? '냥!' : '냥! 냥!', 0.5, 'shout'); sfx(M, 'meow', { kind: 'mew' }); }
+      pose(cat, { mouthOpen: 0.4 + 0.4 * Math.abs(s) });
+    }
+    pawSpeed(cat, 0, CH_DEF.p0x[1]);
+    pose(cat, { p0w: 0, rear: 0, mouthOpen: 0 });
+    yield* wait(0.2);
+  };
+  POST.smug = function* (M) {
+    const cat = M.cat;
+    pose(cat, { sit: 1, happy: 1, tailCurl: 1.2, tailLash: 0.05 });
+    lookAt(cat, cat.ch.x.v + cat.faceSign * 60, 80);
+    say(M, '흥.', 1.0);
+    yield* wait(1.1);
+    pose(cat, { sit: 0, happy: 0 });
+    yield* wait(0.3);
+  };
+  POST.guard = function* (M) {
+    const cat = M.cat, C = cat.ch;
+    yield* travel(M, G.hatchCX + 4, 'walk');
+    pose(cat, { sit: 0.9, eyeOpen: 0.5, brow: 0.9, earBack: 0.5, tailLash: 1 });
+    say(M, '지켜본다', 1.3, 'think');
+    let t = 0;
+    while (t < 2.6) {
+      t += (yield) || 0;
+      lookAt(cat, cat.cursor.x, cat.cursor.y);
+      if (cat.cursor.x < C.x.v - 20 && cat.faceSign > 0) C.face.t = -1;
+      if (cat.cursor.x > C.x.v + 20 && cat.faceSign < 0) C.face.t = 1;
+    }
+    pose(cat, { sit: 0 });
+    yield* wait(0.25);
+  };
+  POST.wave = function* (M) {
+    const cat = M.cat;
+    lookUser(cat, 1);
+    pose(cat, { happy: 1, blush: 0.5, sit: 0.6 });
+    snapPaw(cat, 0);
+    const h = () => cat.R.headW;
+    let t = 0;
+    say(M, '빠이', 0.9);
+    sfx(M, 'meow', { kind: 'mew' });
+    while (t < 1.0) {
+      t += (yield) || 0;
+      reachPaw(cat, 0, h().x + cat.faceSign * (22 + Math.sin(t * 14) * 7), h().y - 10, 1);
+    }
+    pose(cat, { p0w: 0, happy: 0, blush: 0, sit: 0 });
+    yield* wait(0.2);
+  };
+  POST.huff = function* (M) {
+    const cat = M.cat;
+    lookUser(cat, 1);
+    pose(cat, { puff: 0.9, brow: 1, earBack: 1, shake: 0.8 });
+    say(M, '씩씩', 1.0, 'shout');
+    for (let k = 0; k < 3; k++) {
+      fx(M, 'steam', 0, 0, 2, { fromNose: true });
+      sfx(M, 'huff');
+      yield* wait(0.3);
+    }
+    pose(cat, { shake: 0 });
+    yield* wait(0.15);
+  };
+  POST.hello = function* (M) {
+    const cat = M.cat;
+    lookUser(cat, 1);
+    pose(cat, { sit: 0.9, eyeOpen: 0.85, brow: 0, earBack: 0 });
+    yield* wait(0.9);
+    say(M, '안녕?', 1.0);
+    sfx(M, 'meow', { kind: 'mew' });
+    snapPaw(cat, 0);
+    const h = () => cat.R.headW;
+    let t = 0;
+    while (t < 1.0) { t += (yield) || 0; reachPaw(cat, 0, h().x + cat.faceSign * (22 + Math.sin(t * 14) * 7), h().y - 10, 1); }
+    pose(cat, { p0w: 0 });
+    lookSwitch(cat, 1); yield* wait(0.5);
+    lookSwitch(cat, 4); yield* wait(0.5);
+    lookUser(cat, 1);
+    pose(cat, { brow: 0.6, eyeOpen: 0.5 });
+    say(M, '저거 건드리지 마.', 1.6, 'think');
+    yield* wait(1.7);
+    pose(cat, { sit: 0 });
+    yield* wait(0.3);
+  };
+  POST.lookBack = function* (M) {
+    const cat = M.cat;
+    yield* travel(M, G.hatchCX, M.anger > 0.5 ? 'hop' : 'walk');
+    lookUser(cat, 1);
+    pose(cat, { eyeOpen: 0.35, brow: 0.9, headTilt: 0.12 * cat.faceSign });
+    say(M, '째릿', 0.9, 'think');
+    yield* wait(0.9);
+  };
+
+  // ------------------------------------------------------------------ going back in
+  const RETREAT = {};
+  const LID_ON_CORD = 9;   // the lid rests on the power cord while the cat is out
+  function* goHome(M) {
+    yield* travel(M, G.hatchCX, M.anger > 0.55 && Math.abs(M.cat.ch.x.v - G.hatchCX) > 90 ? 'hop' : 'walk');
+    if (M.lid.t < 60) {
+      M.lid.w = 10; M.lid.t = 104; sfx(M, 'creak', { v: 0.6 });
+      yield* until(() => M.lid.v > 70, 0.8);
+    }
+  }
+  RETREAT.gentle = function* (M) {
+    const cat = M.cat, C = cat.ch;
+    yield* goHome(M);
+    relax(M);
+    C.lift.w = 5; C.lift.t = G.inside;
+    yield* until(() => C.lift.v > 105, 1.8);
+    M.lid.w = 6; M.lid.t = 0; sfx(M, 'creak', { v: 0.5 });
+    yield* until(() => C.lift.v > 140 && M.lid.v < 2, 2);
+    sfx(M, 'lidShut', { v: 0.4 });
+  };
+  RETREAT.slam = function* (M) {
+    const cat = M.cat, C = cat.ch;
+    yield* goHome(M);
+    say(M, '흥!', 0.7, 'shout');
+    C.lift.w = 13; C.lift.t = G.inside;
+    yield* until(() => C.lift.v > 100, 1);
+    M.lid.w = 42; M.lid.t = 0;
+    yield* until(() => M.lid.v < 4, 0.6);
+    sfx(M, 'bang'); M.shake = Math.max(M.shake, 5);
+    fx(M, 'dust', G.hatchCX, G.hatchBack, 8);
+    yield* until(() => C.lift.v > 140, 0.8);
+  };
+  RETREAT.peek = function* (M) {
+    const cat = M.cat, C = cat.ch;
+    yield* RETREAT.gentle(M);
+    yield* wait(0.9);
+    M.lid.w = 7; M.lid.t = 22; sfx(M, 'creak', { v: 0.5 });
+    C.lift.w = 7; C.lift.t = EYE_LIFT;
+    pose(cat, { eyeOpen: 0.5, brow: 0.7 });
+    yield* wait(0.55);
+    lookAt(cat, G.boxL + 40, 270); yield* wait(0.4);
+    lookAt(cat, G.boxR - 40, 270); yield* wait(0.4);
+    lookUser(cat, 1); yield* wait(0.35);
+    C.lift.t = G.inside; M.lid.t = 0;
+    yield* until(() => M.lid.v < 2 && C.lift.v > 140, 1.5);
+    sfx(M, 'lidShut', { v: 0.4 });
+  };
+
+  function* reemerge(M) {
+    // a switch went on while we were leaving
+    const cat = M.cat, C = cat.ch;
+    const wasIn = C.lift.v > 25;
+    lookUser(cat, 1);
+    pose(cat, { eyeOpen: 1.15, puff: 0.8, earBack: 1, brow: 1 });
+    say(M, wasIn ? '?!' : '!', 0.8, 'shout');
+    sfx(M, 'meow', { kind: 'angry' });
+    if (wasIn) {
+      M.lid.w = 30; M.lid.t = 108; sfx(M, 'bang');
+      C.lift.w = 16; C.lift.t = 0;
+      yield* until(() => C.lift.v < 3, 1);
+      M.lid.w = 7; M.lid.t = LID_ON_CORD;
+    }
+    yield* wait(0.3);
+  }
+
+  // peek when nothing is on after all (user switched it back off before we came out)
+  function* peekNothing(M) {
+    const cat = M.cat, C = cat.ch;
+    M.lid.w = 6; M.lid.t = 22; sfx(M, 'creak', { v: 0.5 });
+    C.lift.w = 6; C.lift.t = EYE_LIFT;
+    pose(cat, { eyeOpen: 1, pupil: 0.8 });
+    yield* wait(0.6);
+    lookAt(cat, G.boxL + 30, 272); yield* wait(0.45);
+    lookAt(cat, G.boxR - 30, 272); yield* wait(0.45);
+    say(M, '?', 0.9);
+    lookUser(cat, 1); yield* wait(0.6);
+    C.lift.t = G.inside; M.lid.t = 0;
+    yield* until(() => M.lid.v < 2 && C.lift.v > 140, 1.5);
+  }
+
+  // idle check-up while nobody's touching anything
+  function* idlePeek(M) {
+    const cat = M.cat, C = cat.ch;
+    M.lid.w = 4; M.lid.t = 18;
+    C.lift.w = 5; C.lift.t = EYE_LIFT;
+    pose(cat, { eyeOpen: 0.7, pupil: 0.9 });
+    yield* wait(0.8);
+    lookAt(cat, cat.cursor.x, cat.cursor.y); yield* wait(0.9);
+    lookAt(cat, G.boxL + 40, 270); yield* wait(0.5);
+    C.lift.t = G.inside; M.lid.t = 0;
+    yield* until(() => M.lid.v < 2 && C.lift.v > 140, 1.5);
+  }
+
+  // ------------------------------------------------------------------ planning
+  const LABEL = {
+    creep: '살금살금 엿보기', pop: '벌컥 튀어나오기', grumpy: '노려보며 스윽', sleepy: '하품하며 기어나오기', alarm: '깜짝 튀어오르기',
+    count: '하나 둘 세어보기', glare: '째려보기', hiss: '하악질', stretch: '기지개', sigh: '한숨', again: '"또?!" 이중 확인',
+    swat: '앞발로 톡', double: '양발 쾅 (늘어나는 팔)', flop: '배치기 털썩', sweep: '한 번에 쓸어내리기', zoomies: '우다다 전부 쓸기',
+    tail: '꼬리로 탁', kick: '뒷발 차기', butt: '엉덩이로 깔고 앉기', stomp: '점프해서 쿵', judgy: '빤히 보며 천천히 밀기', bonk: '머리로 콩',
+    confused: '어? 이미 꺼져 있네', reflex: '끼어들기 포착!', reemerge: '도로 튀어나오기',
+    dust: '발 털기', scold: '삿대질 냥냥', smug: '흥 하고 앉기', guard: '보초 서기', wave: '손 흔들기', huff: '씩씩거리기', lookBack: '뒤돌아 째려보기',
+    gentle: '얌전히 들어가기', slam: '쾅 닫기', peek: '다시 빼꼼 확인',
+    boopHappy: '쓰다듬 골골', boopAngry: '냥냥펀치', nothing: '빼꼼… 아무것도 없네?', hello: '처음 인사',
+  };
+  const GROUP = {
+    emerge: ['creep', 'pop', 'grumpy', 'sleepy', 'alarm'],
+    pre: ['count', 'glare', 'hiss', 'stretch', 'sigh', 'again'],
+    off: ['swat', 'double', 'flop', 'sweep', 'zoomies', 'tail', 'kick', 'butt', 'stomp', 'judgy', 'bonk'],
+    post: ['hello', 'dust', 'scold', 'smug', 'guard', 'wave', 'huff', 'lookBack'],
+    retreat: ['gentle', 'slam', 'peek'],
+    react: ['confused', 'reflex', 'reemerge', 'nothing', 'boopHappy', 'boopAngry'],
+  };
+  const TRAVEL_LABEL = { walk: '터벅터벅', hop: '폴짝', run: '우다다' };
+
+  function runsOf(ids) {
+    const s = ids.slice().sort((a, b) => a - b), out = [];
+    for (const i of s) {
+      const last = out[out.length - 1];
+      if (last && i === last[last.length - 1] + 1) last.push(i); else out.push([i]);
+    }
+    return out;
+  }
+
+  function analyze(M) {
+    const on = onList(M), n = on.length, key = on.join('');
+    const runs = runsOf(on);
+    const since = M.t - M.hist.lastEnd;
+    const recent = M.hist.flipsT.filter(t => M.t - t < 3).length;
+    return {
+      on, n, key, runs,
+      all: n === 6,
+      same: n > 0 && key === M.hist.lastKey && since < 25,
+      quick: since < 3,
+      spam: recent,
+      alt: n >= 3 && runs.every(r => r.length === 1) && on.every((v, k) => k === 0 || v - on[k - 1] === 2),
+      sym: n >= 2 && n < 6 && on.every(i => on.includes(5 - i)),
+      ends: key === '05',
+      left: on.filter(i => G.swX[i] < G.hatchCX).length,
+      right: on.filter(i => G.swX[i] > G.hatchCX).length,
+    };
+  }
+
+  function pickTravel(M, dist) {
+    const a = M.anger;
+    if (dist < 50) return 'walk';
+    if (a > 0.85 && dist > 120) return 'run';
+    if (a > 0.5 && M.rng() < 0.4 + a * 0.4) return 'hop';
+    if (dist > 220 && M.rng() < 0.35) return 'hop';
+    return 'walk';
+  }
+
+  // where the cat ends up after a move (for route planning)
+  function moveEnd(mv, x, face) {
+    const L = BODY.L;
+    switch (mv.kind) {
+      case 'sweep': case 'zoomies': return { x: leverTip(Math.min(...mv.ids)).x - 18 + L / 2 - 14, face: -1 };
+      case 'tail': { const t = leverTip(mv.ids[0]).x; const d = (t - x) * face < 0 ? face : (Math.sign(t - x) || face); return { x: t + d * (L / 2 + 34), face: d }; }
+      case 'kick': return { x: leverTip(mv.ids[0]).x + L / 2 + 30, face: 1 };
+      case 'double': case 'flop': { const m = (leverTip(mv.ids[0]).x + leverTip(mv.ids[1]).x) / 2; const d = x > m ? -1 : 1; return { x: m - d * 20, face: d }; }
+      case 'judgy': return { x: leverTip(mv.ids[0]).x + 16 + L / 2, face: -1 };
+      default: { const t = leverTip(mv.ids[0]).x; const d = x > t ? -1 : 1; return { x: t - d * 30, face: d }; }
+    }
+  }
+  function moveApproach(mv, x) {
+    const L = BODY.L;
+    switch (mv.kind) {
+      case 'sweep': case 'zoomies': return leverTip(Math.max(...mv.ids)).x + 20 + L / 2;
+      case 'double': case 'flop': return (leverTip(mv.ids[0]).x + leverTip(mv.ids[1]).x) / 2;
+      case 'tail': return leverTip(mv.ids[0]).x;
+      default: return leverTip(mv.ids[0]).x;
+    }
+  }
+
+  function planMoves(M, on, x, face) {
+    const R = M.rng, a = M.anger, moves = [];
+    let rem = on.slice().sort((p, q) => p - q);
+    if (rem.length === 6 && a > 0.42) {
+      const mv = { kind: 'zoomies', ids: rem.slice(), travel: 'run' };
+      moves.push(mv);
+      return moves;
+    }
+    const used = {};
+    let guard = 0;
+    while (rem.length && guard++ < 12) {
+      // a lone lever right behind us → tail or kick, without even turning round
+      const hipX = x - face * BODY.L / 2;
+      const behind = rem.filter(i => {
+        const tx = leverTip(i).x;
+        return (tx - x) * face < 0 && Math.abs(tx - hipX) < 120 && !rem.includes(i - 1) && !rem.includes(i + 1);
+      });
+      if (moves.length && behind.length && R() < 0.55 + a * 0.3) {
+        const i = behind[0];
+        const kind = face > 0 && R() < 0.4 && roomAt(leverTip(i).x + BODY.L / 2 + 30) ? 'kick' : 'tail';
+        const mv = { kind, ids: [i], travel: 'walk' };
+        moves.push(mv); rem = rem.filter(k => k !== i);
+        const e = moveEnd(mv, x, face); x = e.x; face = e.face;
+        continue;
+      }
+      const runs = runsOf(rem);
+      const cands = [];
+      for (const r of runs) {
+        if (r.length >= 3) cands.push({ kind: 'sweep', ids: r });
+        else if (r.length === 2) {
+          const k = M.force && ['double', 'flop'].includes(M.force.off) ? M.force.off : R.weighted({ double: 0.6 + a * 2, flop: a < 0.55 ? 1.4 - a : 0.1, split: 0.8 });
+          if (k === 'split') { cands.push({ kind: 'single', ids: [r[0]] }); cands.push({ kind: 'single', ids: [r[1]] }); }
+          else cands.push({ kind: k, ids: r });
+        } else cands.push({ kind: 'single', ids: r });
+      }
+      for (const c of cands) c.score = Math.abs(moveApproach(c, x) - x) + R() * 60 - (c.ids.length - 1) * 25;
+      cands.sort((p, q) => p.score - q.score);
+      const c = cands[0];
+      if (c.kind === 'single') {
+        const w = {
+          swat: 3,
+          judgy: !used.judgy && a < 0.65 ? 1.3 : 0,
+          butt: !used.butt && a < 0.4 ? 1.3 : 0,
+          bonk: !used.bonk && a < 0.28 ? 1.1 : 0,
+          stomp: a > 0.4 ? 0.8 + a * 2.4 : 0,
+          tail: !used.tail ? 0.8 : 0.2,
+          kick: !used.kick && a > 0.3 && roomAt(leverTip(c.ids[0]).x + BODY.L / 2 + 30) ? 0.7 : 0,
+        };
+        c.kind = M.force && M.force.off && w[M.force.off] != null ? M.force.off : R.weighted(w);
+        used[c.kind] = true;
+      }
+      c.travel = pickTravel(M, Math.abs(moveApproach(c, x) - x));
+      delete c.score;
+      moves.push(c);
+      rem = rem.filter(k => !c.ids.includes(k));
+      const e = moveEnd(c, x, face); x = e.x; face = e.face;
+    }
+    return moves;
+  }
+
+  function chooseEmerge(M, A) {
+    const a = M.anger;
+    if (M.force && M.force.emerge) return M.force.emerge;
+    if (M.sleeping) return 'sleepy';
+    return M.rng.weighted({
+      creep: a < 0.3 ? 3 : 0.5,
+      pop: 0.7 + a * 3 + (A.quick ? 3 : 0),
+      grumpy: a > 0.2 ? 1 + a * 1.6 : 0.15,
+      sleepy: a < 0.15 && M.hist.episodes > 0 ? 0.8 : 0,
+      alarm: A.n >= 4 || A.spam >= 4 ? 2.6 : 0.15,
+    });
+  }
+  function choosePre(M, A, em) {
+    const a = M.anger, R = M.rng, pre = [];
+    if (M.force && M.force.pre) return [M.force.pre];
+    if (A.same && M.hist.episodes > 0) pre.push('again');
+    if (A.all) pre.push('hiss');
+    else if (A.n >= 4) pre.push(R() < 0.7 ? 'count' : 'glare');
+    else if (A.sym || A.ends) pre.push('sigh');
+    else if (a > 0.6 && R() < 0.65) pre.push(R() < 0.5 ? 'glare' : 'hiss');
+    else if (a < 0.22 && em !== 'sleepy' && R() < 0.35) pre.push('stretch');
+    else if (em !== 'grumpy' && R() < 0.22) pre.push('glare');
+    return [...new Set(pre)].slice(0, 2);
+  }
+  function choosePost(M, A) {
+    const a = M.anger, R = M.rng;
+    if (M.force && M.force.post) return [M.force.post];
+    const k = R.weighted({
+      none: 1.2,
+      dust: 1.2,
+      wave: a < 0.3 ? 1.4 : 0,
+      smug: a < 0.55 ? 1.1 : 0.2,
+      scold: a > 0.3 ? 0.6 + a * 1.6 : 0,
+      huff: a > 0.6 ? 1.6 : 0,
+      guard: a > 0.55 || (A && A.spam >= 3) ? 1.3 + a : 0,
+      lookBack: a > 0.25 ? 1.0 : 0.2,
+    });
+    return k === 'none' ? [] : [k];
+  }
+  function chooseRetreat(M, A) {
+    const a = M.anger;
+    if (M.force && M.force.retreat) return M.force.retreat;
+    return M.rng.weighted({
+      gentle: a < 0.5 ? 3 : 0.6,
+      slam: a > 0.4 ? 0.5 + a * 3 : 0.1,
+      peek: (A && (A.spam >= 3 || A.quick)) || a > 0.5 ? 1.4 : 0.3,
+    });
+  }
+
+  function reasonsFor(M, A, S) {
+    const r = [];
+    const nums = ids => ids.map(i => i + 1).join('·');
+    if (!A.n) { r.push('나와 보니 다 꺼져 있음 → 헛걸음'); return r; }
+    r.push(`켜진 스위치 ${A.n}개 (${nums(A.on)})`);
+    if (A.all) r.push('전부 켜짐 → 이성을 잃음');
+    else if (A.alt) r.push('지그재그 배치 → 하나씩 찾아다녀야 함');
+    else if (A.ends) r.push('양쪽 끝 → 먼 길이라 한숨부터');
+    else if (A.sym) r.push('좌우 대칭 → 한숨부터');
+    for (const run of A.runs) if (run.length >= 3) r.push(`${nums(run)} 연속 → 한 줄로 쓸어버릴 수 있음`);
+    for (const run of A.runs) if (run.length === 2) r.push(`${nums(run)} 나란히 → 두 개 한꺼번에`);
+    if (A.same) r.push('방금이랑 같은 조합 → "또?!"');
+    if (A.quick) r.push('닫자마자 또 켬 → 짜증 급상승');
+    if (A.spam >= 3) r.push(`3초 안에 ${A.spam}번 켬 → 경계 태세`);
+    const band = moodBand(M.anger);
+    r.push(`짜증 ${Math.round(M.anger * 100)}% (${band.label}) → ${LABEL[S.retreat]}`);
+    return r;
+  }
+
+  function moodBand(a) {
+    if (a < 0.25) return { key: 'calm', label: '평온' };
+    if (a < 0.5) return { key: 'grumpy', label: '뾰로통' };
+    if (a < 0.78) return { key: 'angry', label: '화남' };
+    return { key: 'furious', label: '폭발 직전' };
+  }
+
+  // plan shown in the UI: flat list of steps
+  function mkStep(kind, extra) { return Object.assign({ kind, label: LABEL[kind] || kind, st: 'todo' }, extra || {}); }
+  function moveStep(mv) {
+    return mkStep(mv.kind, { ids: mv.ids.slice(), travel: mv.travel, sub: `${mv.ids.map(i => i + 1).join('·')}번 · ${TRAVEL_LABEL[mv.travel] || ''}`, mv });
+  }
+  function publishPlan(M) { M.plan.version++; }
+
+  function* runStep(M, step, gen) {
+    step.st = 'doing'; publishPlan(M);
+    M.seen[step.kind] = true;
+    yield* gen;
+    if (step.st === 'doing') step.st = 'done';
+    publishPlan(M);
+  }
+
+  function* interruptible(M, gen) {
+    let dt = 0;
+    while (true) {
+      if (anyOn(M)) { gen.return(); return false; }
+      const r = gen.next(dt);
+      if (r.done) return true;
+      dt = (yield) || 0;
+    }
+  }
+
+  // ------------------------------------------------------------------ an episode (cat comes out, fixes things, goes back)
+  function* episode(M, opts) {
+    const cat = M.cat, C = cat.ch;
+    const A = analyze(M);
+    const greet = !!(opts && opts.greet);
+    M.state = 'out';
+    if (!greet) M.stats.sorties++;
+    M.plan.steps = []; M.plan.reasons = []; publishPlan(M);
+
+    if (!A.n && !greet) {
+      const st = mkStep('nothing');
+      M.plan.steps = [st]; M.plan.reasons = reasonsFor(M, A, { retreat: 'gentle' });
+      yield* runStep(M, st, peekNothing(M));
+      finish(M, A);
+      return;
+    }
+
+    // face toward where the work is
+    const firstDir = A.right > A.left ? 1 : A.left > A.right ? -1 : (M.rng() < 0.5 ? -1 : 1);
+    C.face.v = C.face.t = firstDir; cat.faceSign = firstDir;
+    C.x.v = C.x.t = G.hatchCX;
+
+    const S = {};
+    if (greet) {
+      // already sitting on the lid when the page opens
+      C.lift.v = C.lift.t = 0; M.lid.v = M.lid.t = LID_ON_CORD;
+      S.emerge = null; S.pre = []; S.moves = []; S.post = ['hello']; S.retreat = 'gentle';
+    } else {
+      S.emerge = chooseEmerge(M, A);
+      S.pre = choosePre(M, A, S.emerge);
+      S.moves = planMoves(M, A.on, G.hatchCX, firstDir);
+      S.post = choosePost(M, A);
+      S.retreat = chooseRetreat(M, A);
+    }
+
+    const head = S.emerge ? [mkStep(S.emerge), ...S.pre.map(k => mkStep(k))] : [];
+    let moves = S.moves.map(moveStep);
+    let tail = [...S.post.map(k => mkStep(k)), mkStep(S.retreat)];
+    const rebuild = () => { M.plan.steps = [...head, ...moves, ...tail]; publishPlan(M); };
+    M.plan.reasons = greet ? ['처음 보는 사람 → 일단 인사', '스위치는 건드리지 말라고 당부함'] : reasonsFor(M, A, S);
+    rebuild();
+
+    if (head.length) {
+      yield* runStep(M, head[0], EMERGE[S.emerge](M, A));
+      sfx(M, 'boot');
+      M.lid.w = 16; M.lid.t = LID_ON_CORD;
+      relax(M, ['puff']);
+    }
+    for (let k = 1; k < head.length; k++) { yield* runStep(M, head[k], PRE[head[k].kind](M, A)); relax(M, ['puff']); }
+
+    while (true) {
+      // ---- work: keep going until every switch is off, re-planning when you meddle
+      let guard = 0;
+      while (anyOn(M) && guard++ < 40) {
+        const on = onList(M);
+        const todo = moves.filter(s => s.st === 'todo');
+        const planned = new Set(todo.flatMap(s => s.ids));
+        if (!todo.length || on.some(i => !planned.has(i))) {
+          moves = moves.filter(s => s.st !== 'todo');
+          if (todo.length || moves.length) moves.push(mkStep('reflex', { st: 'done', sub: '계획 수정' }));
+          const fresh = planMoves(M, on, C.x.v, cat.faceSign).map(moveStep);
+          moves.push(...fresh);
+          rebuild();
+          continue;
+        }
+        const step = todo[0];
+        const live = step.ids.filter(i => M.sw[i].on);
+        if (!live.length) {
+          step.kind = 'confused'; step.label = LABEL.confused;
+          yield* runStep(M, step, TECH.confused(M, step.ids[0]));
+          continue;
+        }
+        let mv = step.mv;
+        if (live.length < mv.ids.length) mv = { kind: 'swat', ids: live, travel: mv.travel };
+        yield* runStep(M, step, TECH[mv.kind](M, mv));
+        relax(M, ['puff']);
+      }
+
+      // ---- wrap up (any new switch interrupts and sends us back to work)
+      let ok = true;
+      for (const st of tail) {
+        const gen = st.kind in POST ? POST[st.kind](M, A) : RETREAT[st.kind](M, A);
+        ok = yield* interruptible(M, runStep(M, st, gen));
+        relax(M, ['puff']);
+        if (!ok) { st.st = 'skip'; break; }
+      }
+      if (ok) break;
+      M.anger = clamp(M.anger + 0.12, 0, 1);
+      tail.forEach(s => { if (s.st === 'todo' || s.st === 'doing') s.st = 'skip'; });
+      const re = mkStep('reemerge');
+      moves.push(re);
+      rebuild();
+      yield* runStep(M, re, reemerge(M));
+      relax(M, ['puff']);
+      const P = choosePost(M, A), Rt = chooseRetreat(M, A);
+      tail = [...P.map(k => mkStep(k)), mkStep(Rt)];
+      rebuild();
+    }
+    finish(M, A);
+  }
+
+  function finish(M, A) {
+    const C = M.cat.ch;
+    sfx(M, 'powerdown');
+    M.state = 'inside';
+    M.lid.t = 0;
+    C.lift.t = G.inside;
+    M.hist.lastKey = A.key; M.hist.lastEnd = M.t; M.hist.episodes++;
+    M.anger = clamp(M.anger - 0.04, 0, 1);
+    M.idleT = 0; M.nextIdle = 14 + M.rng() * 14;
+    relax(M);
+  }
+
+  // ------------------------------------------------------------------ reflexes (short interrupts while outside)
+  function* reflexFlip(M, i) {
+    const cat = M.cat;
+    lookSwitch(cat, i);
+    cat.ch.lookX.w = 30; cat.ch.lookY.w = 30;
+    pose(cat, { eyeOpen: 1.15, earBack: 1, puff: Math.max(cat.ch.puff.t, 0.5) });
+    say(M, '!', 0.6, 'shout');
+    yield* wait(0.35);
+    lookUser(cat, 1);
+    pose(cat, { brow: 1 });
+    yield* wait(0.25);
+    cat.ch.lookX.w = cat.ch.lookX.w0; cat.ch.lookY.w = cat.ch.lookY.w0;
+  }
+  function* reflexBoop(M, happy) {
+    const cat = M.cat;
+    M.seen[happy ? 'boopHappy' : 'boopAngry'] = true;
+    if (happy) {
+      lookUser(cat, 1);
+      pose(cat, { happy: 1, blush: 1, earBack: 0, brow: 0, mouthCurve: 0.8, tailCurl: 1.2 });
+      say(M, '골골…', 1.0);
+      sfx(M, 'purr');
+      fx(M, 'hearts', cat.R.headW.x, cat.R.headW.y - 20, 3);
+      yield* wait(1.0);
+    } else {
+      const cur = cat.cursor;
+      pose(cat, { earBack: 1, brow: 1, mouthOpen: 1, fang: 1, puff: 0.8 });
+      say(M, '냥!', 0.5, 'shout');
+      sfx(M, 'hiss', { short: true });
+      snapPaw(cat, 1);
+      pawSpeed(cat, 1, 50);
+      for (let k = 0; k < 2; k++) {
+        reachPaw(cat, 1, cur.x, cur.y, 1); yield* wait(0.1);
+        reachPaw(cat, 1, cat.R.shW.x + cat.faceSign * 10, cat.R.shW.y - 10); yield* wait(0.1);
+      }
+      pawSpeed(cat, 1, CH_DEF.p1x[1]);
+      pose(cat, { p1w: 0, mouthOpen: 0, fang: 0 });
+      yield* wait(0.2);
+    }
+  }
+
+  function snapPose(cat) {
+    const o = {};
+    for (const k in cat.ch) o[k] = [cat.ch[k].t, cat.ch[k].w];
+    return o;
+  }
+
+  // ------------------------------------------------------------------ the machine
+  function makeMachine(seed) {
+    const M = {
+      t: 0, rng: makeRng(seed || (Date.now() & 0xffffffff)),
+      sw: Array.from({ length: 6 }, () => ({ on: false, ang: G.offDeg, vel: 0, kick: 0 })),
+      lid: Ch(0, 10),
+      cat: makeCat(),
+      state: 'inside', pending: false, deadline: 0, pendingSince: 0,
+      anger: 0.08, gen: null, reflex: null, reflexQ: [], idleGen: null, idleT: 0, nextIdle: 16, sleeping: false,
+      hist: { lastKey: '', lastEnd: -99, flipsT: [], episodes: 0 },
+      stats: { flips: 0, sorties: 0, catOffs: 0, maxAnger: 0.08 },
+      seen: {},
+      plan: { steps: [], reasons: [], version: 0 },
+      events: [], shake: 0, sweepN: 0,
+    };
+    M.cat.ch.lift.v = M.cat.ch.lift.t = G.inside;
+    return M;
+  }
+
+  // user flips switch i (returns new state)
+  function flip(M, i) {
+    const s = M.sw[i];
+    s.on = !s.on;
+    s.kick = s.on ? 1 : -1;
+    sfx(M, 'click', { pitch: 1 + i * 0.04, user: true, on: s.on });
+    if (!s.on) return false;
+    M.stats.flips++;
+    M.hist.flipsT.push(M.t);
+    M.hist.flipsT = M.hist.flipsT.filter(t => M.t - t < 6);
+    const quick = M.t - M.hist.lastEnd < 2.5;
+    M.anger = clamp(M.anger + 0.06 + (M.state === 'out' ? 0.05 : 0) + (quick ? 0.12 : 0), 0, 1);
+    M.sleeping = false;
+    if (M.state === 'inside') {
+      const r = M.rng.range(0.5, 3);
+      if (M.idleGen) {
+        // it was already peeking and saw you do it
+        M.idleGen.return(); M.idleGen = null;
+        M.pending = true; M.deadline = M.t + 0.5; M.pendingSince = M.t;
+      } else if (!M.pending) {
+        M.pending = true; M.deadline = M.t + r; M.pendingSince = M.t;
+      } else {
+        // each extra flip pushes the moment back, but never past 3s after the latest flip
+        const pushed = Math.max(M.deadline, M.t + r);
+        M.deadline = pushed > M.deadline + 1e-6 ? pushed : Math.min(M.deadline + M.rng.range(0.15, 0.5), M.t + 3);
+      }
+    } else {
+      M.reflexQ.push(i);
+    }
+    return true;
+  }
+
+  function greet(M) { M.gen = episode(M, { greet: true }); }
+
+  function boop(M) {
+    const C = M.cat.ch;
+    if (M.state !== 'out' || M.reflex || M.cat.air || C.lift.v > 5) return false;
+    if (C.p0w.t > 0.5 || C.p1w.t > 0.5 || C.kw.t > 0.5 || C.tw.t > 0.5) return false;
+    const happy = M.anger < 0.3;
+    M.anger = clamp(M.anger + (happy ? -0.15 : 0.05), 0, 1);
+    M.reflexSnap = snapPose(M.cat);
+    M.reflex = reflexBoop(M, happy);
+    return true;
+  }
+
+  function update(M, dt) {
+    M.t += dt;
+    const C = M.cat.ch;
+
+    // mood drifts back down while it's left alone
+    if (M.state === 'inside' && !M.pending) M.anger = clamp(M.anger - dt * 0.022, 0, 1);
+    M.stats.maxAnger = Math.max(M.stats.maxAnger, M.anger);
+
+    if (M.state === 'inside') {
+      if (M.pending && M.t >= M.deadline) {
+        M.pending = false;
+        if (M.idleGen) { M.idleGen.return(); M.idleGen = null; }
+        M.gen = episode(M);
+      } else if (!M.pending) {
+        M.idleT += dt;
+        if (!M.idleGen && M.idleT > M.nextIdle && !M.sleeping) {
+          M.idleGen = idlePeek(M); M.seen.idle = true;
+          M.nextIdle = M.idleT + 18 + M.rng() * 16;
+        }
+        if (M.idleT > 45) M.sleeping = true;
+      }
+    }
+
+    // run the main behaviour; short reflexes pause it (only when feet are on the ground)
+    const busyLimb = C.p0w.t > 0.5 || C.p1w.t > 0.5 || C.kw.t > 0.5 || C.tw.t > 0.5;
+    if (!M.reflex && M.reflexQ.length && M.state === 'out' && !M.cat.air && M.gen && !busyLimb && C.lift.v < 5) {
+      const i = M.reflexQ.shift(); M.reflexQ.length = 0;
+      M.seen.reflex = true;
+      M.reflexSnap = snapPose(M.cat);
+      M.reflex = reflexFlip(M, i);
+    }
+    if (M.reflex) {
+      if (M.reflex.next(dt).done) {
+        M.reflex = null;
+        // put back whatever the interrupted action was doing (paw raised, sitting, ...), keep the new temper
+        const snap = M.reflexSnap; M.reflexSnap = null;
+        if (snap) for (const k in snap) { if (k === 'puff' || k === 'brow' || k === 'earBack') continue; const c = M.cat.ch[k]; c.t = snap[k][0]; c.w = snap[k][1]; }
+      }
+    } else if (M.gen) {
+      const r = M.gen.next(dt);
+      if (r.done) M.gen = null;
+    } else if (M.idleGen) {
+      if (M.idleGen.next(dt).done) { M.idleGen = null; relax(M); }
+    }
+    if (!M.gen && M.state === 'out') M.state = 'inside';
+
+    updateCat(M, dt);
+
+    // lid and levers
+    stepCh(M.lid, dt);
+    // springy levers: substep so a long frame (slow device, background tab) can't blow up the integrator
+    const nSub = Math.max(1, Math.ceil(dt / (1 / 240)));
+    const h = dt / nSub;
+    for (const s of M.sw) {
+      const target = s.on ? G.onDeg : G.offDeg;
+      const k = 900, d = 2 * Math.sqrt(k) * 0.55;
+      for (let q = 0; q < nSub; q++) {
+        s.vel += (-(s.ang - target) * k - s.vel * d) * h;
+        s.ang += s.vel * h;
+      }
+      if (!Number.isFinite(s.ang)) { s.ang = target; s.vel = 0; }
+    }
+    M.shake *= Math.exp(-dt * 9);
+    if (M.shake < 0.05) M.shake = 0;
+  }
+
+  // steady-state helpers for tests / UI
+  function isIdle(M) { return M.state === 'inside' && !M.gen && !M.pending && !M.idleGen && M.lid.v < 2; }
+
+  // eye height when peeking through the gap
+  (function () {
+    const c = makeCat(); c.ch.lift.v = 0; rig(c);
+    EYE_LIFT = (G.hatchFront - 8) - G.laneY - (c.R.eyeY - G.laneY);
+  })();
+
+  const UM = {
+    G, BODY, CH_DEF, D2R, TAU, clamp, lerp, leverTip, makeRng, makeMachine, update, flip, boop, greet, rig,
+    analyze, planMoves, LABEL, GROUP, TRAVEL_LABEL, moodBand, isIdle, anyOn, onList,
+    get EYE_LIFT() { return EYE_LIFT; },
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = UM;
+  else root.UM = UM;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* Useless Machine — canvas renderer. Everything is drawn from the rig in core.js. */
+(function () {
+  'use strict';
+  const UM = window.UM, G = UM.G, D2R = UM.D2R, TAU = Math.PI * 2;
+  const clamp = UM.clamp, lerp = UM.lerp;
+
+  const P = {
+    wall: '#2e6a63', grout: '#3d7b73', tileHi: 'rgba(255,255,255,.07)',
+    deskTop: '#b9713f', deskFront: '#8c4f2b', deskEdge: '#d38a55', grain: 'rgba(80,40,15,.18)',
+    box: '#f2c14e', boxShade: '#dba53a', boxTop: '#f9d97a', boxTopBack: '#f4cd62', boxLine: '#9a6d1f', boxHi: '#fff0b8',
+    plate: '#fbf3df', ink: '#1c1a22', brass: '#e2cf96', brassDark: '#a88b45',
+    chrome: '#cfd5db', chromeHi: '#ffffff', chromeLo: '#6c757f',
+    lampOff: '#7a4516', lampOn: '#ffc46b',
+    hole: '#150f0b', holeLip: '#3a2a16',
+    cat: '#1d1b22', catFar: '#121015', white: '#f4efe4', whiteFar: '#cfc8ba',
+    eye: '#bde64b', pupil: '#0c0b10', nose: '#f28ca0', earIn: '#e9879d', mouth: '#4a1522', tongue: '#f07a93',
+    whisker: 'rgba(236,230,214,.85)', vein: '#ff4d5e', bean: '#f5a3b4',
+  };
+
+  function mk(w, h) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+  function rrect(g, x, y, w, h, r) {
+    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+
+  // ------------------------------------------------------------------ static scene
+  function drawStatic(g) {
+    const W = G.W, H = G.H;
+    // tiled wall
+    g.fillStyle = P.wall; g.fillRect(0, 0, W, H);
+    const tw = 64, th = 30;
+    for (let row = 0, y = -8; y < G.deskY; row++, y += th) {
+      const off = row % 2 ? tw / 2 : 0;
+      for (let x = -tw + off; x < W; x += tw) {
+        g.fillStyle = P.tileHi; g.fillRect(x + 3, y + 3, tw - 6, 3);
+        g.strokeStyle = P.grout; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, tw - 2, th - 2);
+      }
+    }
+    const lamp = g.createRadialGradient(150, 20, 10, 150, 20, 620);
+    lamp.addColorStop(0, 'rgba(255,236,190,.20)'); lamp.addColorStop(1, 'rgba(255,236,190,0)');
+    g.fillStyle = lamp; g.fillRect(0, 0, W, H);
+    const vig = g.createLinearGradient(0, 0, 0, G.deskY);
+    vig.addColorStop(0, 'rgba(10,30,28,.25)'); vig.addColorStop(0.5, 'rgba(10,30,28,0)'); vig.addColorStop(1, 'rgba(10,30,28,.3)');
+    g.fillStyle = vig; g.fillRect(0, 0, W, G.deskY);
+    // box shadow on wall
+    g.fillStyle = 'rgba(10,30,28,.28)';
+    rrect(g, G.boxL + 22, G.backY - 6, G.boxR - G.boxL, G.deskY - G.backY, 14); g.fill();
+
+    // desk
+    g.fillStyle = P.deskTop; g.fillRect(0, G.deskY, W, 22);
+    g.strokeStyle = P.grain; g.lineWidth = 1;
+    for (let k = 0; k < 9; k++) {
+      g.beginPath(); const y = G.deskY + 3 + k * 2.2;
+      g.moveTo(0, y); for (let x = 0; x <= W; x += 40) g.lineTo(x, y + Math.sin(x * 0.013 + k * 1.7) * 1.2); g.stroke();
+    }
+    g.fillStyle = P.deskEdge; g.fillRect(0, G.deskY + 22, W, 3);
+    g.fillStyle = P.deskFront; g.fillRect(0, G.deskY + 25, W, H - G.deskY - 25);
+    g.fillStyle = 'rgba(0,0,0,.35)';
+    g.beginPath(); g.ellipse((G.boxL + G.boxR) / 2 + 8, G.deskY + 3, (G.boxR - G.boxL) / 2 + 12, 9, 0, 0, TAU); g.fill();
+
+    // box: top face (a slight trapezoid for depth)
+    const inset = 9;
+    const top = g.createLinearGradient(0, G.backY, 0, G.frontTop);
+    top.addColorStop(0, P.boxTopBack); top.addColorStop(1, P.boxTop);
+    g.fillStyle = top;
+    g.beginPath(); g.moveTo(G.boxL + inset, G.backY); g.lineTo(G.boxR - inset, G.backY); g.lineTo(G.boxR, G.frontTop); g.lineTo(G.boxL, G.frontTop); g.closePath(); g.fill();
+    g.strokeStyle = P.boxLine; g.lineWidth = 1.5; g.stroke();
+    // front face
+    const fr = g.createLinearGradient(0, G.frontTop, 0, G.deskY);
+    fr.addColorStop(0, P.box); fr.addColorStop(1, P.boxShade);
+    g.fillStyle = fr;
+    g.beginPath(); g.moveTo(G.boxL, G.frontTop); g.lineTo(G.boxR, G.frontTop); g.lineTo(G.boxR, G.deskY - 10);
+    g.quadraticCurveTo(G.boxR, G.deskY, G.boxR - 10, G.deskY); g.lineTo(G.boxL + 10, G.deskY); g.quadraticCurveTo(G.boxL, G.deskY, G.boxL, G.deskY - 10); g.closePath(); g.fill();
+    g.stroke();
+    g.fillStyle = P.boxHi; g.fillRect(G.boxL + 2, G.frontTop + 1, G.boxR - G.boxL - 4, 2.5);
+    g.fillStyle = 'rgba(120,80,20,.25)'; g.fillRect(G.boxL + 2, G.frontTop + 3.5, G.boxR - G.boxL - 4, 1.5);
+    // screws
+    for (const [x, y] of [[G.boxL + 14, G.frontTop + 16], [G.boxR - 14, G.frontTop + 16], [G.boxL + 14, G.deskY - 16], [G.boxR - 14, G.deskY - 16]]) {
+      g.fillStyle = P.chrome; g.beginPath(); g.arc(x, y, 4.2, 0, TAU); g.fill();
+      g.strokeStyle = P.chromeLo; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x - 2.6, y - 1.2); g.lineTo(x + 2.6, y + 1.2); g.stroke();
+    }
+    // hatch seam (closed lid) + hinges
+    g.strokeStyle = P.boxLine; g.lineWidth = 1.6;
+    rrect(g, G.hatchL, G.hatchBack, G.hatchR - G.hatchL, G.hatchFront - G.hatchBack, 3); g.stroke();
+    g.fillStyle = 'rgba(154,109,31,.5)';
+    for (const x of [G.hatchL + 18, G.hatchR - 30]) g.fillRect(x, G.hatchBack - 2, 12, 3);
+    g.fillStyle = P.boxLine; rrect(g, G.hatchCX - 9, G.hatchFront - 5, 18, 3.5, 1.5); g.fill();
+
+    // switch plates, engraving
+    g.font = '600 7.5px "DM Mono", ui-monospace, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let i = 0; i < 6; i++) {
+      const x = G.swX[i], y = G.swBaseY;
+      g.fillStyle = 'rgba(120,80,20,.28)'; g.beginPath(); g.ellipse(x + 1.5, y + 1.5, 17, 6.5, 0, 0, TAU); g.fill();
+      const pl = g.createLinearGradient(x - 16, 0, x + 16, 0);
+      pl.addColorStop(0, P.chromeLo); pl.addColorStop(0.35, P.chromeHi); pl.addColorStop(1, P.chrome);
+      g.fillStyle = pl; g.beginPath(); g.ellipse(x, y, 16, 5.8, 0, 0, TAU); g.fill();
+      g.fillStyle = 'rgba(90,60,15,.55)';
+      g.fillText('OFF', x - 25, y - 1); g.fillText('ON', x + 24, y - 1);
+      // lamp housing
+      const ly = 306;
+      g.fillStyle = P.chromeLo; g.beginPath(); g.arc(x, ly, 9.5, 0, TAU); g.fill();
+      g.fillStyle = P.chrome; g.beginPath(); g.arc(x, ly, 8, 0, TAU); g.fill();
+      g.fillStyle = P.lampOff; g.beginPath(); g.arc(x, ly, 5.8, 0, TAU); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(x - 1.8, ly - 2, 1.6, 0, TAU); g.fill();
+      // number plate
+      g.fillStyle = 'rgba(120,80,20,.25)'; rrect(g, x - 14, 325, 30, 20, 3); g.fill();
+      g.fillStyle = P.plate; rrect(g, x - 15, 324, 30, 20, 3); g.fill();
+      g.fillStyle = P.ink; g.font = '20px "Do Hyeon", "Black Han Sans", sans-serif'; g.fillText(String(i + 1), x, 335);
+      g.font = '600 7.5px "DM Mono", ui-monospace, monospace';
+    }
+    // name plate
+    const nx = G.hatchCX, ny = 398;
+    g.fillStyle = 'rgba(120,80,20,.3)'; rrect(g, nx - 128, ny - 22, 260, 50, 6); g.fill();
+    const br = g.createLinearGradient(0, ny - 24, 0, ny + 26);
+    br.addColorStop(0, '#f1e3b4'); br.addColorStop(1, P.brass);
+    g.fillStyle = br; rrect(g, nx - 130, ny - 24, 260, 50, 6); g.fill();
+    g.strokeStyle = P.brassDark; g.lineWidth = 1.5; g.stroke();
+    for (const [x, y] of [[nx - 120, ny - 14], [nx + 120, ny - 14], [nx - 120, ny + 16], [nx + 120, ny + 16]]) {
+      g.fillStyle = P.brassDark; g.beginPath(); g.arc(x, y, 2.4, 0, TAU); g.fill();
+    }
+    g.fillStyle = P.ink; g.font = '26px "Do Hyeon", "Black Han Sans", sans-serif'; g.fillText('쓸모없는 기계', nx, ny - 3);
+    g.font = '500 8.5px "DM Mono", ui-monospace, monospace'; g.fillStyle = 'rgba(28,26,34,.7)';
+    g.fillText('MODEL MK-6 · 고양이 구동식 · 1 CAT POWER', nx, ny + 17);
+    // warning sticker
+    const sx = 132, sy = 380;
+    g.save(); g.translate(sx + 56, sy + 22); g.rotate(-0.04);
+    g.fillStyle = P.plate; rrect(g, -56, -22, 112, 44, 4); g.fill();
+    g.strokeStyle = P.ink; g.lineWidth = 1.2; rrect(g, -52, -18, 104, 36, 3); g.stroke();
+    g.fillStyle = P.ink;
+    g.beginPath(); g.ellipse(-34, 3, 7, 6, 0, 0, TAU); g.fill();
+    for (const [dx, dy] of [[-42, -6], [-36, -10], [-29, -9], [-24, -3]]) { g.beginPath(); g.ellipse(dx, dy, 2.6, 3.2, 0, 0, TAU); g.fill(); }
+    g.textAlign = 'left'; g.font = '13px "Do Hyeon", sans-serif'; g.fillText('손 대지 마시오', -20, -3);
+    g.font = '500 7px "DM Mono", monospace'; g.fillText('안에 고양이 있음', -20, 10);
+    g.restore();
+    // vents
+    for (let k = 0; k < 5; k++) {
+      g.fillStyle = 'rgba(90,60,15,.55)'; rrect(g, 600, 374 + k * 10, 86, 4.5, 2.2); g.fill();
+      g.fillStyle = 'rgba(255,240,190,.5)'; g.fillRect(602, 379 + k * 10, 82, 1);
+    }
+  }
+
+  // ------------------------------------------------------------------ dynamic pieces
+  function lidFrontY(deg) { const a = deg * D2R; return G.hatchBack + 24 * Math.cos(a) - 26.4 * Math.sin(a); }
+
+  function drawHole(g) {
+    g.fillStyle = P.hole;
+    rrect(g, G.hatchL, G.hatchBack, G.hatchR - G.hatchL, G.hatchFront - G.hatchBack, 3); g.fill();
+    const gr = g.createLinearGradient(0, G.hatchBack, 0, G.hatchFront);
+    gr.addColorStop(0, 'rgba(90,60,25,.55)'); gr.addColorStop(0.35, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(G.hatchL + 1, G.hatchBack + 1, G.hatchR - G.hatchL - 2, G.hatchFront - G.hatchBack - 2);
+    g.strokeStyle = P.holeLip; g.lineWidth = 1.2; g.strokeRect(G.hatchL + 0.5, G.hatchBack + 0.5, G.hatchR - G.hatchL - 1, G.hatchFront - G.hatchBack - 1);
+  }
+
+  function drawLid(g, deg) {
+    const yf = lidFrontY(deg), yb = G.hatchBack;
+    const under = deg > 78;
+    g.fillStyle = under ? '#c8952f' : P.boxTop;
+    g.strokeStyle = P.boxLine; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(G.hatchL, yb); g.lineTo(G.hatchR, yb); g.lineTo(G.hatchR + 1, yf); g.lineTo(G.hatchL - 1, yf); g.closePath(); g.fill(); g.stroke();
+    if (under) { g.fillStyle = 'rgba(90,60,15,.25)'; g.fillRect(G.hatchL + 6, Math.min(yb, yf) + 3, G.hatchR - G.hatchL - 12, 2); }
+    // handle on the front edge
+    g.fillStyle = P.boxLine; rrect(g, G.hatchCX - 9, yf - (yf < yb ? 1 : 4), 18, 3.5, 1.5); g.fill();
+  }
+
+  function drawLever(g, i, deg, hot) {
+    const x = G.swX[i], y = G.swBaseY, a = deg * D2R, L = G.leverLen;
+    const tx = x + Math.sin(a) * L, ty = y - Math.cos(a) * L;
+    // shadow on the top face
+    g.strokeStyle = 'rgba(110,70,15,.22)'; g.lineWidth = 5; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x + 2, y + 1); g.lineTo(x + Math.sin(a) * L * 0.55 + 9, y - 3); g.stroke();
+    // bat (tapered)
+    const nx = Math.cos(a), ny = Math.sin(a);
+    g.fillStyle = P.chrome;
+    g.beginPath();
+    g.moveTo(x - nx * 3.6, y - ny * 3.6); g.lineTo(tx - nx * 2.2, ty - ny * 2.2);
+    g.lineTo(tx + nx * 2.2, ty + ny * 2.2); g.lineTo(x + nx * 3.6, y + ny * 3.6); g.closePath(); g.fill();
+    g.strokeStyle = P.chromeLo; g.lineWidth = 1; g.stroke();
+    g.strokeStyle = P.chromeHi; g.lineWidth = 1.3;
+    g.beginPath(); g.moveTo(x - nx * 1.4, y - ny * 1.4 - 2); g.lineTo(tx - nx * 0.8, ty - ny * 0.8 + 1); g.stroke();
+    // ball tip
+    const bt = g.createRadialGradient(tx - 1.6, ty - 1.8, 0.5, tx, ty, 5.4);
+    bt.addColorStop(0, '#fff'); bt.addColorStop(0.5, P.chrome); bt.addColorStop(1, P.chromeLo);
+    g.fillStyle = bt; g.beginPath(); g.arc(tx, ty, 5.2, 0, TAU); g.fill();
+    if (hot) { g.strokeStyle = 'rgba(255,240,180,.9)'; g.lineWidth = 2; g.beginPath(); g.arc(tx, ty, 9, 0, TAU); g.stroke(); }
+    // nut
+    g.fillStyle = P.chromeLo; g.beginPath(); g.ellipse(x, y + 0.5, 7.5, 3.6, 0, 0, TAU); g.fill();
+    g.fillStyle = P.chrome; g.beginPath(); g.ellipse(x, y - 0.6, 6.6, 3, 0, 0, TAU); g.fill();
+  }
+
+  function drawLamp(g, i, on, t) {
+    if (!on) return;
+    const x = G.swX[i], y = 306;
+    const gl = g.createRadialGradient(x, y, 2, x, y, 30);
+    gl.addColorStop(0, 'rgba(255,180,70,.65)'); gl.addColorStop(1, 'rgba(255,180,70,0)');
+    g.fillStyle = gl; g.beginPath(); g.arc(x, y, 30, 0, TAU); g.fill();
+    g.fillStyle = P.lampOn; g.beginPath(); g.arc(x, y, 6, 0, TAU); g.fill();
+    g.fillStyle = '#fff6dc'; g.beginPath(); g.arc(x - 1.6, y - 1.8, 2.2, 0, TAU); g.fill();
+  }
+
+  // ------------------------------------------------------------------ the cat (a tuxedo-painted robot)
+  const MOOD_LED = { calm: '#6fe3b4', grumpy: '#ffd166', angry: '#ff9a3c', furious: '#ff4d5e' };
+  const moodLed = M => MOOD_LED[UM.moodBand(M.anger).key];
+  const METAL = { dark: '#474c57', mid: '#8b939f', hi: '#e2e7ec', seam: '#3c3a46', far: '#34373f' };
+
+  function glowDot(g, x, y, r, col, a) {
+    const gl = g.createRadialGradient(x, y, 0, x, y, r * 3.2);
+    gl.addColorStop(0, col); gl.addColorStop(1, 'rgba(0,0,0,0)');
+    g.globalAlpha = a == null ? 0.55 : a; g.fillStyle = gl; g.beginPath(); g.arc(x, y, r * 3.2, 0, TAU); g.fill();
+    g.globalAlpha = 1; g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.arc(x - r * 0.35, y - r * 0.35, r * 0.35, 0, TAU); g.fill();
+  }
+
+  function jointDisc(g, x, y, r, far) {
+    g.fillStyle = far ? METAL.far : METAL.mid;
+    g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    g.strokeStyle = far ? '#24262c' : METAL.dark; g.lineWidth = 1.1; g.stroke();
+    if (far) return;
+    g.fillStyle = METAL.hi; g.beginPath(); g.arc(x - r * 0.28, y - r * 0.3, r * 0.34, 0, TAU); g.fill();
+    g.fillStyle = METAL.dark; g.beginPath(); g.arc(x, y, r * 0.3, 0, TAU); g.fill();
+  }
+
+  function drawLeg(g, L, far, front) {
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    const col = far ? P.catFar : P.cat, sock = far ? P.whiteFar : P.white;
+    const w1 = front ? 9.6 : 12.2, w2 = front ? 7.4 : 8.2;
+    g.strokeStyle = col; g.lineWidth = w1;
+    g.beginPath(); g.moveTo(L.jx, L.jy); g.lineTo(L.kx, L.ky); g.stroke();
+    g.lineWidth = w2;
+    g.beginPath(); g.moveTo(L.kx, L.ky); g.lineTo(L.fx, L.fy); g.stroke();
+    // white gloves (front, from the wrist) and socks (hind, from the hock), like a real tuxedo
+    const s0 = front ? 0.52 : 0.3;
+    const sx = lerp(L.kx, L.fx, s0), sy = lerp(L.ky, L.fy, s0);
+    g.strokeStyle = sock; g.lineWidth = w2 - 1.3;
+    g.beginPath(); g.moveTo(sx, sy); g.lineTo(L.fx, L.fy); g.stroke();
+    // a thin seam where the white enamel starts
+    const dx = L.fx - L.kx, dy = L.fy - L.ky, d = Math.hypot(dx, dy) || 1;
+    g.strokeStyle = far ? 'rgba(0,0,0,.35)' : 'rgba(120,125,135,.9)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(sx - dy / d * w2 * 0.45, sy + dx / d * w2 * 0.45); g.lineTo(sx + dy / d * w2 * 0.45, sy - dx / d * w2 * 0.45); g.stroke();
+    jointDisc(g, L.kx, L.ky, front ? 2.5 : 2.9, far);
+    // paw
+    const ang = L.reach > 0.4 ? Math.atan2(dy, dx) : 0;
+    g.save(); g.translate(L.fx, L.fy + (L.reach > 0.4 ? 0 : -1.6)); g.rotate(ang);
+    g.fillStyle = sock; g.beginPath(); g.ellipse(0, 0, 5.6, 3.9, 0, 0, TAU); g.fill();
+    g.strokeStyle = far ? 'rgba(0,0,0,.25)' : 'rgba(150,145,135,.8)'; g.lineWidth = 0.8; g.stroke();
+    if (L.reach > 0.4 && !far) {
+      g.fillStyle = P.bean;
+      g.beginPath(); g.arc(1.4, 0.8, 1.5, 0, TAU); g.fill();
+      for (const [bx, by] of [[-1.8, -1.9], [1, -2.5], [3.3, -1.3]]) { g.beginPath(); g.arc(bx, by, 0.9, 0, TAU); g.fill(); }
+    }
+    g.restore();
+  }
+
+  // segmented tail: enamel links with steel collars and a status LED on the tip
+  function drawTail(g, R, C, t, M) {
+    const pts = R.tail, n = pts.length, puff = C.puff.v;
+    const wOf = k => (7 - (k / (n - 1)) * 2.4) * (1 + puff * 0.45);
+    g.lineCap = 'round';
+    g.strokeStyle = P.cat;
+    for (let k = 0; k < n - 1; k++) {
+      g.lineWidth = wOf(k);
+      g.beginPath(); g.moveTo(pts[k].x, pts[k].y); g.lineTo(pts[k + 1].x, pts[k + 1].y); g.stroke();
+    }
+    const hot = clamp((puff - 0.25) * 1.6, 0, 1);
+    for (let k = 1; k < n - 1; k++) {
+      const a = pts[k - 1], b = pts[k + 1], p = pts[k];
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, w = wOf(k) * 0.5 + 0.2;
+      g.strokeStyle = hot > 0 ? `rgba(255,${Math.round(150 - hot * 70)},${Math.round(160 - hot * 90)},${0.55 + hot * 0.4})` : 'rgba(139,147,159,.85)';
+      g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(p.x - dy / d * w, p.y + dx / d * w); g.lineTo(p.x + dy / d * w, p.y - dx / d * w); g.stroke();
+    }
+    const tip = pts[n - 1];
+    const blink = M.anger > 0.78 ? (Math.sin(t * 14) > 0 ? 1 : 0.35) : 1;
+    glowDot(g, tip.x, tip.y, 2.6, moodLed(M), 0.5 * blink);
+  }
+
+  // coiled power cord from inside the machine to the cat's rump
+  function drawCable(g, M) {
+    const R = M.cat.R, C = M.cat.ch;
+    if (C.lift.v > G.inside - 8 && M.lid.v < 1) return;
+    const ax = G.hatchCX - 24, ay = G.hatchFront - 3;
+    const bx = R.hipW.x - R.fs * 7, by = R.hipW.y + 3;
+    const cx = (ax + bx) / 2, cy = Math.max(G.laneY + 3, Math.max(ay, by) + 6);
+    const N = 70, coils = 15;
+    const pts = [];
+    for (let k = 0; k <= N; k++) {
+      const u = k / N, iu = 1 - u;
+      const x = iu * iu * ax + 2 * iu * u * cx + u * u * bx, y = iu * iu * ay + 2 * iu * u * cy + u * u * by;
+      const tx = 2 * iu * (cx - ax) + 2 * u * (bx - cx), ty = 2 * iu * (cy - ay) + 2 * u * (by - cy), d = Math.hypot(tx, ty) || 1;
+      const ph = u * coils * TAU, amp = 2.6 * Math.sin(Math.PI * Math.min(1, u * 6)) ;
+      pts.push({ x: x - ty / d * Math.sin(ph) * amp, y: y + tx / d * Math.sin(ph) * amp, front: Math.cos(ph) > 0 });
+    }
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = '#23252b'; g.lineWidth = 2.6;
+    g.beginPath(); pts.forEach((p, k) => (k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y))); g.stroke();
+    g.strokeStyle = '#7b8290'; g.lineWidth = 1;
+    for (let k = 1; k < pts.length; k++) {
+      if (!pts[k].front) continue;
+      g.beginPath(); g.moveTo(pts[k - 1].x, pts[k - 1].y - 0.6); g.lineTo(pts[k].x, pts[k].y - 0.6); g.stroke();
+    }
+    // plug on the cat
+    g.save(); g.translate(bx, by); g.rotate(Math.atan2(by - cy, bx - cx));
+    g.fillStyle = METAL.mid; g.fillRect(-7, -2.6, 7, 5.2);
+    g.fillStyle = METAL.dark; g.fillRect(-7, -2.6, 2, 5.2);
+    g.restore();
+  }
+
+  function bodyPath(R, C) {
+    const hip = R.hip, sh = R.sh, c = R.ctrl, N = 14, pts = [];
+    for (let k = 0; k <= N; k++) {
+      const u = k / N, iu = 1 - u;
+      const x = iu * iu * hip.x + 2 * iu * u * c.x + u * u * sh.x;
+      const y = iu * iu * hip.y + 2 * iu * u * c.y + u * u * sh.y;
+      const tx = 2 * iu * (c.x - hip.x) + 2 * u * (sh.x - c.x), ty = 2 * iu * (c.y - hip.y) + 2 * u * (sh.y - c.y);
+      const d = Math.hypot(tx, ty) || 1;
+      pts.push({ x, y, nx: ty / d, ny: -tx / d, tx: tx / d, ty: ty / d, u });
+    }
+    const k = 1 + C.puff.v * 0.24;
+    // real-cat profile: rounded haunch, slim waist, deep chest
+    const top = u => (11 + 1.8 * Math.exp(-(((u - 0.12) / 0.2) ** 2))) * k;
+    const bot = u => (8.6 + 6.2 * Math.exp(-(((u - 0.8) / 0.22) ** 2)) + 2.6 * Math.exp(-(((u - 0.1) / 0.14) ** 2)) - C.crouch.v * 1.2) * k;
+    const path = new Path2D();
+    const p0 = pts[0], pe = pts[N];
+    path.moveTo(p0.x + p0.nx * top(0), p0.y + p0.ny * top(0));
+    for (const p of pts) path.lineTo(p.x + p.nx * top(p.u), p.y + p.ny * top(p.u));
+    const aUp = Math.atan2(pe.ny, pe.nx), rF = (top(1) + bot(1)) / 2;
+    path.arc(pe.x + pe.nx * (top(1) - rF), pe.y + pe.ny * (top(1) - rF), rF, aUp, aUp + Math.PI, false);
+    for (let i = N; i >= 0; i--) { const p = pts[i]; path.lineTo(p.x - p.nx * bot(p.u), p.y - p.ny * bot(p.u)); }
+    const a0 = Math.atan2(-p0.ny, -p0.nx), rB = (top(0) + bot(0)) / 2;
+    path.arc(p0.x + p0.nx * (top(0) - rB), p0.y + p0.ny * (top(0) - rB), rB + 1.2, a0, a0 + Math.PI, false);
+    path.closePath();
+    return { path, pts, top, bot };
+  }
+
+  function drawBody(g, R, C, t, M) {
+    g.save();
+    g.translate(R.X, R.baseY); g.scale(R.fs, 1);
+    const B = bodyPath(R, C), pts = B.pts, N = pts.length - 1, at = u => pts[Math.round(u * N)];
+    g.fillStyle = P.cat; g.fill(B.path);
+    g.save(); g.clip(B.path);
+    // white bib: chin to belly, widest at the chest
+    g.fillStyle = P.white;
+    g.beginPath();
+    let first = true;
+    for (let i = Math.round(N * 0.34); i <= N; i++) { const p = pts[i]; const x = p.x - p.nx * (B.bot(p.u) + 3), y = p.y - p.ny * (B.bot(p.u) + 3); first ? g.moveTo(x, y) : g.lineTo(x, y); first = false; }
+    for (let i = N; i >= Math.round(N * 0.34); i--) {
+      const p = pts[i], s = clamp((p.u - 0.34) / 0.66, 0, 1), w = 2.5 + 10.5 * s * s;
+      g.lineTo(p.x - p.nx * (B.bot(p.u) - w), p.y - p.ny * (B.bot(p.u) - w));
+    }
+    g.closePath(); g.fill();
+    const pe = pts[N];
+    g.beginPath(); g.ellipse(pe.x + pe.tx * 5 - pe.nx * 2, pe.y + pe.ty * 5 - pe.ny * 2, 8.5, 11, Math.atan2(pe.ty, pe.tx), 0, TAU); g.fill();
+    // panel seams + rivets
+    g.strokeStyle = '#4a4755'; g.lineWidth = 1.1;
+    for (const u of [0.36, 0.64]) {
+      const p = at(u), tp = B.top(u), bt = B.bot(u);
+      g.beginPath();
+      g.moveTo(p.x + p.nx * (tp + 2), p.y + p.ny * (tp + 2));
+      g.quadraticCurveTo(p.x + p.tx * 3, p.y + p.ty * 3, p.x - p.nx * (bt + 2) + p.tx * 1.5, p.y - p.ny * (bt + 2) + p.ty * 1.5);
+      g.stroke();
+      for (const f of [0.55, 0.15]) {
+        g.fillStyle = '#6b6f7a';
+        g.beginPath(); g.arc(p.x + p.nx * tp * f - p.tx * 2.6, p.y + p.ny * tp * f - p.ty * 2.6, 0.9, 0, TAU); g.fill();
+      }
+    }
+    // back vents: dark slits that glow when it's furious
+    const hot = clamp((C.puff.v - 0.2) * 1.5, 0, 1);
+    for (const u of [0.44, 0.5, 0.56]) {
+      const p = at(u), tp = B.top(u) - 3.2;
+      const x0 = p.x + p.nx * tp - p.tx * 2.2, y0 = p.y + p.ny * tp - p.ty * 2.2;
+      g.strokeStyle = hot > 0 ? `rgba(255,${Math.round(120 - hot * 60)},70,${0.4 + hot * 0.6})` : '#34323d';
+      g.lineWidth = 1.6;
+      g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + p.tx * 4.4, y0 + p.ty * 4.4); g.stroke();
+    }
+    // enamel sheen
+    g.strokeStyle = 'rgba(255,255,255,.1)'; g.lineWidth = 2.6;
+    g.beginPath(); pts.forEach((p, k) => { const x = p.x + p.nx * (B.top(p.u) - 3.2), y = p.y + p.ny * (B.top(p.u) - 3.2); k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+    g.restore();
+    // status LED on the chest plate
+    const led = { x: pe.x + pe.tx * 3 - pe.nx * 5, y: pe.y + pe.ty * 3 - pe.ny * 5 };
+    g.strokeStyle = METAL.mid; g.lineWidth = 1; g.beginPath(); g.arc(led.x, led.y, 3.3, 0, TAU); g.stroke();
+    g.restore();
+    // LED glow in world space (so it isn't mirrored)
+    const lw = { x: R.X + led.x * R.fs, y: R.baseY + led.y };
+    const blink = M.anger > 0.78 ? (Math.sin(t * 14) > 0 ? 1 : 0.4) : 0.85 + 0.15 * Math.sin(t * 2.4);
+    glowDot(g, lw.x, lw.y, 2.1, moodLed(M), 0.45 * blink);
+    return lw;
+  }
+
+  function drawVein(g, x, y, s, t) {
+    g.save(); g.translate(x, y); g.scale(s, s); g.rotate(0.3);
+    g.strokeStyle = P.vein; g.lineWidth = 2.1; g.lineCap = 'round';
+    for (let q = 0; q < 4; q++) {
+      g.rotate(Math.PI / 2);
+      g.beginPath(); g.arc(4.2, 4.2, 3.4, Math.PI * 1.05, Math.PI * 1.45); g.stroke();
+      g.beginPath(); g.arc(4.2, 4.2, 3.4, Math.PI * 1.55, Math.PI * 1.95); g.stroke();
+    }
+    g.restore();
+  }
+
+  function drawHead(g, cat, M, R, C, t) {
+    const H = R.headW;
+    const tilt = C.headTilt.v + R.sn * 0.25 * R.fsgn;
+    const hs = 0.74 + 0.26 * Math.min(1, Math.abs(R.fs));
+    const yaw = R.yaw, pitch = R.pitch, puff = C.puff.v;
+    const HS = 1.12;
+    const led = moodLed(M);
+    g.save(); g.translate(H.x, H.y - 3); g.rotate(tilt); g.scale(hs * HS, HS);
+
+    // antenna (springy)
+    const sway = Math.sin(t * 3.1) * 0.08 + (cat.ch.x.vel || 0) * -0.0025 + C.shake.v * Math.sin(t * 40) * 0.2;
+    const ax0 = 4 + yaw * 3, ay0 = -18;
+    const ax1 = ax0 + Math.sin(sway + 0.18) * 13, ay1 = ay0 - Math.cos(sway + 0.18) * 13;
+    g.strokeStyle = METAL.mid; g.lineWidth = 1.3; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(ax0, ay0); g.quadraticCurveTo(ax0 + 1, ay0 - 7, ax1, ay1); g.stroke();
+    const blink = M.anger > 0.55 ? (Math.sin(t * (M.anger > 0.78 ? 16 : 7)) > 0 ? 1 : 0.35) : 1;
+    glowDot(g, ax1, ay1, 2.6, led, 0.5 * blink);
+
+    // ears: enamel shells with a speaker-grille lining
+    for (const s of [-1, 1]) {
+      const back = C.earBack.v, perk = C.earPerk.v;
+      let rot = s * (0.2 + back * 0.95) - perk * s * 0.12;
+      if (cat.earTwitch > 0 && s === 1) rot += Math.sin(cat.earTwitch * 40) * 0.25;
+      const hgt = 19 * (1 + perk * 0.15) * (1 - back * 0.32);
+      g.save(); g.translate(s * 12 + yaw * 3, -12); g.rotate(rot);
+      g.fillStyle = P.cat;
+      g.beginPath(); g.moveTo(-8.5, 3); g.quadraticCurveTo(-3.5, -hgt * 0.6, s * 1.2, -hgt); g.quadraticCurveTo(4.5, -hgt * 0.55, 8.5, 3); g.closePath(); g.fill();
+      g.fillStyle = '#5a5f6b';
+      g.beginPath(); g.moveTo(-4.6, 1); g.quadraticCurveTo(-1.8, -hgt * 0.45, s * 1, -hgt + 6); g.quadraticCurveTo(2.6, -hgt * 0.42, 4.6, 1); g.closePath(); g.fill();
+      g.strokeStyle = '#2c2e35'; g.lineWidth = 0.9;
+      for (const f of [0.18, 0.36, 0.54]) { const y = -hgt * f; const w = 3.6 * (1 - f); g.beginPath(); g.moveTo(-w, y); g.lineTo(w, y); g.stroke(); }
+      g.restore();
+    }
+    // head shell + cheeks
+    g.fillStyle = P.cat;
+    g.beginPath(); g.ellipse(0, -1, 22.5, 19, 0, 0, TAU); g.fill();
+    for (const s of [-1, 1]) { g.beginPath(); g.ellipse(s * 11.5, 6, 12.5 + puff * 2.5, 10.5 + puff * 1.5, 0, 0, TAU); g.fill(); }
+    // crown seam + temple bolts
+    g.strokeStyle = '#4a4755'; g.lineWidth = 1;
+    g.beginPath(); g.ellipse(0, -1, 19.5, 15.5, 0, Math.PI * 1.18, Math.PI * 1.82); g.stroke();
+    for (const s of [-1, 1]) { g.fillStyle = '#6b6f7a'; g.beginPath(); g.arc(s * 18.5 + yaw * 2, -4, 1.1, 0, TAU); g.fill(); }
+    // white blaze + muzzle + chin
+    const mx = yaw * 8, my = pitch * 2.5;
+    g.fillStyle = P.white;
+    g.beginPath();
+    g.moveTo(mx - yaw, -12 + my);
+    g.quadraticCurveTo(mx + 4.5, -2 + my, mx + 12, 6 + my);
+    g.quadraticCurveTo(mx + 14, 17 + my, mx, 18.5 + my);
+    g.quadraticCurveTo(mx - 14, 17 + my, mx - 12, 6 + my);
+    g.quadraticCurveTo(mx - 4.5, -2 + my, mx - yaw, -12 + my);
+    g.fill();
+
+    // eyes: optic lenses (keep the cat expressions, add a steel bezel and a faint glow)
+    const blinkNow = cat.blink > 0;
+    const open = blinkNow ? 0 : C.eyeOpen.v, happy = C.happy.v;
+    for (const s of [-1, 1]) {
+      const cx = s * 9.4 + yaw * 6.2, cy = -3.5 + pitch * 3;
+      if (happy > 0.5) {
+        g.strokeStyle = P.white; g.lineWidth = 2.2; g.lineCap = 'round';
+        g.beginPath(); g.arc(cx, cy + 2.5, 4.6, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
+        continue;
+      }
+      if (open < 0.1) {
+        g.strokeStyle = P.white; g.lineWidth = 1.8; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(cx - 5, cy); g.quadraticCurveTo(cx, cy + 3.2, cx + 5, cy); g.stroke();
+        continue;
+      }
+      const big = Math.max(1, Math.min(1.25, open));
+      const rx = 6.4 * big, ry = 7.4 * big;
+      const gl = g.createRadialGradient(cx, cy, rx * 0.5, cx, cy, rx * 1.9);
+      gl.addColorStop(0, 'rgba(189,230,75,.35)'); gl.addColorStop(1, 'rgba(189,230,75,0)');
+      g.fillStyle = gl; g.beginPath(); g.arc(cx, cy, rx * 1.9, 0, TAU); g.fill();
+      g.fillStyle = P.eye; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, TAU); g.fill();
+      g.strokeStyle = 'rgba(255,255,255,.28)'; g.lineWidth = 0.8;
+      for (const f of [-0.35, 0.3]) { g.beginPath(); g.moveTo(cx - rx * 0.8, cy + ry * f); g.lineTo(cx + rx * 0.8, cy + ry * f); g.stroke(); }
+      const pw = 1.3 + C.pupil.v * 3.6, ph = ry * 0.86;
+      const px = cx + R.pdx * 2.6, py = cy + R.pdy * 2.4;
+      g.fillStyle = P.pupil; g.beginPath(); g.ellipse(px, py, pw, ph, 0, 0, TAU); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(px - 1.8, py - 2.8, 1.35, 0, TAU); g.fill();
+      g.strokeStyle = METAL.mid; g.lineWidth = 1.2; g.beginPath(); g.ellipse(cx, cy, rx + 0.8, ry + 0.8, 0, 0, TAU); g.stroke();
+      const o = Math.min(1, open), brow = C.brow.v;
+      const lidY = cy - ry + (1 - o) * 1.75 * ry;
+      const yIn = lidY + brow * ry * 0.85, yOut = lidY + brow * ry * 0.12 - 0.5;
+      g.fillStyle = P.cat;
+      g.beginPath();
+      g.moveTo(cx - s * (rx + 2.4), yIn); g.lineTo(cx + s * (rx + 2.4), yOut);
+      g.lineTo(cx + s * (rx + 2.4), cy - ry - 3.5); g.lineTo(cx - s * (rx + 2.4), cy - ry - 3.5); g.closePath(); g.fill();
+      if (brow > 0.3 || o < 0.9) {
+        g.strokeStyle = METAL.mid; g.lineWidth = 1.1;
+        g.beginPath(); g.moveTo(cx - s * (rx + 1), yIn - 0.5); g.lineTo(cx + s * (rx + 1), yOut - 0.5); g.stroke();
+      }
+    }
+    if (C.blush.v > 0.03) {
+      g.fillStyle = `rgba(245,154,176,${(C.blush.v * 0.8).toFixed(3)})`;
+      for (const s of [-1, 1]) { g.beginPath(); g.ellipse(s * 13 + yaw * 5, 7 + my, 4.2, 2.5, 0, 0, TAU); g.fill(); }
+    }
+    // nose, mouth
+    const nyy = 5.2 + my;
+    g.fillStyle = P.nose;
+    g.beginPath(); g.moveTo(mx - 2.8, nyy - 1.2); g.lineTo(mx + 2.8, nyy - 1.2); g.quadraticCurveTo(mx + 0.6, nyy + 2.4, mx, nyy + 2.4); g.quadraticCurveTo(mx - 0.6, nyy + 2.4, mx - 2.8, nyy - 1.2); g.fill();
+    const mo = C.mouthOpen.v, my2 = nyy + 4.2;
+    if (mo > 0.08) {
+      const w = 4 + mo * 1.8, h = 1.4 + mo * 6;
+      g.fillStyle = P.mouth; g.beginPath(); g.ellipse(mx, my2 + h * 0.5, w, h, 0, 0, TAU); g.fill();
+      g.fillStyle = P.tongue; g.beginPath(); g.ellipse(mx, my2 + h * 0.9, w * 0.7, h * 0.4, 0, 0, TAU); g.fill();
+      if (C.fang.v > 0.15) {
+        g.fillStyle = '#fff';
+        for (const s of [-1, 1]) { g.beginPath(); g.moveTo(mx + s * (w - 2.6), my2); g.lineTo(mx + s * (w - 0.6), my2); g.lineTo(mx + s * (w - 1.6), my2 + 1.5 + C.fang.v * 2.6); g.closePath(); g.fill(); }
+      }
+    } else {
+      const cv = C.mouthCurve.v;
+      g.strokeStyle = '#5b5362'; g.lineWidth = 1.3; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(mx, nyy + 2.2); g.lineTo(mx, my2 - 0.4); g.stroke();
+      for (const s of [-1, 1]) {
+        g.beginPath(); g.moveTo(mx, my2 - 0.4);
+        g.quadraticCurveTo(mx + s * 1.8, my2 + 2.6 * cv, mx + s * 4, my2 - 0.4 - cv * 0.6); g.stroke();
+      }
+    }
+    if (C.tongue.v > 0.25) {
+      g.fillStyle = P.tongue;
+      g.beginPath(); g.ellipse(mx + 1, my2 + 1.8 * C.tongue.v, 1.8, 2.1 * C.tongue.v, 0, 0, TAU); g.fill();
+    }
+    // whiskers: steel wire
+    g.strokeStyle = 'rgba(214,220,228,.9)'; g.lineWidth = 0.85;
+    const droop = C.earBack.v * 0.18;
+    for (const s of [-1, 1]) {
+      for (const a of [-0.16, 0.05, 0.26]) {
+        const x0 = mx + s * 8.5, y0 = 8 + my, aa = a + droop;
+        g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(x0 + s * 8, y0 + aa * 6 - 1, x0 + s * 17, y0 + aa * 15); g.stroke();
+      }
+      g.fillStyle = '#9aa1ad'; g.beginPath(); g.arc(mx + s * 8.5, 8 + my, 0.9, 0, TAU); g.fill();
+    }
+    g.restore();
+
+    const veinOn = M.anger > 0.55 || (cat.veinT || 0) > 0;
+    if (veinOn && C.lift.v < 40) drawVein(g, H.x + 18, H.y - 22, 0.9 + 0.12 * Math.sin(t * 9), t);
+  }
+
+  // clip so the cat only shows through the hatch while it's (partly) inside
+  function clipInside(g, M) {
+    const C = M.cat.ch;
+    if (C.lift.v <= 1) return;
+    const r = new Path2D();
+    r.rect(G.hatchL + 1, G.hatchBack + 0.5, G.hatchR - G.hatchL - 2, G.hatchFront - G.hatchBack - 0.5);
+    if (M.lid.v >= 50) r.rect(0, 0, G.W, G.hatchBack + 0.5);
+    g.clip(r);
+  }
+
+  // ------------------------------------------------------------------ fx + bubbles
+  // camera window onto the 820×520 world (crops empty wall so the cat reads bigger)
+  const CAM0 = { VX: 48, VY: 58, VW: 724, VH: 446 };
+  let VX = CAM0.VX, VY = CAM0.VY, VW = CAM0.VW, VH = CAM0.VH;
+  function useCam(v) { VX = v.cam.VX; VY = v.cam.VY; VW = v.cam.VW; VH = v.cam.VH; }
+
+  function View(canvas, cam) {
+    this.cv = canvas; this.g = canvas.getContext('2d');
+    this.cam = Object.assign({}, cam || CAM0);
+    this.parts = []; this.bubble = null; this.hover = -1; this.zT = 0;
+    this.bg = null; this.scale = 1; this.dpr = 1;
+  }
+  View.prototype.resize = function () {
+    useCam(this);
+    const cssW = this.cv.clientWidth || VW;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.scale = cssW / VW; this.dpr = dpr;
+    this.cv.width = Math.round(cssW * dpr); this.cv.height = Math.round(cssW * VH / VW * dpr);
+    this.bg = mk(this.cv.width, this.cv.height);
+    const g = this.bg.getContext('2d');
+    g.setTransform(this.scale * dpr, 0, 0, this.scale * dpr, -VX * this.scale * dpr, -VY * this.scale * dpr);
+    drawStatic(g);
+  };
+  View.prototype.toWorld = function (cx, cy) {
+    useCam(this);
+    const r = this.cv.getBoundingClientRect();
+    return { x: VX + (cx - r.left) / r.width * VW, y: VY + (cy - r.top) / r.height * VH };
+  };
+
+  View.prototype.consume = function (M, ev) {
+    const cat = M.cat, R = cat.R;
+    if (ev.type === 'bubble') {
+      this.bubble = { text: ev.text, kind: ev.kind, t: 0, dur: ev.dur };
+    } else if (ev.type === 'fx') {
+      let x = ev.x, y = ev.y;
+      if (ev.fromNose) { x = R.headW.x + R.fsgn * 10; y = R.headW.y + 8; }
+      for (let k = 0; k < ev.n; k++) this.spawn(ev.kind, x, y, M);
+    }
+  };
+  View.prototype.spawn = function (kind, x, y, M) {
+    const r = Math.random;
+    const p = { kind, x, y, vx: 0, vy: 0, life: 0.6, max: 0.6, s: 1, rot: r() * TAU };
+    if (kind === 'dust') { p.vx = (r() - 0.5) * 70; p.vy = -r() * 25; p.s = 3 + r() * 3; p.life = p.max = 0.5 + r() * 0.3; }
+    else if (kind === 'spark') { const a = r() * TAU; p.vx = Math.cos(a) * 90; p.vy = Math.sin(a) * 90; p.life = p.max = 0.22; }
+    else if (kind === 'stars') { const a = -Math.PI * (0.1 + r() * 0.8); p.vx = Math.cos(a) * (70 + r() * 70); p.vy = Math.sin(a) * (70 + r() * 70); p.life = p.max = 0.7; p.s = 4 + r() * 2; }
+    else if (kind === 'steam') { p.vx = M.cat.faceSign * (20 + r() * 20); p.vy = -20 - r() * 15; p.life = p.max = 0.9; p.s = 3; }
+    else if (kind === 'vent') { p.vx = (r() - 0.5) * 12; p.vy = -38 - r() * 20; p.life = p.max = 0.7; p.s = 2.2; }
+    else if (kind === 'hearts') { p.vx = (r() - 0.5) * 30; p.vy = -35 - r() * 20; p.life = p.max = 1.3; p.s = 5 + r() * 2; p.x += (r() - 0.5) * 30; }
+    else if (kind === 'sweat') { p.life = p.max = 0.9; p.s = 4; }
+    else if (kind === 'vein') { M.cat.veinT = 1.3; return; }
+    else if (kind === 'zzz') { p.vx = 8 + r() * 8; p.vy = -18; p.life = p.max = 2.2; p.s = 10 + r() * 5; }
+    this.parts.push(p);
+  };
+
+  View.prototype.tick = function (M, dt) {
+    for (let k = this.parts.length - 1; k >= 0; k--) {
+      const p = this.parts[k];
+      p.life -= dt;
+      if (p.life <= 0) { this.parts.splice(k, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.kind === 'stars') p.vy += 260 * dt;
+      if (p.kind === 'dust') { p.vx *= Math.exp(-dt * 4); p.s += dt * 8; }
+      if (p.kind === 'steam' || p.kind === 'vent') { p.s += dt * 14; }
+      if (p.kind === 'hearts') p.x += Math.sin(p.life * 6) * 0.4;
+      if (p.kind === 'sweat') p.y += dt * 10;
+      p.rot += dt * 6;
+    }
+    if (this.bubble) { this.bubble.t += dt; if (this.bubble.t > this.bubble.dur) this.bubble = null; }
+    if (M.cat.veinT > 0) M.cat.veinT -= dt;
+    const Rr = M.cat.R;
+    if (M.cat.ch.puff.v > 0.45 && M.cat.ch.lift.v < 20 && Math.random() < dt * 6) {
+      // steam leaves from the vents on the back (spine midpoint pushed out along the body's up-normal)
+      const lx = 0.25 * Rr.hip.x + 0.5 * Rr.ctrl.x + 0.25 * Rr.sh.x - Rr.sn * 12;
+      const ly = 0.25 * Rr.hip.y + 0.5 * Rr.ctrl.y + 0.25 * Rr.sh.y - Rr.cs * 12;
+      this.spawn('vent', Rr.X + lx * Rr.fs + (Math.random() - 0.5) * 6, Rr.baseY + ly, M);
+    }
+    if (M.sleeping && M.state === 'inside' && !M.pending) {
+      this.zT -= dt;
+      if (this.zT <= 0) { this.zT = 1.4; this.spawn('zzz', G.hatchCX + 30, G.hatchBack - 2, M); }
+    }
+  };
+
+  function drawParts(g, parts) {
+    for (const p of parts) {
+      const a = clamp(p.life / p.max * 1.4, 0, 1);
+      g.globalAlpha = a;
+      if (p.kind === 'dust') { g.fillStyle = '#f3e3bf'; g.beginPath(); g.arc(p.x, p.y, p.s, 0, TAU); g.fill(); }
+      else if (p.kind === 'spark') { g.strokeStyle = '#fff4c2'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x - p.vx * 0.05, p.y - p.vy * 0.05); g.stroke(); }
+      else if (p.kind === 'stars') {
+        g.save(); g.translate(p.x, p.y); g.rotate(p.rot); g.fillStyle = '#ffe07a'; g.strokeStyle = P.ink; g.lineWidth = 1;
+        g.beginPath();
+        for (let k = 0; k < 8; k++) { const r = k % 2 ? p.s * 0.4 : p.s; const a2 = k * Math.PI / 4; k ? g.lineTo(Math.cos(a2) * r, Math.sin(a2) * r) : g.moveTo(r, 0); }
+        g.closePath(); g.fill(); g.stroke(); g.restore();
+      }
+      else if (p.kind === 'steam' || p.kind === 'vent') { g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(p.x, p.y, p.s, 0, TAU); g.arc(p.x + p.s * 0.8, p.y + 1, p.s * 0.7, 0, TAU); g.fill(); }
+      else if (p.kind === 'hearts') {
+        g.save(); g.translate(p.x, p.y); g.scale(p.s / 6, p.s / 6); g.fillStyle = '#ff7aa2';
+        g.beginPath(); g.moveTo(0, 3); g.bezierCurveTo(-6, -2, -3, -7, 0, -3); g.bezierCurveTo(3, -7, 6, -2, 0, 3); g.fill(); g.restore();
+      }
+      else if (p.kind === 'sweat') {
+        g.fillStyle = '#8fd3ff'; g.beginPath(); g.moveTo(p.x, p.y - 5); g.quadraticCurveTo(p.x + 4, p.y + 1, p.x, p.y + 3); g.quadraticCurveTo(p.x - 4, p.y + 1, p.x, p.y - 5); g.fill();
+      }
+      else if (p.kind === 'zzz') {
+        g.fillStyle = '#fbf3df'; g.font = `${p.s}px "Gaegu", "Do Hyeon", sans-serif`; g.textAlign = 'center';
+        g.fillText('z', p.x, p.y);
+      }
+    }
+    g.globalAlpha = 1;
+  }
+
+  function drawBubble(g, b, M, tk) {
+    const R = M.cat.R, C = M.cat.ch;
+    tk = tk || 1;   // text scale: >1 on small (phone) stages so the words stay readable
+    let ax, ay;
+    if (C.lift.v > 55) { ax = G.hatchCX + 18; ay = G.hatchBack - 6; }
+    else { ax = R.headW.x + R.fsgn * 10; ay = R.headW.y - 26; }
+    const pop = Math.min(1, b.t / 0.12), fade = clamp((b.dur - b.t) / 0.18, 0, 1);
+    const sc = (0.6 + 0.4 * pop) + (pop < 1 ? 0.12 * Math.sin(pop * Math.PI) : 0);
+    const shout = b.kind === 'shout', think = b.kind === 'think', count = b.kind === 'count';
+    g.save();
+    g.font = `700 ${(shout ? 25 : count ? 24 : 22) * tk}px "Gaegu", "Do Hyeon", sans-serif`;
+    const tw = g.measureText(b.text).width;
+    const w = Math.max((count ? 30 : 40) * tk, tw + 24 * tk), h = (count ? 30 : 34) * tk;
+    let bx = ax + 16, by = ay - 34 * tk;
+    if (bx + w > VX + VW - 8) bx = ax - 16 - w;
+    bx = clamp(bx, VX + 6, VX + VW - w - 6); by = Math.max(VY + 6, by);
+    g.globalAlpha = fade;
+    g.translate(bx + w / 2, by + h / 2); g.scale(sc, sc); g.translate(-(bx + w / 2), -(by + h / 2));
+    g.fillStyle = shout ? '#ffe07a' : '#fbf3df'; g.strokeStyle = P.ink; g.lineWidth = 2.2; g.lineJoin = 'round';
+    if (shout) {
+      g.beginPath();
+      const cx = bx + w / 2, cy = by + h / 2, n = 18;
+      for (let k = 0; k <= n; k++) {
+        const a = k / n * TAU, rr = k % 2 ? 1 : 1.2;
+        const x = cx + Math.cos(a) * (w / 2 + 4) * rr, y = cy + Math.sin(a) * (h / 2 + 3) * rr;
+        k ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.closePath(); g.fill(); g.stroke();
+    } else if (think) {
+      rrect(g, bx, by, w, h, h / 2); g.fill(); g.stroke();
+      const tx = ax + (bx > ax ? 6 : -6), ty = ay + 2;
+      g.beginPath(); g.arc(lerp(tx, bx + w / 2, 0.45), lerp(ty, by + h, 0.45), 4, 0, TAU); g.fill(); g.stroke();
+      g.beginPath(); g.arc(tx, ty, 2.4, 0, TAU); g.fill(); g.stroke();
+    } else {
+      rrect(g, bx, by, w, h, 10); g.fill(); g.stroke();
+      const sx = clamp(ax, bx + 10, bx + w - 10);
+      g.beginPath(); g.moveTo(sx - 6, by + h - 1); g.lineTo(ax, ay + 2); g.lineTo(sx + 5, by + h - 1); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(sx - 6, by + h); g.lineTo(ax, ay + 2); g.lineTo(sx + 5, by + h); g.stroke();
+    }
+    g.fillStyle = P.ink; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(b.text, bx + w / 2, by + h / 2 + 1);
+    g.restore();
+  }
+
+  // ------------------------------------------------------------------ frame
+  View.prototype.draw = function (M) {
+    useCam(this);
+    const g = this.g, k = this.scale * this.dpr, t = M.t;
+    const cat = M.cat, C = cat.ch, R = cat.R;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.drawImage(this.bg, 0, 0);
+    g.setTransform(k, 0, 0, k, -VX * k, -VY * k);
+    if (M.shake > 0.05) {
+      // the box rattles: redraw the static layer offset
+      const sx = (Math.random() - 0.5) * M.shake, sy = (Math.random() - 0.5) * M.shake * 0.6;
+      g.translate(sx, sy);
+      g.drawImage(this.bg, VX, VY, VW, VH);
+    }
+    for (let i = 0; i < 6; i++) drawLamp(g, i, M.sw[i].on, t);
+
+    const lid = M.lid.v;
+    const catOnTop = C.lift.v < 20;
+    const lidUnder = lid > 50 || catOnTop;   // standing on the lid → lid goes under the cat
+    if (lid > 0.6) drawHole(g);
+    if (lid > 0.6 && lidUnder) drawLid(g, lid);
+
+    const catVisible = C.lift.v < G.inside - 6 || lid > 0.6;
+    if (catVisible) {
+      g.save(); clipInside(g, M);
+      drawCable(g, M);
+      drawTail(g, R, C, t, M);
+      const L = R.legs;
+      drawLeg(g, L[3], true, false);
+      if (L[1].reach <= 0.3) drawLeg(g, L[1], true, true);
+      drawBody(g, R, C, t, M);
+      drawLeg(g, L[2], false, false);
+      jointDisc(g, L[2].jx, L[2].jy, 5.6, false);
+      if (L[0].reach <= 0.3) { drawLeg(g, L[0], false, true); jointDisc(g, L[0].jx, L[0].jy, 4.8, false); }
+      drawHead(g, cat, M, R, C, t);
+      g.restore();
+    }
+    if (lid > 0.6 && !lidUnder) drawLid(g, lid);
+
+    for (let i = 0; i < 6; i++) drawLever(g, i, M.sw[i].ang, this.hover === i);
+
+    if (catVisible && (R.legs[0].reach > 0.3 || R.legs[1].reach > 0.3)) {
+      g.save(); clipInside(g, M);
+      if (R.legs[1].reach > 0.3) drawLeg(g, R.legs[1], true, true);
+      if (R.legs[0].reach > 0.3) { drawLeg(g, R.legs[0], false, true); jointDisc(g, R.legs[0].jx, R.legs[0].jy, 4.8, false); }
+      g.restore();
+    }
+    drawParts(g, this.parts);
+    // bubble text is 22 world px; keep it at >= ~12.5 CSS px when the stage is shown small (phones)
+    if (this.bubble) drawBubble(g, this.bubble, M, clamp(12.5 / (22 * this.scale), 1, 1.4));
+  };
+
+  // hit tests (world coords)
+  View.prototype.hitSwitch = function (x, y) {
+    if (y < 188 || y > 352) return -1;
+    let best = -1, bd = 44;
+    for (let i = 0; i < 6; i++) { const d = Math.abs(x - G.swX[i]); if (d < bd) { bd = d; best = i; } }
+    return best;
+  };
+  View.prototype.hitCat = function (M, x, y) {
+    const C = M.cat.ch, R = M.cat.R;
+    if (M.state !== 'out' || C.lift.v > 20) return false;
+    if (Math.hypot(x - R.headW.x, y - R.headW.y) < 26) return true;
+    const ax = R.hipW.x, ay = R.hipW.y - 8, bx = R.shW.x, by = R.shW.y - 8;
+    const dx = bx - ax, dy = by - ay, u = clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+    return Math.hypot(x - (ax + dx * u), y - (ay + dy * u)) < 17;
+  };
+
+  View.VIEW = CAM0;
+  window.UMView = View;
+})();
+</script>
+<script>/* Useless Machine — synthesized sound (no samples). */
+(function () {
+  'use strict';
+  const A = { ctx: null, master: null, on: true, nb: null, lastStep: 0 };
+  try { A.on = localStorage.getItem('useless.sound') !== 'off'; } catch (e) { /* storage blocked */ }
+
+  function init() {
+    if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const c = new AC();
+    const comp = c.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 5;
+    const m = c.createGain(); m.gain.value = A.on ? 0.8 : 0;
+    m.connect(comp); comp.connect(c.destination);
+    A.ctx = c; A.master = m;
+    const nb = c.createBuffer(1, c.sampleRate, c.sampleRate), d = nb.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    A.nb = nb;
+  }
+  function setOn(on) {
+    A.on = on;
+    try { localStorage.setItem('useless.sound', on ? 'on' : 'off'); } catch (e) { /* ignore */ }
+    if (A.master) A.master.gain.setTargetAtTime(on ? 0.8 : 0, A.ctx.currentTime, 0.05);
+  }
+
+  function gainEnv(t, a, peak, d, hold) {
+    const g = A.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a);
+    if (hold) g.gain.setValueAtTime(peak, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + a + (hold || 0) + d);
+    return g;
+  }
+  function tone(type, f0, f1, t, dur, vol, a) {
+    const c = A.ctx, o = c.createOscillator();
+    o.type = type; o.frequency.setValueAtTime(f0, t);
+    if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = gainEnv(t, a || 0.004, vol, dur);
+    o.connect(g); g.connect(A.master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function noise(t, dur, vol, type, freq, q, a, f1) {
+    const c = A.ctx, s = c.createBufferSource();
+    s.buffer = A.nb; s.loop = true;
+    const f = c.createBiquadFilter(); f.type = type || 'bandpass'; f.frequency.setValueAtTime(freq || 1000, t); f.Q.value = q || 1;
+    if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = gainEnv(t, a || 0.003, vol, dur);
+    s.connect(f); f.connect(g); g.connect(A.master);
+    s.start(t, Math.random() * 0.5); s.stop(t + dur + (a || 0) + 0.05);
+    return g;
+  }
+
+  function meow(t, kind) {
+    const c = A.ctx;
+    const cfg = {
+      mew: { f: 760, dur: 0.26, vol: 0.2, shape: [0.85, 1.18, 0.8] },
+      meow: { f: 560, dur: 0.46, vol: 0.24, shape: [0.8, 1.2, 0.72] },
+      angry: { f: 430, dur: 0.72, vol: 0.28, shape: [0.75, 1.3, 0.62] },
+      yawn: { f: 420, dur: 0.95, vol: 0.18, shape: [1.25, 0.9, 0.5] },
+    }[kind] || { f: 600, dur: 0.4, vol: 0.22, shape: [0.8, 1.2, 0.75] };
+    const { f, dur, vol, shape } = cfg;
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f * shape[0], t);
+    o.frequency.linearRampToValueAtTime(f * shape[1], t + dur * 0.32);
+    o.frequency.linearRampToValueAtTime(f * shape[2], t + dur);
+    const lfo = c.createOscillator(), lg = c.createGain();
+    lfo.frequency.value = 6.2; lg.gain.value = f * 0.02; lfo.connect(lg); lg.connect(o.frequency);
+    // formants: "mi" → "a" → "u"
+    const f1 = c.createBiquadFilter(); f1.type = 'bandpass'; f1.Q.value = 5;
+    f1.frequency.setValueAtTime(420, t); f1.frequency.linearRampToValueAtTime(1150, t + dur * 0.35); f1.frequency.linearRampToValueAtTime(520, t + dur);
+    const f2 = c.createBiquadFilter(); f2.type = 'bandpass'; f2.Q.value = 7;
+    f2.frequency.setValueAtTime(2400, t); f2.frequency.linearRampToValueAtTime(1600, t + dur * 0.4); f2.frequency.linearRampToValueAtTime(950, t + dur);
+    const mix = c.createGain(); mix.gain.value = 1;
+    const g2 = c.createGain(); g2.gain.value = 0.6;
+    o.connect(f1); o.connect(f2); f1.connect(mix); f2.connect(g2); g2.connect(mix);
+    const env = gainEnv(t, 0.05, vol, dur * 0.55, dur * 0.4);
+    // a little ring modulation makes it a robot's meow
+    const rm = c.createGain(); rm.gain.value = 0;
+    const car = c.createOscillator(); car.frequency.value = 72; car.connect(rm.gain);
+    const wet = c.createGain(), dry = c.createGain();
+    wet.gain.value = 0.45; dry.gain.value = 0.75;
+    mix.connect(rm); rm.connect(wet); mix.connect(dry);
+    const voice = c.createGain(); voice.gain.value = 1;
+    wet.connect(voice); dry.connect(voice);
+    car.start(t); car.stop(t + dur + 0.1);
+    if (kind === 'angry') {
+      const am = c.createOscillator(), ag = c.createGain(), dc = c.createGain();
+      am.frequency.value = 32; ag.gain.value = 0.45; dc.gain.value = 1;
+      am.connect(ag); ag.connect(dc.gain);
+      voice.connect(dc); dc.connect(env);
+      am.start(t); am.stop(t + dur + 0.1);
+    } else voice.connect(env);
+    env.connect(A.master);
+    o.start(t); o.stop(t + dur + 0.1); lfo.start(t); lfo.stop(t + dur + 0.1);
+  }
+
+  const S = {
+    click(t, o) {
+      const p = o.pitch || 1, user = o.user;
+      noise(t, 0.012, user ? 0.5 : 0.42, 'bandpass', 3300 * p, 2.2);
+      tone('square', 2100 * p, 1500 * p, t, 0.018, 0.035);
+      noise(t + 0.017, 0.022, 0.3, 'bandpass', 1700 * p, 2);
+      tone('sine', 190, 90, t, 0.06, 0.18);
+    },
+    step(t, o) {
+      if (t - A.lastStep < 0.06) return;
+      A.lastStep = t;
+      noise(t, 0.035, 0.03 + 0.04 * (o.v || 0.5), 'lowpass', 700, 0.7);
+    },
+    hop(t) { tone('sine', 300, 560, t, 0.09, 0.07); },
+    land(t) { tone('sine', 150, 70, t, 0.12, 0.2); noise(t, 0.06, 0.12, 'lowpass', 600, 0.7); },
+    thud(t) { tone('sine', 120, 42, t, 0.24, 0.5); noise(t, 0.12, 0.3, 'lowpass', 520, 0.8); },
+    bang(t) { tone('sine', 110, 45, t, 0.22, 0.45); noise(t, 0.09, 0.35, 'bandpass', 1500, 0.8); tone('sine', 640, 600, t, 0.3, 0.05); },
+    lidShut(t, o) { tone('sine', 140, 80, t, 0.1, 0.18 * (o.v || 1)); noise(t, 0.04, 0.1, 'bandpass', 900, 1); },
+    creak(t, o) {
+      const c = A.ctx, s = c.createOscillator(); s.type = 'sawtooth';
+      s.frequency.setValueAtTime(68, t); s.frequency.linearRampToValueAtTime(102, t + 0.18); s.frequency.linearRampToValueAtTime(80, t + 0.36);
+      const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 950; f.Q.value = 9;
+      const g = gainEnv(t, 0.05, 0.07 * (o.v || 1), 0.3, 0.05);
+      s.connect(f); f.connect(g); g.connect(A.master); s.start(t); s.stop(t + 0.45);
+    },
+    whoosh(t) { noise(t, 0.13, 0.13, 'bandpass', 600, 1.4, 0.02, 2600); },
+    squish(t) { tone('sine', 240, 110, t, 0.16, 0.16); noise(t, 0.1, 0.08, 'lowpass', 400, 1); },
+    pat(t) { noise(t, 0.03, 0.08, 'bandpass', 1300, 1.2); },
+    tick(t, o) { tone('sine', 1150 * (o.pitch || 1), null, t, 0.05, 0.07); },
+    meow(t, o) { meow(t, o.kind); },
+    hiss(t, o) { noise(t, o.short ? 0.25 : 0.7, 0.32, 'highpass', 2600, 0.7, 0.04); noise(t, o.short ? 0.2 : 0.55, 0.12, 'bandpass', 6200, 1.5, 0.03); },
+    growl(t) {
+      const c = A.ctx, s = c.createOscillator(); s.type = 'sawtooth'; s.frequency.setValueAtTime(92, t); s.frequency.linearRampToValueAtTime(78, t + 0.7);
+      const am = c.createOscillator(), ag = c.createGain(), dc = c.createGain(); am.frequency.value = 27; ag.gain.value = 0.6; dc.gain.value = 0.7;
+      am.connect(ag); ag.connect(dc.gain);
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520;
+      const g = gainEnv(t, 0.08, 0.2, 0.35, 0.3);
+      s.connect(f); f.connect(dc); dc.connect(g); g.connect(A.master);
+      s.start(t); s.stop(t + 0.8); am.start(t); am.stop(t + 0.8);
+    },
+    purr(t) {
+      const c = A.ctx, s = c.createBufferSource(); s.buffer = A.nb; s.loop = true;
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 240;
+      const am = c.createOscillator(), ag = c.createGain(), dc = c.createGain(); am.type = 'square'; am.frequency.value = 24; ag.gain.value = 0.5; dc.gain.value = 0.5;
+      am.connect(ag); ag.connect(dc.gain);
+      const g = gainEnv(t, 0.15, 0.6, 0.35, 0.7);
+      s.connect(f); f.connect(dc); dc.connect(g); g.connect(A.master);
+      s.start(t); s.stop(t + 1.3); am.start(t); am.stop(t + 1.3);
+    },
+    sigh(t) { noise(t, 0.5, 0.1, 'bandpass', 850, 0.7, 0.2); },
+    huff(t) { noise(t, 0.12, 0.14, 'bandpass', 1100, 0.9, 0.01); noise(t + 0.02, 0.2, 0.05, 'highpass', 4000, 0.7, 0.02); },
+    servo(t, o) {
+      const p = o.pitch || 1, c = A.ctx, s2 = c.createOscillator(); s2.type = 'sawtooth';
+      s2.frequency.setValueAtTime(140 * p, t); s2.frequency.linearRampToValueAtTime(260 * p, t + 0.1); s2.frequency.linearRampToValueAtTime(200 * p, t + 0.16);
+      const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1300 * p; f.Q.value = 2.5;
+      const g = gainEnv(t, 0.01, 0.045, 0.1, 0.06);
+      s2.connect(f); f.connect(g); g.connect(A.master); s2.start(t); s2.stop(t + 0.22);
+    },
+    boot(t) { tone('sine', 880, null, t, 0.06, 0.05); tone('sine', 1320, null, t + 0.07, 0.08, 0.05); },
+    powerdown(t) { tone('sine', 700, 200, t + 0.05, 0.3, 0.045); },
+  };
+
+  function play(ev) {
+    if (!A.ctx || !A.on) return;
+    const f = S[ev.name];
+    if (f) f(A.ctx.currentTime + 0.005, ev);
+  }
+
+  window.UMAudio = { init, play, setOn, get on() { return A.on; }, get ready() { return !!A.ctx; } };
+})();
+</script>
+<script>/* Useless Machine — page glue: loop, input, the notebook panel, the move collection. */
+(function () {
+  'use strict';
+  const UM = window.UM, View = window.UMView, AU = window.UMAudio, G = UM.G;
+  const $ = id => document.getElementById(id);
+
+  const canvas = $('stage');
+  const view = new View(canvas);
+  const q0 = new URLSearchParams(location.search);
+  const M = UM.makeMachine(q0.has('seed') ? +q0.get('seed') : undefined);
+  if (q0.has('force')) { M.force = {}; for (const kv of q0.get('force').split(',')) { const [k, v] = kv.split(':'); M.force[k] = v; } }
+
+  // groups → colour class, for chips
+  const GROUP_OF = {};
+  for (const g in UM.GROUP) for (const k of UM.GROUP[g]) GROUP_OF[k] = g;
+  const GROUP_NAME = { emerge: '등장', pre: '준비', off: '끄기', post: '마무리', retreat: '퇴장', react: '돌발' };
+  const DEX = Object.keys(UM.GROUP).flatMap(g => UM.GROUP[g]);
+
+  // remembered collection (per viewer)
+  try {
+    const saved = JSON.parse(localStorage.getItem('useless.seen') || '{}');
+    for (const k in saved) if (DEX.includes(k)) M.seen[k] = true;
+  } catch (e) { /* storage blocked */ }
+
+  // ------------------------------------------------------------------ overlay buttons (keyboard / screen readers)
+  const swBtns = [];
+  const overlay = $('switches');
+  for (let i = 0; i < 6; i++) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'swbtn'; b.id = 'sw' + (i + 1);
+    const V = View.VIEW;
+    b.style.left = ((G.swX[i] - 38 - V.VX) / V.VW * 100) + '%';
+    b.style.top = ((192 - V.VY) / V.VH * 100) + '%';
+    b.style.width = (76 / V.VW * 100) + '%';
+    b.style.height = (158 / V.VH * 100) + '%';
+    b.addEventListener('click', e => { AU.init(); UM.flip(M, i); e.preventDefault(); });
+    overlay.appendChild(b);
+    swBtns.push(b);
+  }
+
+  // ------------------------------------------------------------------ pointer on the canvas
+  let pointerSeen = false;
+  function onMove(e) {
+    const p = view.toWorld(e.clientX, e.clientY);
+    M.cat.cursor.x = p.x; M.cat.cursor.y = p.y; pointerSeen = true;
+    const overCat = view.hitCat(M, p.x, p.y);
+    view.hover = overCat ? -1 : view.hitSwitch(p.x, p.y);
+    canvas.style.cursor = overCat ? 'grab' : view.hover >= 0 ? 'pointer' : 'default';
+  }
+  canvas.addEventListener('pointermove', onMove);
+  canvas.addEventListener('pointerleave', () => { view.hover = -1; });
+  canvas.addEventListener('pointerdown', e => {
+    AU.init();
+    onMove(e);
+    const p = view.toWorld(e.clientX, e.clientY);
+    if (view.hitCat(M, p.x, p.y)) { UM.boop(M); return; }
+    const i = view.hitSwitch(p.x, p.y);
+    if (i >= 0) UM.flip(M, i);
+  });
+  // phones: a touch only counts as a user gesture when the finger lifts, so (re)start the audio there too
+  window.addEventListener('pointerup', () => AU.init(), true);
+  window.addEventListener('touchend', () => AU.init(), true);
+  window.addEventListener('keydown', e => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= 6 && !e.metaKey && !e.ctrlKey && !e.altKey) { AU.init(); UM.flip(M, n - 1); e.preventDefault(); }
+  });
+
+  const btnSound = $('btnSound');
+  function paintSound() {
+    btnSound.setAttribute('aria-pressed', AU.on ? 'true' : 'false');
+    btnSound.querySelector('.lbl').textContent = AU.on ? '소리 켬' : '소리 끔';
+  }
+  btnSound.addEventListener('click', () => { AU.init(); AU.setOn(!AU.on); paintSound(); });
+  paintSound();
+
+  // ------------------------------------------------------------------ notebook panel
+  const el = {
+    status: $('status'), timerRow: $('timerRow'), timerNum: $('timerNum'), timerFill: $('timerFill'),
+    moodFill: $('moodFill'), moodLbl: $('moodLbl'), plan: $('plan'), reasons: $('reasons'),
+    dex: $('dex'), dexCount: $('dexCount'), dexFill: $('dexFill'),
+    stFlips: $('stFlips'), stSorties: $('stSorties'), stOffs: $('stOffs'), stMax: $('stMax'),
+  };
+  $('dexTotal').textContent = DEX.length;
+
+  let planVer = -1, seenN = -1, lastStatus = '';
+  function statusText() {
+    if (M.state === 'out') {
+      const cur = M.plan.steps.find(s => s.st === 'doing');
+      return cur ? `밖에 나와 있음 · ${cur.label}` : '밖에 나와 있음';
+    }
+    if (M.pending) return '딸깍 소리를 들었다…';
+    if (M.idleGen) return '빼꼼 감시 중';
+    if (M.sleeping) return '상자 안에서 자는 중';
+    return '상자 안에서 쉬는 중';
+  }
+  function renderPlan() {
+    el.plan.innerHTML = '';
+    M.plan.steps.forEach((s, k) => {
+      const li = document.createElement('li');
+      li.className = `chip g-${GROUP_OF[s.kind] || 'react'} st-${s.st}`;
+      const b = document.createElement('span'); b.className = 'lbl'; b.textContent = s.label;
+      li.appendChild(b);
+      if (s.sub) { const m = document.createElement('span'); m.className = 'sub'; m.textContent = s.sub; li.appendChild(m); }
+      el.plan.appendChild(li);
+    });
+    if (!M.plan.steps.length) {
+      const li = document.createElement('li'); li.className = 'empty'; li.textContent = '아직 아무 생각 없음. 스위치를 켜 보세요.';
+      el.plan.appendChild(li);
+    }
+    el.reasons.innerHTML = '';
+    for (const r of M.plan.reasons) { const li = document.createElement('li'); li.textContent = r; el.reasons.appendChild(li); }
+  }
+  function renderDex() {
+    el.dex.innerHTML = '';
+    let n = 0;
+    for (const g in UM.GROUP) {
+      const row = document.createElement('div'); row.className = 'dexrow';
+      const h = document.createElement('span'); h.className = `dexg g-${g}`; h.textContent = GROUP_NAME[g];
+      row.appendChild(h);
+      for (const k of UM.GROUP[g]) {
+        const c = document.createElement('span');
+        const seen = !!M.seen[k]; if (seen) n++;
+        c.className = `dexchip g-${g}` + (seen ? ' seen' : '');
+        c.textContent = seen ? UM.LABEL[k] : '???';
+        row.appendChild(c);
+      }
+      el.dex.appendChild(row);
+    }
+    el.dexCount.textContent = n;
+    el.dexFill.style.width = (n / DEX.length * 100).toFixed(1) + '%';
+    try { localStorage.setItem('useless.seen', JSON.stringify(M.seen)); } catch (e) { /* ignore */ }
+  }
+  function renderUI() {
+    const st = statusText();
+    if (st !== lastStatus) { el.status.textContent = st; lastStatus = st; }
+    if (M.state === 'inside' && M.pending) {
+      el.timerRow.hidden = false;
+      const left = Math.max(0, M.deadline - M.t);
+      el.timerNum.textContent = left.toFixed(1);
+      el.timerFill.style.width = (Math.min(1, left / 3) * 100).toFixed(1) + '%';
+    } else el.timerRow.hidden = true;
+    const band = UM.moodBand(M.anger);
+    el.moodFill.style.width = (M.anger * 100).toFixed(1) + '%';
+    el.moodFill.dataset.band = band.key;
+    el.moodLbl.textContent = `${band.label} ${Math.round(M.anger * 100)}%`;
+    if (M.plan.version !== planVer) { planVer = M.plan.version; renderPlan(); }
+    const sn = Object.keys(M.seen).filter(k => DEX.includes(k)).length;
+    if (sn !== seenN) { seenN = sn; renderDex(); }
+    el.stFlips.textContent = M.stats.flips;
+    el.stSorties.textContent = M.stats.sorties;
+    el.stOffs.textContent = M.stats.catOffs;
+    el.stMax.textContent = Math.round(M.stats.maxAnger * 100) + '%';
+    for (let i = 0; i < 6; i++) {
+      const on = M.sw[i].on;
+      const b = swBtns[i];
+      if (b.dataset.on !== String(on)) { b.dataset.on = String(on); b.setAttribute('aria-label', `${i + 1}번 스위치 (${on ? '켜짐' : '꺼짐'})`); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+    }
+  }
+
+  // ------------------------------------------------------------------ loop
+  let last = 0, lastFrame = 0, uiT = 0;
+  function frame() {
+    const now = performance.now();
+    const dt = last ? Math.min(0.05, Math.max(0, (now - last) / 1000)) : 1 / 60;
+    last = now; lastFrame = now;
+    try {
+      if (!pointerSeen) { M.cat.cursor.x = G.hatchCX + Math.sin(M.t * 0.5) * 120; M.cat.cursor.y = 120; }
+      UM.update(M, dt);
+      for (const ev of M.events) { if (ev.type === 'sfx') AU.play(ev); else view.consume(M, ev); }
+      M.events.length = 0;
+      view.tick(M, dt);
+      view.draw(M);
+      uiT -= dt;
+      if (uiT <= 0) { uiT = 0.05; renderUI(); }
+    } catch (err) {
+      if (!frame.warned) { frame.warned = true; console.error('useless-machine frame error', err && err.stack || err); }
+    }
+  }
+  function raf() { frame(); requestAnimationFrame(raf); }
+  setInterval(() => { if (performance.now() - lastFrame > 250) frame(); }, 120);
+
+  function resize() { view.resize(); }
+  let rt = 0;
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 60); });
+
+  // boot
+  resize();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
+  UM.greet(M);
+  // local debug: ?adv=seconds&on=135 (switches to flip, 1-based)
+  const q = new URLSearchParams(location.search);
+  if (q.has('nogreet')) { M.gen = null; M.state = 'inside'; M.cat.ch.lift.v = M.cat.ch.lift.t = G.inside; M.lid.v = M.lid.t = 0; }
+  if (q.has('pre')) for (let k = 0; k < +q.get('pre') * 60; k++) UM.update(M, 1 / 60), (M.events.length = 0);
+  if (q.has('on')) for (const ch of q.get('on')) UM.flip(M, +ch - 1);
+  if (q.has('anger')) M.anger = +q.get('anger');
+  const adv1 = () => { UM.update(M, 1 / 60); for (const ev of M.events) if (ev.type !== 'sfx') view.consume(M, ev); M.events.length = 0; view.tick(M, 1 / 60); };
+  if (q.has('until')) {
+    // advance until a plan step of this kind starts (debug screenshots)
+    const kind = q.get('until');
+    for (let k = 0; k < 60 * 60; k++) { adv1(); if (M.plan.steps.some(s => s.kind === kind && s.st === 'doing')) break; }
+  }
+  if (q.has('adv')) for (let k = 0; k < +q.get('adv') * 60; k++) adv1();
+  window.__um = { M, view, UM };
+  frame();
+  requestAnimationFrame(raf);
+})();
+</script>
+
+</body></html>
