@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no" />
+<title>Voxel Sandbox</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #87ceeb; color: #fff; user-select: none;
+    font-family: -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+  canvas { display: block; }
+
+  /* ---------- HUD ---------- */
+  #crosshair { position: fixed; left: 50%; top: 50%; width: 22px; height: 22px;
+    transform: translate(-50%, -50%); pointer-events: none; z-index: 5; opacity: .85; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff;
+    box-shadow: 0 0 2px rgba(0,0,0,.6); }
+  #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+  #crosshair::after  { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+
+  #info { position: fixed; left: 10px; top: 10px; z-index: 5; pointer-events: none;
+    font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
+    text-shadow: 0 1px 2px rgba(0,0,0,.85); white-space: pre; }
+
+  #breakbar { position: fixed; left: 50%; top: calc(50% + 22px); transform: translateX(-50%);
+    width: 64px; height: 6px; background: rgba(0,0,0,.45); border-radius: 3px; z-index: 5;
+    overflow: hidden; display: none; }
+  #breakbar > i { display: block; height: 100%; width: 0%; background: #e8e8e8; }
+
+  #health { position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%);
+    display: flex; gap: 3px; z-index: 5; }
+  #health .seg { width: 14px; height: 14px; border-radius: 3px; background: #4a1010;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+  #health .seg.on { background: #e23b3b; }
+  #health .seg.half { background: linear-gradient(90deg,#e23b3b 50%,#4a1010 50%); }
+
+  #oxygen { position: fixed; left: 50%; bottom: 104px; transform: translateX(-50%);
+    display: none; gap: 3px; z-index: 5; }
+  #oxygen .bub { width: 12px; height: 12px; border-radius: 50%;
+    background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+  #oxygen .bub.on { background: #54b6ff; box-shadow: inset 0 0 0 1px rgba(0,0,0,.3); }
+
+  #flyhint { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 5;
+    display: none; background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.2);
+    padding: 4px 12px; border-radius: 8px; font-size: 12px; text-shadow: 0 1px 2px #000; }
+
+  #soundBtn { position: fixed; right: 12px; top: 12px; z-index: 6; cursor: pointer;
+    background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.25); color: #fff;
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  #soundBtn:hover { background: rgba(0,0,0,.6); }
+
+  /* ---------- Hotbar ---------- */
+  #hotbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+    display: flex; gap: 5px; z-index: 5; padding: 6px; background: rgba(0,0,0,.32);
+    border-radius: 10px; }
+  .slot { position: relative; width: 50px; height: 50px; border-radius: 7px;
+    border: 2px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .slot canvas { width: 38px; height: 38px; image-rendering: pixelated; border-radius: 4px; }
+  .slot .num { position: absolute; top: 1px; left: 4px; font-size: 10px; font-weight: 700;
+    color: #fff; text-shadow: 0 1px 2px #000; }
+  .slot .cnt { position: absolute; bottom: 1px; right: 4px; font-size: 12px; font-weight: 700;
+    color: #fff; text-shadow: 0 1px 2px #000; }
+  .slot.selected { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+
+  /* ---------- Screens ---------- */
+  .screen { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center;
+    justify-content: center; background: rgba(10,16,24,.6); backdrop-filter: blur(3px); text-align: center; }
+  .card { background: rgba(20,28,38,.94); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 16px; padding: 26px 32px; max-width: 600px; width: min(92vw, 600px);
+    box-shadow: 0 18px 50px rgba(0,0,0,.5); max-height: 92vh; overflow: auto; }
+  .card h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: .5px; }
+  .card h2 { margin: 0 0 14px; font-size: 16px; font-weight: 500; color: #bcd; }
+  .card p  { margin: 6px 0; color: #cdd6e0; font-size: 14px; }
+  .group { margin: 14px 0; text-align: left; }
+  .group > .label { font-size: 13px; color: #9fb0c0; text-transform: uppercase;
+    letter-spacing: .6px; margin-bottom: 7px; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .opts.two { grid-template-columns: 1fr 1fr; }
+  .opt { border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.05);
+    border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: .08s; }
+  .opt:hover { background: rgba(255,255,255,.1); }
+  .opt.sel { border-color: #5ec06a; background: rgba(94,192,106,.16); box-shadow: 0 0 0 1px #5ec06a inset; }
+  .opt b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .opt span { font-size: 11.5px; color: #aebccb; line-height: 1.35; }
+
+  .row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+  .row label { width: 150px; font-size: 14px; color: #d6dee8; text-align: left; }
+  .row input[type=range] { flex: 1; }
+  .row input[type=text] { flex: 1; padding: 7px 10px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.3); color: #fff; }
+
+  .btn { margin-top: 8px; display: inline-block; padding: 11px 26px; border-radius: 10px;
+    cursor: pointer; border: none; font-weight: 700; font-size: 15px; color: #fff;
+    background: linear-gradient(180deg,#5ec06a,#3d9a4d); box-shadow: 0 6px 18px rgba(40,150,70,.4); }
+  .btn:hover { filter: brightness(1.07); }
+  .btn.alt { background: linear-gradient(180deg,#5a6b7e,#3f4d5c); box-shadow: none; }
+  .btn.block { display: block; width: 100%; margin: 8px 0 0; }
+  .controls { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; text-align: left;
+    margin: 14px auto; max-width: 420px; font-size: 13.5px; color: #d6dee8; }
+  .controls b { color: #fff; background: rgba(255,255,255,.10); padding: 1px 7px; border-radius: 5px;
+    font-family: ui-monospace, monospace; font-size: 12px; justify-self: start; }
+  .tiny { font-size: 12px; color: #94a3b4; margin-top: 12px; }
+  .hidden { display: none !important; }
+
+  /* ---------- Inventory ---------- */
+  #inv .card { width: min(94vw, 720px); }
+  .invgrid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; margin: 10px 0; }
+  .icell { position: relative; aspect-ratio: 1; border-radius: 6px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.05);
+    display: flex; align-items: center; justify-content: center; }
+  .icell:hover { background: rgba(255,255,255,.12); }
+  .icell.sel { border-color: #fff; box-shadow: 0 0 0 1px #fff inset; }
+  .icell canvas { width: 80%; height: 80%; image-rendering: pixelated; }
+  .icell .cnt { position: absolute; bottom: 1px; right: 4px; font-size: 12px; font-weight: 700;
+    text-shadow: 0 1px 2px #000; }
+  .icell .nm { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; color: #cfd9e3; white-space: nowrap; opacity: 0; pointer-events: none; }
+  .icell:hover .nm { opacity: 1; }
+  .craftlist { text-align: left; margin-top: 6px; }
+  .recipe { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 8px;
+    background: rgba(255,255,255,.04); margin-bottom: 6px; }
+  .recipe .desc { flex: 1; font-size: 13px; }
+  .recipe .desc small { color: #9fb0c0; }
+  .recipe button { padding: 6px 14px; border-radius: 7px; border: none; cursor: pointer;
+    font-weight: 700; color: #fff; background: #3d9a4d; }
+  .recipe button:disabled { background: #44505c; color: #8a97a3; cursor: not-allowed; }
+  .subhead { font-size: 13px; color: #9fb0c0; text-transform: uppercase; letter-spacing: .6px;
+    margin: 14px 0 6px; text-align: left; }
+
+  /* ---------- Touch (phones / tablets) ---------- */
+  html, body { overscroll-behavior: none; }
+  body.touch { -webkit-touch-callout: none; -webkit-user-select: none; }
+  body > canvas { touch-action: none; }   /* the 3D view only (item icons are canvases too) */
+  #lookZone { position: fixed; inset: 0; z-index: 4; display: none; touch-action: none; }
+  body:not(.touch) .t-only { display: none; }
+  body.touch .d-only { display: none; }
+  #invTip { min-height: 18px; margin-bottom: 4px; font-size: 13px; color: #cfd9e3; }
+  /* touch play: HUD clears the stick (bottom-left), the buttons (right) and the top-right button row */
+  body.tp #info { left: calc(10px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top)); }
+  body.tp #soundBtn { top: calc(66px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right));
+    min-height: 44px; display: flex; align-items: center; }
+  body.tp #flyhint { top: calc(88px + env(safe-area-inset-top)); pointer-events: none; }
+  body.tp #hotbar { bottom: calc(10px + env(safe-area-inset-bottom)); gap: 4px; padding: 5px; }
+  body.tpa #hotbar { z-index: 2147483001; }   /* above the stick zone while playing (menus keep it under their overlay) */
+  body.tp .slot { width: 44px; height: 44px; }
+  body.tp .slot canvas { width: 32px; height: 32px; }
+  body.tp .slot .num, body.tp .slot .cnt { font-size: 12px; }
+  body.tp #health { bottom: calc(76px + env(safe-area-inset-bottom)); pointer-events: none; }
+  body.tp #oxygen { bottom: calc(94px + env(safe-area-inset-bottom)); pointer-events: none; }
+  @media (orientation: portrait) {
+    body.tp #info { top: calc(66px + env(safe-area-inset-top)); }
+    body.tp #flyhint { top: calc(146px + env(safe-area-inset-top)); }
+    body.tp #hotbar { flex-wrap: wrap; justify-content: center; width: 256px; bottom: calc(256px + env(safe-area-inset-bottom)); }
+    body.tp #health { bottom: calc(366px + env(safe-area-inset-bottom)); }
+    body.tp #oxygen { bottom: calc(384px + env(safe-area-inset-bottom)); }
+  }
+  body.touch .opt span, body.touch .recipe .desc small { font-size: 12px; }
+  body.touch .row input[type=text] { font-size: 16px; }
+  body.touch .row input[type=range] { height: 44px; }
+  body.touch .row input[type=checkbox] { width: 28px; height: 28px; margin: 8px 0; }
+  body.touch .recipe button { min-height: 44px; min-width: 72px; }
+  body.touch .icell .nm { display: none; }
+  @media (max-width: 520px) {
+    body.touch .card { padding: 18px 14px; }
+    body.touch .invgrid { grid-template-columns: repeat(7, 1fr); }
+  }
+  /* short screens (phone landscape): tighter cards */
+  @media (max-height: 520px) {
+    .card { padding: 16px 22px; }
+    .card h1 { font-size: 24px; }
+    .card h2 { margin-bottom: 8px; }
+    .group { margin: 8px 0; }
+    .opt { padding: 7px 10px; }
+    .row { margin: 6px 0; }
+    .controls { margin: 8px auto; }
+    #invClose { position: sticky; bottom: 0; }   /* the inventory scrolls; keep Close in reach */
+  }
+</style>
+</head>
+<body>
+  <!-- HUD -->
+  <div id="crosshair" class="hidden"></div>
+  <div id="info" class="hidden"></div>
+  <div id="breakbar"><i></i></div>
+  <div id="health" class="hidden"></div>
+  <div id="oxygen"></div>
+  <div id="flyhint"><span class="d-only">Flying &middot; Space up &middot; Ctrl/C down &middot; Shift faster &middot; double-tap Space to land</span><span class="t-only">Flying &middot; UP / DOWN buttons &middot; RUN faster &middot; tap FLY to land</span></div>
+  <div id="hotbar" class="hidden"></div>
+  <div id="soundBtn" class="hidden">Sound: On</div>
+  <div id="lookZone"></div>
+
+  <!-- Title -->
+  <div id="title" class="screen">
+    <div class="card">
+      <h1>Voxel Sandbox</h1>
+      <h2>An infinite block world in your browser</h2>
+      <div class="controls t-only">
+        <b>Left stick</b><span>Move</span>
+        <b>Drag</b><span>Look around</span>
+        <b>BREAK · PLACE</b><span>Mine / place at the crosshair</span>
+        <b>JUMP</b><span>Jump, swim · double-tap to fly (Creative)</span>
+        <b>Hotbar</b><span>Tap a slot to pick a block or tool</span>
+        <b>INV · ❚❚</b><span>Inventory &amp; crafting · pause</span>
+      </div>
+      <p class="tiny"><span class="d-only">Desktop + mouse recommended. </span>Needs an internet connection (loads Three.js from a CDN).</p>
+      <button class="btn" id="startBtn">Start Game</button>
+    </div>
+  </div>
+
+  <!-- World setup -->
+  <div id="setup" class="screen hidden">
+    <div class="card">
+      <h1>Create World</h1>
+      <div class="group">
+        <div class="label">World Type</div>
+        <div class="opts" id="typeOpts">
+          <div class="opt" data-type="flat"><b>Flat</b><span>Mostly flat. Great for building.</span></div>
+          <div class="opt sel" data-type="natural"><b>Natural</b><span>Hills, plains, water, trees. Default.</span></div>
+          <div class="opt" data-type="amplified"><b>Amplified</b><span>Huge mountains, deep valleys, cliffs.</span></div>
+        </div>
+      </div>
+      <div class="group">
+        <div class="label">Game Mode</div>
+        <div class="opts two" id="modeOpts">
+          <div class="opt sel" data-mode="survival"><b>Survival</b><span>Health, gather, mine by hand/tools, craft.</span></div>
+          <div class="opt" data-mode="creative"><b>Creative</b><span>Fly, invincible, instant break, all blocks.</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <label>Seed (optional)</label>
+        <input type="text" id="seedInput" placeholder="leave blank for random" />
+      </div>
+      <button class="btn block" id="createBtn">Enter World</button>
+      <button class="btn alt block" id="backToTitle">Back</button>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="screen hidden">
+    <div class="card">
+      <h1>Paused</h1>
+      <p id="pauseInfo"></p>
+      <button class="btn block" id="resumeBtn">Resume</button>
+      <button class="btn alt block" id="settingsBtn">Settings</button>
+      <button class="btn alt block" id="titleBtn">Return to Title</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings" class="screen hidden">
+    <div class="card">
+      <h1>Settings</h1>
+      <div class="row"><label><span class="d-only">Mouse sensitivity</span><span class="t-only">Look sensitivity</span></label><input type="range" id="sensRange" min="1" max="100" value="40" /></div>
+      <div class="row"><label>Sound volume</label><input type="range" id="volRange" min="0" max="100" value="60" /></div>
+      <div class="row"><label>Mute</label><input type="checkbox" id="muteChk" /></div>
+      <button class="btn block" id="settingsBack">Back</button>
+    </div>
+  </div>
+
+  <!-- Inventory -->
+  <div id="inv" class="screen hidden">
+    <div class="card">
+      <h1 id="invTitle">Inventory</h1>
+      <div id="invTip" class="t-only"></div>
+      <div id="invContent"></div>
+      <button class="btn block" id="invClose">Close<span class="d-only"> (E)</span></button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- shared touch-kit from the aemtti site kit -->
+  <script>
+/* touch-kit.js — on-screen touch controls for keyboard/mouse web games. No dependencies.
+ * Inline it into a single-file game (inside a script tag) or load it next to the game.
+ *
+ *   const kit = TouchKit.create({
+ *     sticks: [
+ *       { id: 'move', side: 'left',  label: 'MOVE', keys: 'wasd' },            // 'wasd' | 'arrows' | {up,down,left,right} codes
+ *       { id: 'aim',  side: 'right', label: 'AIM',  onMove: (x, y, on) => {} } // analog -1..1, on=false when released
+ *     ],
+ *     buttons: [ { id: 'fire', label: 'FIRE', icon: '✦', key: 'Space' },      // key: KeyboardEvent.code to hold while pressed
+ *                { id: 'map', label: 'MAP', key: 'KeyM', place: 'top-right' } ],
+ *     landscape: true,        // ask to rotate when the phone is held upright
+ *   })
+ *   kit.show(false)           // hide in menus, kit.show(true) in gameplay (default: shown on touch devices)
+ *   kit.stick('aim')          // → { x, y, on }   kit.pressed('fire') → boolean
+ *
+ * Buttons without `key` can use onDown/onUp. Sticks with `keys` send keydown/keyup (8 directions) and still report analog x/y.
+ * Keys are dispatched as KeyboardEvents (key, code, keyCode, which) on document, so window/document listeners receive them.
+ * Everything else on the page keeps working: the kit only captures touches that start on its own zones/buttons.
+ */
+(function () {
+  'use strict'
+  if (window.TouchKit) return
+  const KEYS = { Space: [' ', 32], Enter: ['Enter', 13], Escape: ['Escape', 27], Tab: ['Tab', 9], ShiftLeft: ['Shift', 16],
+    ControlLeft: ['Control', 17], AltLeft: ['Alt', 18], ArrowLeft: ['ArrowLeft', 37], ArrowUp: ['ArrowUp', 38],
+    ArrowRight: ['ArrowRight', 39], ArrowDown: ['ArrowDown', 40], Backspace: ['Backspace', 8] }
+  const keyInfo = code => {
+    if (KEYS[code]) return KEYS[code]
+    if (/^Key[A-Z]$/.test(code)) return [code[3].toLowerCase(), code.charCodeAt(3)]
+    if (/^Digit\d$/.test(code)) return [code[5], code.charCodeAt(5)]
+    return [code, 0]
+  }
+  const held = new Map()                                   // code → count of sources holding it
+  function sendKey(type, code) {
+    const [key, kc] = keyInfo(code)
+    const ev = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true, composed: true })
+    try { Object.defineProperty(ev, 'keyCode', { get: () => kc }); Object.defineProperty(ev, 'which', { get: () => kc }) } catch (e) {}
+    const t = document.activeElement && document.activeElement !== document.body ? document.activeElement : document
+    t.dispatchEvent(ev)
+  }
+  function press(code) { const n = held.get(code) || 0; held.set(code, n + 1); if (n === 0) sendKey('keydown', code) }
+  function release(code) { const n = held.get(code) || 0; if (n <= 1) { held.delete(code); if (n === 1) sendKey('keyup', code) } else held.set(code, n - 1) }
+  function tapKey(code) { press(code); setTimeout(() => release(code), 80) }
+
+  const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
+  const CSS = `
+.tk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:600 11px/1 system-ui,-apple-system,'Segoe UI',sans-serif;
+  letter-spacing:.06em;color:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tk-root.tk-off{display:none}
+.tk-zone{position:absolute;bottom:0;top:22%;pointer-events:auto;touch-action:none}
+.tk-zone.l{left:0;width:42%}.tk-zone.r{right:0;width:42%}
+.tk-base{position:absolute;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;border:2px solid rgba(255,255,255,.28);
+  background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,.02) 70%);transition:opacity .15s;opacity:.55}
+.tk-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
+  background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.55);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.tk-base.on{opacity:.95}
+.tk-lab{position:absolute;left:0;right:0;top:50%;margin-top:-5px;text-align:center;opacity:.75;text-shadow:0 1px 2px #000;pointer-events:none}
+.tk-btns{position:absolute;display:flex;gap:12px;pointer-events:none}
+.tk-btns.br{right:calc(18px + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse;align-items:flex-end}
+.tk-btns.tr{right:calc(12px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));flex-direction:row-reverse}
+.tk-btns.tl{left:calc(12px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top))}
+.tk-btns.bl{left:calc(18px + env(safe-area-inset-left));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse}
+.tk-row{display:flex;gap:12px;flex-direction:row-reverse;align-items:flex-end}
+.tk-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
+  background:rgba(20,22,30,.42);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.tk-btn.s{width:48px;height:48px;font-size:9px}.tk-btn.l{width:84px;height:84px}
+.tk-btn i{font-style:normal;font-size:22px;line-height:1}.tk-btn.s i{font-size:17px}
+.tk-btn.on{background:rgba(255,255,255,.34);border-color:#fff;transform:scale(.94)}
+.tk-rot{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+  background:rgba(8,9,14,.94);color:#eee;font:500 16px/1.5 system-ui,sans-serif;text-align:center;pointer-events:auto;padding:24px}
+.tk-rot b{font-size:44px;display:block;animation:tkr 1.8s ease-in-out infinite}
+.tk-rot button{margin-top:6px;background:none;border:1px solid #666;color:#bbb;border-radius:20px;padding:8px 18px;font:inherit;font-size:13px}
+@keyframes tkr{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait){.tk-rot.need{display:flex}}
+`
+  // A tap on a kit button is followed by a compatibility `click` at the same spot ~100–300 ms later. If the button just
+  // opened a game overlay/menu under the finger, that click would hit it (and often close it). Swallow it.
+  let clickBlockUntil = 0
+  function suppressClick() { clickBlockUntil = Date.now() + 450 }
+  document.addEventListener('click', e => {
+    if (Date.now() < clickBlockUntil && !(e.target && e.target.closest && e.target.closest('.tk-root'))) { e.stopPropagation(); e.preventDefault() }
+  }, true)
+
+  function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e }
+
+  function create(opt) {
+    opt = opt || {}
+    if (!document.getElementById('tk-style')) { const st = el('style'); st.id = 'tk-style'; st.textContent = CSS; document.head.appendChild(st) }
+    const root = el('div', 'tk-root', document.body)
+    const api = { root, sticks: {}, buttons: {}, visible: false }
+
+    // ---- sticks: floating — the base appears where the thumb lands inside its half of the screen
+    for (const s of opt.sticks || []) {
+      const side = s.side === 'right' ? 'r' : 'l'
+      const zone = el('div', 'tk-zone ' + side, root)
+      if (s.zone) Object.assign(zone.style, s.zone)
+      const base = el('div', 'tk-base', zone), knob = el('div', 'tk-knob', base)
+      if (s.label) el('div', 'tk-lab', knob, s.label)
+      const R = s.radius || 52, dz = s.deadzone == null ? 0.3 : s.deadzone
+      const keys = s.keys === 'wasd' ? { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }
+        : s.keys === 'arrows' ? { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } : s.keys || null
+      const st = { x: 0, y: 0, on: false, pid: null, cx: 0, cy: 0, dirs: {} }
+      api.sticks[s.id || side] = st
+      const rest = () => {                                   // idle hint position; keeps clear of the bottom-right buttons
+        const zr = zone.getBoundingClientRect(); let x = side === 'l' ? 96 : zr.width - 96
+        if (side === 'r' && groups.br) { const gr = groups.br.getBoundingClientRect(); if (gr.width) x = Math.min(x, gr.left - zr.left - 80) }
+        base.style.left = x + 'px'; base.style.top = (zr.height - 110) + 'px'
+      }
+      const setDirs = (want) => {
+        if (!keys) return
+        for (const d of ['up', 'down', 'left', 'right']) {
+          if (want[d] && !st.dirs[d]) { st.dirs[d] = true; press(keys[d]) }
+          else if (!want[d] && st.dirs[d]) { st.dirs[d] = false; release(keys[d]) }
+        }
+      }
+      const move = (px, py) => {
+        let dx = px - st.cx, dy = py - st.cy; const d = Math.hypot(dx, dy)
+        if (d > R) { dx *= R / d; dy *= R / d }
+        knob.style.transform = `translate(${dx}px,${dy}px)`
+        st.x = dx / R; st.y = dy / R
+        const m = Math.hypot(st.x, st.y), a = Math.atan2(st.y, st.x)
+        const want = { up: false, down: false, left: false, right: false }
+        if (m > dz) { const oct = Math.round(a / (Math.PI / 4)); // 8 directions
+          want.right = [0, 1, -1].includes(oct); want.left = [4, -4, 3, -3].includes(oct); want.down = [1, 2, 3].includes(oct); want.up = [-1, -2, -3].includes(oct) }
+        setDirs(want)
+        if (s.onMove) s.onMove(st.x, st.y, true)
+      }
+      zone.addEventListener('pointerdown', e => {
+        if (st.pid !== null) return
+        e.preventDefault(); st.pid = e.pointerId; try { zone.setPointerCapture(e.pointerId) } catch (x) {}
+        const zr = zone.getBoundingClientRect(); st.cx = e.clientX; st.cy = e.clientY
+        base.style.left = (e.clientX - zr.left) + 'px'; base.style.top = (e.clientY - zr.top) + 'px'
+        base.classList.add('on'); st.on = true; move(e.clientX, e.clientY)
+        if (s.onStart) s.onStart()
+      })
+      zone.addEventListener('pointermove', e => { if (e.pointerId === st.pid) { e.preventDefault(); move(e.clientX, e.clientY) } })
+      const end = e => {
+        if (e.pointerId !== st.pid) return
+        st.pid = null; st.on = false; st.x = st.y = 0; knob.style.transform = ''; base.classList.remove('on'); setDirs({}); rest()
+        if (s.onMove) s.onMove(0, 0, false); if (s.onEnd) s.onEnd()
+      }
+      zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end)
+      st.reset = () => { if (st.pid !== null) end({ pointerId: st.pid }) }
+      requestAnimationFrame(rest); addEventListener('resize', rest)
+    }
+
+    // ---- buttons: grouped by place (default bottom-right cluster)
+    const groups = {}
+    for (const b of opt.buttons || []) {
+      const place = b.place || 'bottom-right', code = { 'bottom-right': 'br', 'top-right': 'tr', 'top-left': 'tl', 'bottom-left': 'bl' }[place] || 'br'
+      if (!groups[code]) groups[code] = el('div', 'tk-btns ' + code, root)
+      let parent = groups[code]
+      if (code === 'br' && b.row != null) { parent = groups['br' + b.row] || (groups['br' + b.row] = el('div', 'tk-row', groups.br)) }
+      const btn = el('div', 'tk-btn' + (b.size ? ' ' + b.size : ''), parent, (b.icon ? `<i>${b.icon}</i>` : '') + (b.label ? `<span>${b.label}</span>` : ''))
+      const bs = { down: false, pid: null, el: btn }
+      api.buttons[b.id || b.label] = bs
+      const down = e => {
+        e.preventDefault(); e.stopPropagation()
+        if (b.toggle) { bs.down = !bs.down; btn.classList.toggle('on', bs.down); if (b.key) (bs.down ? press : release)(b.key); (bs.down ? b.onDown : b.onUp) && (bs.down ? b.onDown : b.onUp)(); return }
+        if (bs.pid !== null) return
+        bs.pid = e.pointerId; try { btn.setPointerCapture(e.pointerId) } catch (x) {}
+        bs.down = true; btn.classList.add('on')
+        if (b.key) { if (b.tap) tapKey(b.key); else press(b.key) }
+        if (b.onDown) b.onDown()
+        if (navigator.vibrate && b.buzz !== false) try { navigator.vibrate(8) } catch (x) {}
+      }
+      const up = e => {
+        suppressClick()
+        if (b.toggle || e.pointerId !== bs.pid) return
+        bs.pid = null; bs.down = false; btn.classList.remove('on')
+        if (b.key && !b.tap) release(b.key)
+        if (b.onUp) b.onUp()
+      }
+      btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up)
+      btn.addEventListener('contextmenu', e => e.preventDefault())
+    }
+
+    // ---- portrait → ask to rotate (can be dismissed)
+    let rot = null, rotDismissed = false                      // once dismissed, show(true) must not bring the hint back
+    if (opt.landscape) {
+      rot = el('div', 'tk-rot', document.body, `<b>⟳</b><div>${opt.rotateText || '휴대폰을 가로로 돌려 주세요'}<br><small style="opacity:.6">Rotate your phone</small></div><button type="button">그래도 세로로 하기</button>`)
+      rot.querySelector('button').addEventListener('click', () => { rotDismissed = true; rot.classList.remove('need') })
+    }
+
+    // ---- page hygiene for touch play: no pinch/double-tap zoom, no pull-to-refresh, no long-press menu on the game
+    if (opt.preventGestures !== false) {
+      document.documentElement.style.overscrollBehavior = 'none'
+      document.addEventListener('gesturestart', e => e.preventDefault())
+      let lastT = 0
+      document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastT < 300 && !(e.target.closest && e.target.closest('input,textarea,select,a,button'))) e.preventDefault(); lastT = now }, { passive: false })
+    }
+
+    api.show = on => {
+      api.visible = on; root.classList.toggle('tk-off', !on); if (rot) rot.classList.toggle('need', on && !!opt.landscape && !rotDismissed)
+      if (!on) { for (const s of Object.values(api.sticks)) s.reset && s.reset(); for (const [code] of held) sendKey('keyup', code); held.clear()
+        for (const b of Object.values(api.buttons)) { b.down = false; b.pid = null; b.el.classList.remove('on') } }
+    }
+    api.stick = id => api.sticks[id] || { x: 0, y: 0, on: false }
+    api.pressed = id => !!(api.buttons[id] && api.buttons[id].down)
+    api.destroy = () => { api.show(false); root.remove(); if (rot) rot.remove() }
+    const mode = opt.show || 'auto'
+    api.show(mode === 'always' || (mode === 'auto' && isTouch()))
+    if (mode === 'auto' && !api.visible) addEventListener('touchstart', function once() { removeEventListener('touchstart', once); api.show(true) }, { passive: true })
+    return api
+  }
+
+  // Helpers for games that read the mouse: fire mouse events at a point (client coords).
+  function mouse(target, type, x, y, extra) {
+    const ev = new MouseEvent(type, Object.assign({ clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1 }, extra || {}))
+    ;(target || document.elementFromPoint(x, y) || document).dispatchEvent(ev)
+  }
+  // Resume every AudioContext the game creates, on the first real touch (iOS/Android need a user gesture).
+  function unlockAudio() {
+    const ctxs = new Set(), AC = window.AudioContext || window.webkitAudioContext
+    if (AC && !AC.__tk) { const W = function (...a) { const c = new AC(...a); ctxs.add(c); return c }; W.prototype = AC.prototype; W.__tk = true; window.AudioContext = W; if (window.webkitAudioContext) window.webkitAudioContext = W }
+    const go = () => { for (const c of ctxs) if (c.state === 'suspended') c.resume().catch(() => {}) }
+    addEventListener('pointerdown', go, true); addEventListener('touchend', go, true)
+  }
+  window.TouchKit = { create, press, release, tapKey, sendKey, mouse, unlockAudio, isTouch }
+})()
+  </script>
+  <script>
+  /* ==================================================================
+     VOXEL SANDBOX  (infinite chunks, survival/creative, crafting, audio)
+     Systems:
+       Config & registry .......... block/item data, hardness, tools
+       Textures ................... procedural atlas + item icons
+       AudioManager ............... Web Audio procedural SFX
+       WorldGenerator ............. Flat / Natural / Amplified
+       World facade + Chunk data .. infinite, seeded, edit overlay
+       Mesher ..................... merged geometry, face cull, AO
+       ChunkManager ............... streaming load/unload + remesh
+       Inventory / CraftingSystem . survival items + recipes
+       GameModeManager ............ survival vs creative rules
+       PlayerController ........... physics, fly, fall damage
+       Interaction ................ raycast, break (timed/instant), place
+       Input + UIManager .......... menus, hotbar, inventory, pause
+     ================================================================== */
+
+  TouchKit.unlockAudio();   // resume the AudioContext on the first touch (iOS / Android)
+
+  // ============================ CONFIG ============================
+  const CHUNK = 16;            // blocks per chunk (X & Z)
+  const H = 96;                // world height
+  const SEA = 32;              // sea level
+  const FLAT_Y = 32;           // surface height for Flat worlds
+  const R = 5;                 // render radius in chunks
+  let SEED = 1234;             // set when a world is created
+
+  // Physics
+  const GRAVITY = 26, JUMP = 8.6, WALK = 4.6, SPRINT = 7.2, FLY = 11, SWIM_UP = 4.2;
+  const PW = 0.3, PH = 1.8, EYE = 1.62, REACH = 6;
+  // Creative flight: horizontal & vertical speeds, plus the Shift fast-flight multiplier.
+  const FLY_H = 6.5, FLY_V = 9, FLY_FAST = 2.0;
+  // Survival fall damage: no damage under SAFE_FALL blocks, then ~1 hp per extra block.
+  const SAFE_FALL = 3;
+  // Survival oxygen / drowning.
+  const MAX_OXY = 100, OXY_DRAIN = 8.5, OXY_REFILL = 34, DROWN_INTERVAL = 1.0, DROWN_DMG = 2;
+  // Creative block-break rate limit (seconds) so holding the button can't mass-delete.
+  const CREATIVE_BREAK_CD = 0.15;
+
+  // Voxel ids (stored in Uint8Array)
+  const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WOOD=5, LEAVES=6, WATER=7, PLANKS=8, CRAFTING_TABLE=9;
+  function isOpaque(id){ return id !== AIR && id !== WATER; }
+
+  // Item/block registry. `block` = voxel id (placeable). tiles: string or {top,side,bottom}.
+  // hardness (seconds base), tool (preferred), needTool (no drop without it), drop (item key).
+  const REG = {
+    grass:          { name:'Grass',          block:GRASS,          tiles:{top:'grass_top',side:'grass_side',bottom:'dirt'}, hardness:0.6, tool:'shovel', drop:'dirt' },
+    dirt:           { name:'Dirt',           block:DIRT,           tiles:'dirt',  hardness:0.6, tool:'shovel', drop:'dirt' },
+    stone:          { name:'Stone',          block:STONE,          tiles:'stone', hardness:2.2, tool:'pickaxe', needTool:true, drop:'stone' },
+    sand:           { name:'Sand',           block:SAND,           tiles:'sand',  hardness:0.6, tool:'shovel', drop:'sand' },
+    log:            { name:'Wood Log',       block:WOOD,           tiles:{top:'wood_top',side:'wood_side',bottom:'wood_top'}, hardness:1.6, tool:'axe', drop:'log' },
+    leaves:         { name:'Leaves',         block:LEAVES,         tiles:'leaves',hardness:0.2, tool:null, drop:null },
+    water:          { name:'Water',          block:WATER,          tiles:'water', hardness:Infinity, unbreakable:true },
+    planks:         { name:'Planks',         block:PLANKS,         tiles:'planks',hardness:1.4, tool:'axe', drop:'planks' },
+    crafting_table: { name:'Crafting Table', block:CRAFTING_TABLE, tiles:{top:'crafting_top',side:'crafting_side',bottom:'planks'}, hardness:1.6, tool:'axe', drop:'crafting_table' },
+    stick:          { name:'Stick',          icon:'stick' },
+    wood_pickaxe:   { name:'Wooden Pickaxe', icon:'pickaxe', tool:'pickaxe', durability:60 },
+    wood_axe:       { name:'Wooden Axe',     icon:'axe',     tool:'axe',     durability:60 },
+    wood_shovel:    { name:'Wooden Shovel',  icon:'shovel',  tool:'shovel',  durability:60 },
+  };
+  // voxel id -> registry key (for drops + mesh tile lookup)
+  const BLOCK_KEY = {};
+  Object.keys(REG).forEach(k => { const b = REG[k].block; if (b !== undefined) BLOCK_KEY[b] = k; });
+  // creative palette (everything) and default creative hotbar
+  const PALETTE = ['grass','dirt','stone','sand','log','leaves','planks','crafting_table','water','stick','wood_pickaxe','wood_axe','wood_shovel'];
+  const CREATIVE_DEFAULT = ['grass','dirt','stone','sand','log','planks','leaves','water','crafting_table'];
+
+  function maxStack(key){ return REG[key] && REG[key].tool ? 1 : 64; }
+  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+  function cv(n){ const c = document.createElement('canvas'); c.width = c.height = n; return c; }
+
+  // ============================ TEXTURES ============================
+  const TILES = ['grass_top','grass_side','dirt','stone','sand','wood_top','wood_side','leaves','water','planks','crafting_top','crafting_side'];
+  const TILE_INDEX = {}; TILES.forEach((t,i)=>TILE_INDEX[t]=i);
+  const TS = 16;
+
+  // One procedural 16x16 tile.
+  function genTile(type){
+    const c = cv(TS), g = c.getContext('2d');
+    const px = (x,y,r,gg,b)=>{ g.fillStyle = `rgb(${r|0},${gg|0},${b|0})`; g.fillRect(x,y,1,1); };
+    const v = a => (Math.random()*2-1)*a;
+    for (let y=0;y<TS;y++) for (let x=0;x<TS;x++){
+      let r,gg,b;
+      switch(type){
+        case 'grass_top':{ const n=v(16); r=78+n*0.4; gg=150+n; b=58+n*0.3; if(Math.random()<0.08){r-=18;gg-=26;b-=8;} break; }
+        case 'grass_side':{ if(y<4||(y===4&&Math.random()<0.45)){ const n=v(16); r=78+n*0.4; gg=150+n; b=58+n*0.3; } else { const n=v(18); r=122+n; gg=84+n*0.7; b=50+n*0.5; } break; }
+        case 'dirt':{ const n=v(18); r=122+n; gg=84+n*0.7; b=50+n*0.5; if(Math.random()<0.12){r-=22;gg-=16;b-=10;} break; }
+        case 'stone':{ const n=v(16); r=128+n; gg=130+n; b=134+n; if(Math.random()<0.10){r-=20;gg-=20;b-=20;} break; }
+        case 'sand':{ const n=v(14); r=219+n; gg=205+n; b=140+n; break; }
+        case 'wood_top':{ const dx=x-7.5,dz=y-7.5,d=Math.sqrt(dx*dx+dz*dz),ring=Math.sin(d*2.2)*0.5+0.5; r=150-ring*40; gg=104-ring*30; b=60-ring*18; break; }
+        case 'wood_side':{ const s=(x%4===0||x%7===0)?-22:0,n=v(10); r=112+n+s; gg=76+n*0.7+s*0.7; b=44+n*0.5; break; }
+        case 'leaves':{ const n=v(20); r=56+n*0.5; gg=118+n; b=46+n*0.4; const k=Math.random(); if(k<0.14){r-=22;gg-=34;b-=16;} else if(k>0.9){r+=14;gg+=18;b+=8;} break; }
+        case 'planks':{ const n=v(12); r=181+n; gg=146+n; b=96+n*0.7; if(y%4===3){r-=30;gg-=26;b-=18;} if((y<4&&x===7)||(y>=4&&y<8&&x===3)||(y>=8&&y<12&&x===11)||(y>=12&&x===6)){r-=24;gg-=20;b-=14;} break; }
+        case 'crafting_top':{ const n=v(10); r=181+n; gg=146+n; b=96+n*0.7; if(x===0||y===0||x===15||y===15||x===7||x===8||y===7||y===8){r-=42;gg-=34;b-=24;} break; }
+        case 'crafting_side':{ const n=v(10); r=170+n; gg=132+n; b=84+n*0.7; if(y>=10){r-=24;gg-=22;b-=16;} if(y%4===3){r-=20;gg-=16;b-=12;} break; }
+        case 'water': default:{ const n=v(10); r=64+n; gg=116+n; b=196+n; break; }
+      }
+      px(x,y,r,gg,b);
+    }
+    return c;
+  }
+
+  // Simple tool/item icons (transparent background).
+  function genIcon(name){
+    const c = cv(TS), g = c.getContext('2d');
+    const bar=(x,y,w,h,col)=>{ g.fillStyle=col; g.fillRect(x,y,w,h); };
+    const handle='#7a4f25', head='#c9a063';
+    if(name!=='stick'){ for(let i=0;i<8;i++) bar(4+i,12-i,2,2,handle); }   // diagonal handle
+    if(name==='stick'){ for(let i=0;i<8;i++) bar(4+i,12-i,2,2,'#8a5a2b'); }
+    else if(name==='pickaxe'){ bar(7,2,7,2,head); bar(7,2,2,3,head); bar(12,2,2,3,head); }
+    else if(name==='axe'){ bar(10,2,4,5,head); bar(9,3,2,3,head); }
+    else if(name==='shovel'){ bar(10,2,4,4,head); }
+    return c;
+  }
+
+  // Texture atlas (all tiles in a horizontal strip), NearestFilter for crisp pixels.
+  function buildAtlas(){
+    const a = cv(1); a.width = TS*TILES.length; a.height = TS;
+    const g = a.getContext('2d');
+    TILES.forEach((t,i)=> g.drawImage(genTile(t), i*TS, 0));
+    const tex = new THREE.CanvasTexture(a);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false; tex.encoding = THREE.sRGBEncoding;
+    return tex;
+  }
+  function tileRect(i){
+    const aw = TS*TILES.length;
+    return [ (i*TS+0.5)/aw, ((i+1)*TS-0.5)/aw, 0.5/TS, (TS-0.5)/TS ];
+  }
+  function tileFor(id, face){          // face 2=top, 3=bottom
+    const reg = REG[BLOCK_KEY[id]]; const t = reg.tiles;
+    if(typeof t === 'string') return TILE_INDEX[t];
+    return TILE_INDEX[ face===2 ? t.top : face===3 ? t.bottom : t.side ];
+  }
+
+  // Representative icon canvas for a key (cached) — used by hotbar & inventory.
+  const _iconCache = {};
+  function iconCanvas(key){
+    if(_iconCache[key]) return _iconCache[key];
+    const reg = REG[key]; let c;
+    if(reg.icon) c = genIcon(reg.icon);
+    else if(key === 'water'){ c = cv(TS); const g=c.getContext('2d'); g.fillStyle='#3f78c8'; g.fillRect(0,0,TS,TS); }
+    else { const rep = (typeof reg.tiles==='string') ? reg.tiles : (key==='crafting_table' ? 'crafting_top' : (reg.tiles.side||reg.tiles.top)); c = genTile(rep); }
+    _iconCache[key] = c; return c;
+  }
+  function iconClone(key){ const src = iconCanvas(key); const c = cv(TS); c.getContext('2d').drawImage(src,0,0); return c; }
+
+  // ============================ AUDIO ============================
+  // Procedural Web Audio sound effects (no files, no music).
+  class AudioManager {
+    constructor(){ this.ctx=null; this.master=null; this.volume=0.6; this.muted=false; }
+    ensure(){
+      if(!this.ctx){
+        const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
+        this.ctx = new AC();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = this.muted ? 0 : this.volume;
+        this.master.connect(this.ctx.destination);
+      }
+      if(this.ctx.state === 'suspended') this.ctx.resume();
+    }
+    setVolume(v){ this.volume=v; if(this.master) this.master.gain.value = this.muted?0:v; }
+    setMuted(m){ this.muted=m; if(this.master) this.master.gain.value = m?0:this.volume; }
+    tone(freq,dur,opt){
+      opt=opt||{}; if(!this.ctx) return; const t=this.ctx.currentTime;
+      const o=this.ctx.createOscillator(), g=this.ctx.createGain();
+      o.type=opt.type||'sine'; o.frequency.setValueAtTime(freq,t);
+      if(opt.to) o.frequency.exponentialRampToValueAtTime(opt.to,t+dur);
+      const gain=opt.gain||0.2;
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+      o.connect(g).connect(this.master); o.start(t); o.stop(t+dur+0.02);
+    }
+    noise(dur,opt){
+      opt=opt||{}; if(!this.ctx) return; const t=this.ctx.currentTime;
+      const n=Math.max(1,Math.floor(this.ctx.sampleRate*dur));
+      const buf=this.ctx.createBuffer(1,n,this.ctx.sampleRate), d=buf.getChannelData(0);
+      for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+      const src=this.ctx.createBufferSource(); src.buffer=buf;
+      const f=this.ctx.createBiquadFilter(); f.type=opt.type||'bandpass'; f.frequency.value=opt.freq||800; f.Q.value=opt.q||1;
+      const g=this.ctx.createGain(); const gain=opt.gain||0.2;
+      g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+      src.connect(f).connect(g).connect(this.master); src.start(t); src.stop(t+dur);
+    }
+    step(){ this.noise(0.07,{freq:250+Math.random()*80,gain:0.10,q:1.2}); }
+    jump(){ this.tone(320,0.12,{type:'square',gain:0.10,to:520}); }
+    land(){ this.noise(0.12,{freq:150,gain:0.18,q:0.7,type:'lowpass'}); }
+    breakSfx(key){ const f = key==='stone'?520 : key==='leaves'?900 : 360; this.noise(0.16,{freq:f,gain:0.20,q:1}); }
+    place(){ this.tone(200,0.07,{type:'square',gain:0.12,to:150}); this.noise(0.05,{freq:400,gain:0.06}); }
+    uiOpen(){ this.tone(520,0.09,{type:'triangle',gain:0.1,to:720}); }
+    uiClose(){ this.tone(720,0.09,{type:'triangle',gain:0.1,to:480}); }
+    click(){ this.tone(600,0.05,{type:'square',gain:0.07}); }
+    hurt(){ this.tone(180,0.18,{type:'sawtooth',gain:0.16,to:120}); }
+  }
+  const audio = new AudioManager();
+
+  // ============================ NOISE ============================
+  function hash2(ix,iz){
+    let h = (Math.imul(ix,0x1f1f1f1f) ^ Math.imul(iz,0x85ebca6b) ^ Math.imul(SEED,0x27d4eb2f)) | 0;
+    h = Math.imul(h ^ (h>>>15), 0x2c1b3c6d);
+    h = Math.imul(h ^ (h>>>13), 0x297a2d39);
+    h ^= h>>>15; return (h>>>0)/4294967295;
+  }
+  const fade = t => t*t*(3-2*t);
+  const lerp = (a,b,t) => a+(b-a)*t;
+  function valueNoise(x,z){
+    const ix=Math.floor(x), iz=Math.floor(z), fx=fade(x-ix), fz=fade(z-iz);
+    const n00=hash2(ix,iz), n10=hash2(ix+1,iz), n01=hash2(ix,iz+1), n11=hash2(ix+1,iz+1);
+    return lerp(lerp(n00,n10,fx), lerp(n01,n11,fx), fz);
+  }
+  function fbm(x,z,oct){
+    let t=0, amp=0.5, freq=1, norm=0;
+    for(let o=0;o<oct;o++){ t+=valueNoise(x*freq,z*freq)*amp; norm+=amp; amp*=0.5; freq*=2; }
+    return t/norm;
+  }
+  function treeRand(x,z){
+    let h=(Math.imul(x+919,0x9e3779b1) ^ Math.imul(z+311,0x7feb352d) ^ Math.imul(SEED,0x846ca68b))|0;
+    h=Math.imul(h ^ (h>>>16),0x85ebca6b); h^=h>>>13; return (h>>>0)/4294967295;
+  }
+
+  // ====================== WORLD GENERATOR ======================
+  // Deterministic terrain height for a column, depending on the world type.
+  let worldType = 'natural';
+  function heightAt(X,Z){
+    if(worldType==='flat') return FLAT_Y;
+    if(worldType==='amplified'){
+      const lo = fbm(X*0.0065, Z*0.0065, 5);           // big landmasses
+      let r = fbm(X*0.013+100, Z*0.013-100, 4);        // ridged detail
+      r = 1 - Math.abs(r*2-1);                          // sharpen into ridges
+      return clamp(Math.floor(14 + Math.pow(lo,1.15)*72 + r*18), 3, H-4);
+    }
+    const e = fbm(X*0.012, Z*0.012, 4);                 // natural
+    return clamp(Math.floor(SEA-4 + Math.pow(e,1.35)*30), 3, H-8);
+  }
+  function treeHeight(X,Z){ return 4 + ((treeRand(X*3+1, Z*7+5)*3)|0); }   // 4..6
+  function isTreeOrigin(X,Z){
+    if(worldType==='flat') return treeRand(X,Z) < 0.006;
+    const top = heightAt(X,Z);
+    if(top <= SEA+1) return false;                                   // not on beach/water
+    if(worldType==='amplified' && top > SEA+34) return false;        // not on bare peaks
+    return treeRand(X,Z) < (worldType==='amplified' ? 0.012 : 0.02);
+  }
+
+  // ================== WORLD FACADE + CHUNK DATA ==================
+  // Per-chunk voxel data is generated on demand from the seed and cached.
+  // Player edits are stored separately (per chunk) so they persist even if a
+  // chunk is unloaded and later regenerated.
+  const chunkData = new Map();    // "cx,cz" -> { data:Uint8Array, colMax:Uint8Array }
+  const editChunks = new Map();   // "cx,cz" -> Map(localIndex -> id)
+  const LI = (lx,lz,y) => lx + CHUNK*(lz + CHUNK*y);
+
+  function stampTree(data, colMax, cx, cz, ox, oz){
+    const sTop = heightAt(ox,oz), base = sTop+1, trunkH = treeHeight(ox,oz), topY = base+trunkH;
+    const put = (X,Y,Z,b,force)=>{
+      if(Y<0||Y>=H) return;
+      const lx=X-cx*CHUNK, lz=Z-cz*CHUNK;
+      if(lx<0||lx>=CHUNK||lz<0||lz>=CHUNK) return;
+      const li=LI(lx,lz,Y);
+      if(force || data[li]===AIR){ data[li]=b; const ci=lx+CHUNK*lz; if(Y+1>colMax[ci]) colMax[ci]=Y+1; }
+    };
+    for(let dy=-2;dy<=1;dy++){ const r = dy<=-1?2:1, ly=topY+dy;
+      for(let dx=-r;dx<=r;dx++) for(let dz=-r;dz<=r;dz++)
+        if(dx*dx+dz*dz <= r*r+1) put(ox+dx,ly,oz+dz,LEAVES,false); }
+    for(let y=base;y<topY;y++) put(ox,y,oz,WOOD,true);
+  }
+
+  function genChunkData(cx,cz){
+    const data = new Uint8Array(CHUNK*CHUNK*H);
+    const colMax = new Uint8Array(CHUNK*CHUNK);
+    const flat = worldType==='flat';
+    for(let lx=0;lx<CHUNK;lx++) for(let lz=0;lz<CHUNK;lz++){
+      const X=cx*CHUNK+lx, Z=cz*CHUNK+lz, top=heightAt(X,Z);
+      const ci=lx+CHUNK*lz;
+      const beach = !flat && top<=SEA+1;
+      const rock = !flat && worldType==='amplified' && top>SEA+34;
+      for(let y=0;y<=top;y++){
+        let b;
+        if(y===top) b = flat?GRASS : rock?STONE : beach?SAND:GRASS;
+        else if(y>top-4) b = (flat||!beach)?DIRT:SAND;
+        else b = STONE;
+        data[LI(lx,lz,y)] = b;
+      }
+      colMax[ci] = top+1;
+      if(!flat && top<SEA){ for(let y=top+1;y<=SEA;y++) data[LI(lx,lz,y)]=WATER; colMax[ci]=SEA+1; }
+    }
+    // Trees: stamp every origin within a 2-block margin so canopies cross chunk borders seamlessly.
+    for(let ox=cx*CHUNK-2; ox<cx*CHUNK+CHUNK+2; ox++)
+      for(let oz=cz*CHUNK-2; oz<cz*CHUNK+CHUNK+2; oz++)
+        if(isTreeOrigin(ox,oz)) stampTree(data,colMax,cx,cz,ox,oz);
+    // Apply persisted edits for this chunk (decode local index -> lx,lz,y).
+    const em = editChunks.get(cx+','+cz);
+    if(em) em.forEach((id,li)=>{
+      data[li]=id;
+      const y=Math.floor(li/(CHUNK*CHUNK)), rem=li-y*CHUNK*CHUNK, lz=Math.floor(rem/CHUNK), lx=rem-lz*CHUNK, ci=lx+CHUNK*lz;
+      if(id!==AIR && y+1>colMax[ci]) colMax[ci]=y+1;
+    });
+    return { data, colMax };
+  }
+
+  const world = {
+    ensureData(cx,cz){
+      const k = cx+','+cz; let c = chunkData.get(k);
+      if(!c){ c = genChunkData(cx,cz); chunkData.set(k,c); }
+      return c;
+    },
+    getBlock(x,y,z){
+      if(y<0) return STONE; if(y>=H) return AIR;
+      const cx=Math.floor(x/CHUNK), cz=Math.floor(z/CHUNK);
+      const c=this.ensureData(cx,cz);
+      return c.data[LI(x-cx*CHUNK, z-cz*CHUNK, y)];
+    },
+    solidAt(x,y,z){ return isOpaque(this.getBlock(x,y,z)); },
+    setBlock(x,y,z,id){
+      if(y<0||y>=H) return;
+      const cx=Math.floor(x/CHUNK), cz=Math.floor(z/CHUNK);
+      const lx=x-cx*CHUNK, lz=z-cz*CHUNK, li=LI(lx,lz,y), k=cx+','+cz;
+      let em=editChunks.get(k); if(!em){ em=new Map(); editChunks.set(k,em); } em.set(li,id);
+      const c=chunkData.get(k);
+      if(c){ c.data[li]=id; if(id!==AIR){ const ci=lx+CHUNK*lz; if(y+1>c.colMax[ci]) c.colMax[ci]=y+1; } }
+    },
+    reset(){ chunkData.clear(); editChunks.clear(); }
+  };
+
+  // ============================ MESHER ============================
+  // Six cube faces: outward normal, 4 CCW corners (seen from outside), UVs.
+  const FACES = [
+    { dir:[ 1, 0, 0], corners:[[1,0,1],[1,0,0],[1,1,0],[1,1,1]], uv:[[0,0],[1,0],[1,1],[0,1]] },
+    { dir:[-1, 0, 0], corners:[[0,0,0],[0,0,1],[0,1,1],[0,1,0]], uv:[[0,0],[1,0],[1,1],[0,1]] },
+    { dir:[ 0, 1, 0], corners:[[0,1,1],[1,1,1],[1,1,0],[0,1,0]], uv:[[0,0],[1,0],[1,1],[0,1]] },
+    { dir:[ 0,-1, 0], corners:[[0,0,0],[1,0,0],[1,0,1],[0,0,1]], uv:[[0,0],[1,0],[1,1],[0,1]] },
+    { dir:[ 0, 0, 1], corners:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]], uv:[[0,0],[1,0],[1,1],[0,1]] },
+    { dir:[ 0, 0,-1], corners:[[1,0,0],[0,0,0],[0,1,0],[1,1,0]], uv:[[0,0],[1,0],[1,1],[0,1]] },
+  ];
+  FACES.forEach(f => f.tan = [0,1,2].filter(a => f.dir[a]===0));
+  const AO_LEVELS = [0.50, 0.66, 0.82, 1.0];
+
+  function vertexAO(x,y,z,f,corner){
+    const d=FACES[f].dir, bx=x+d[0], by=y+d[1], bz=z+d[2], [a1,a2]=FACES[f].tan;
+    const s1=corner[a1]===1?1:-1, s2=corner[a2]===1?1:-1;
+    const off=(ax,s)=>[ax===0?s:0, ax===1?s:0, ax===2?s:0];
+    const u=off(a1,s1), w=off(a2,s2);
+    const o1=world.solidAt(bx+u[0],by+u[1],bz+u[2]);
+    const o2=world.solidAt(bx+w[0],by+w[1],bz+w[2]);
+    const oc=world.solidAt(bx+u[0]+w[0],by+u[1]+w[1],bz+u[2]+w[2]);
+    const ao=(o1&&o2)?0:3-((o1?1:0)+(o2?1:0)+(oc?1:0));
+    return AO_LEVELS[ao];
+  }
+
+  // Build opaque + water geometry for one chunk, looping only up to its tallest column.
+  function buildChunkGeometry(cx,cz){
+    const c = world.ensureData(cx,cz);
+    let maxY=0; for(let i=0;i<c.colMax.length;i++) if(c.colMax[i]>maxY) maxY=c.colMax[i];
+    const sx=cx*CHUNK, sz=cz*CHUNK;
+    const P=[],N=[],U=[],C=[],I=[]; let vi=0;
+    const WP=[],WN=[],WI=[]; let wvi=0;
+    for(let lx=0;lx<CHUNK;lx++) for(let lz=0;lz<CHUNK;lz++) for(let y=0;y<maxY;y++){
+      const x=sx+lx, z=sz+lz, id=world.getBlock(x,y,z);
+      if(id===AIR) continue;
+      if(id===WATER){
+        for(let f=0;f<6;f++){ const d=FACES[f].dir;
+          if(world.getBlock(x+d[0],y+d[1],z+d[2])!==AIR) continue;
+          const fc=FACES[f].corners;
+          for(let k=0;k<4;k++){ const p=fc[k]; WP.push(x+p[0], y+p[1]-(p[1]===1?0.1:0), z+p[2]); WN.push(d[0],d[1],d[2]); }
+          WI.push(wvi,wvi+1,wvi+2,wvi,wvi+2,wvi+3); wvi+=4;
+        }
+        continue;
+      }
+      for(let f=0;f<6;f++){ const d=FACES[f].dir;
+        if(isOpaque(world.getBlock(x+d[0],y+d[1],z+d[2]))) continue;
+        const [u0,u1,v0,v1]=tileRect(tileFor(id,f)), fc=FACES[f].corners, fu=FACES[f].uv;
+        for(let k=0;k<4;k++){ const p=fc[k];
+          P.push(x+p[0],y+p[1],z+p[2]); N.push(d[0],d[1],d[2]);
+          U.push(u0+(u1-u0)*fu[k][0], v0+(v1-v0)*fu[k][1]);
+          const b=vertexAO(x,y,z,f,p); C.push(b,b,b);
+        }
+        I.push(vi,vi+1,vi+2,vi,vi+2,vi+3); vi+=4;
+      }
+    }
+    let opaque=null, water=null;
+    if(P.length){
+      opaque=new THREE.BufferGeometry();
+      opaque.setAttribute('position',new THREE.Float32BufferAttribute(P,3));
+      opaque.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));
+      opaque.setAttribute('uv',new THREE.Float32BufferAttribute(U,2));
+      opaque.setAttribute('color',new THREE.Float32BufferAttribute(C,3));
+      opaque.setIndex(I); opaque.computeBoundingSphere();
+    }
+    if(WP.length){
+      water=new THREE.BufferGeometry();
+      water.setAttribute('position',new THREE.Float32BufferAttribute(WP,3));
+      water.setAttribute('normal',new THREE.Float32BufferAttribute(WN,3));
+      water.setIndex(WI); water.computeBoundingSphere();
+    }
+    return { opaque, water };
+  }
+
+  // ============================ SCENE ============================
+  const SKY = 0x8fc4ec;
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.domElement.tabIndex = 0;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(SKY);
+  scene.fog = new THREE.Fog(SKY, (R-1.5)*CHUNK, (R+0.5)*CHUNK);
+
+  const camera = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.rotation.order = 'YXZ';
+
+  const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x55552f, 0.85); scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff3d6, 0.9);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.bias = -0.0005;
+  const SH = 70;
+  sun.shadow.camera.left=-SH; sun.shadow.camera.right=SH; sun.shadow.camera.top=SH; sun.shadow.camera.bottom=-SH;
+  sun.shadow.camera.near=1; sun.shadow.camera.far=420;
+  scene.add(sun); scene.add(sun.target);
+  let shadowsOn = true;
+
+  const atlasTex = buildAtlas();
+  const terrainMat = new THREE.MeshLambertMaterial({ map:atlasTex, vertexColors:true });
+  const waterMat = new THREE.MeshLambertMaterial({ color:0x3f78c8, transparent:true, opacity:0.72, depthWrite:false, side:THREE.DoubleSide });
+
+  const highlight = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1.001,1.001,1.001)),
+    new THREE.LineBasicMaterial({ color:0x000000, transparent:true, opacity:0.5 }));
+  highlight.visible = false; scene.add(highlight);
+
+  // ---- On-block breaking crack overlay (survival) ----
+  // A transparent cube laid over the targeted block; its texture is one of ten
+  // procedurally drawn crack "stages" that grow denser as break progress rises.
+  function drawPartial(g, p, f){            // draw a polyline up to fraction f of its length
+    let len=0; const segs=[];
+    for(let i=1;i<p.length;i++){ const l=Math.hypot(p[i][0]-p[i-1][0], p[i][1]-p[i-1][1]); segs.push(l); len+=l; }
+    const target=len*f; let acc=0; g.beginPath(); g.moveTo(p[0][0],p[0][1]);
+    for(let i=1;i<p.length;i++){ const l=segs[i-1];
+      if(acc+l<=target){ g.lineTo(p[i][0],p[i][1]); acc+=l; }
+      else { const t=(target-acc)/l; g.lineTo(p[i-1][0]+(p[i][0]-p[i-1][0])*t, p[i-1][1]+(p[i][1]-p[i-1][1])*t); break; } }
+    g.stroke();
+  }
+  const CRACK_PATHS = [
+    [[8,8],[6,5],[3,2]], [[8,8],[11,6],[14,2]], [[8,8],[5,11],[2,15]],
+    [[8,8],[12,12],[15,15]], [[8,8],[9,3],[10,0]], [[8,8],[3,9],[0,7]],
+    [[8,8],[13,9],[16,11]], [[8,8],[7,13],[5,16]],
+  ];
+  function makeCrackTexture(stage){
+    const S=16, c=cv(S), g=c.getContext('2d'); g.clearRect(0,0,S,S);
+    if(stage>0){
+      const f=(stage+1)/10;
+      g.strokeStyle='rgba(8,8,10,0.85)'; g.lineWidth = stage>=6?2:1; g.lineCap='round';
+      CRACK_PATHS.forEach(p=>drawPartial(g,p,f));
+    }
+    const t=new THREE.CanvasTexture(c);
+    t.magFilter=THREE.NearestFilter; t.minFilter=THREE.NearestFilter; t.generateMipmaps=false;
+    return t;
+  }
+  const crackTextures=[]; for(let i=0;i<10;i++) crackTextures.push(makeCrackTexture(i));
+  const crackMat=new THREE.MeshBasicMaterial({ transparent:true, depthWrite:false,
+    polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-2 });
+  const crackMesh=new THREE.Mesh(new THREE.BoxGeometry(1.004,1.004,1.004), crackMat);
+  crackMesh.visible=false; scene.add(crackMesh);
+  function showCrack(t, progress){
+    const stage=clamp(Math.floor(progress*10),0,9);
+    crackMesh.position.set(t.x+0.5, t.y+0.5, t.z+0.5);
+    if(crackMat.map!==crackTextures[stage]){ crackMat.map=crackTextures[stage]; crackMat.needsUpdate=true; }
+    crackMesh.visible=true;
+  }
+  function hideCrack(){ crackMesh.visible=false; }
+
+  // ========================= CHUNK MANAGER =========================
+  // Streams chunk meshes in/out around the player; rebuilds only edited chunks.
+  class ChunkManager {
+    constructor(){ this.meshes = new Map(); this.queue = []; this.queued = new Set(); }
+    keyOf(cx,cz){ return cx+','+cz; }
+    update(px,pz){
+      const pcx=Math.floor(px/CHUNK), pcz=Math.floor(pz/CHUNK);
+      for(let dx=-R;dx<=R;dx++) for(let dz=-R;dz<=R;dz++){
+        if(dx*dx+dz*dz > R*R) continue;
+        const cx=pcx+dx, cz=pcz+dz, k=this.keyOf(cx,cz);
+        if(this.meshes.has(k) || this.queued.has(k)) continue;
+        this.queue.push({cx,cz,d:dx*dx+dz*dz}); this.queued.add(k);
+      }
+      this.queue.sort((a,b)=>a.d-b.d);
+      const un=(R+2)*(R+2);
+      this.meshes.forEach((m,k)=>{ const p=k.split(',').map(Number), dx=p[0]-pcx, dz=p[1]-pcz; if(dx*dx+dz*dz>un) this.unload(k); });
+      const ud=(R+3)*(R+3);
+      chunkData.forEach((v,k)=>{ const p=k.split(',').map(Number), dx=p[0]-pcx, dz=p[1]-pcz; if(dx*dx+dz*dz>ud) chunkData.delete(k); });
+    }
+    process(now,budget){
+      let n=0;
+      while(this.queue.length && performance.now()-now<budget && n<3){
+        const job=this.queue.shift(), k=this.keyOf(job.cx,job.cz); this.queued.delete(k);
+        if(this.meshes.has(k)) continue;
+        this.build(job.cx,job.cz); n++;
+      }
+    }
+    build(cx,cz){
+      const k=this.keyOf(cx,cz);
+      const geo=buildChunkGeometry(cx,cz);
+      const entry={opaque:null,water:null};
+      if(geo.opaque){ const m=new THREE.Mesh(geo.opaque,terrainMat); m.castShadow=true; m.receiveShadow=true; scene.add(m); entry.opaque=m; }
+      if(geo.water){ const m=new THREE.Mesh(geo.water,waterMat); scene.add(m); entry.water=m; }
+      this.meshes.set(k,entry);
+    }
+    remesh(cx,cz){
+      const k=this.keyOf(cx,cz); if(!this.meshes.has(k)) return;
+      this.unload(k); this.build(cx,cz);
+    }
+    unload(k){
+      const e=this.meshes.get(k); if(!e) return;
+      if(e.opaque){ scene.remove(e.opaque); e.opaque.geometry.dispose(); }
+      if(e.water){ scene.remove(e.water); e.water.geometry.dispose(); }
+      this.meshes.delete(k);
+    }
+    clearAll(){ this.meshes.forEach((e,k)=>this.unload(k)); this.meshes.clear(); this.queue=[]; this.queued.clear(); }
+  }
+  const chunks = new ChunkManager();
+
+  // Re-mesh the chunk that owns (x,z) and any border-neighbour that shares its faces.
+  function dirtyAround(x,z){
+    const cx=Math.floor(x/CHUNK), cz=Math.floor(z/CHUNK), lx=x-cx*CHUNK, lz=z-cz*CHUNK;
+    const set=new Set([cx+','+cz]);
+    if(lx===0) set.add((cx-1)+','+cz); if(lx===CHUNK-1) set.add((cx+1)+','+cz);
+    if(lz===0) set.add(cx+','+(cz-1)); if(lz===CHUNK-1) set.add(cx+','+(cz+1));
+    set.forEach(k=>{ const p=k.split(',').map(Number); chunks.remesh(p[0],p[1]); });
+  }
+
+  // ===================== INVENTORY + CRAFTING =====================
+  class Inventory {
+    constructor(size){ this.slots = new Array(size).fill(null); }
+    clear(){ this.slots.fill(null); }
+    count(key){ let t=0; for(const s of this.slots) if(s&&s.key===key) t+=s.count; return t; }
+    has(key,n){ return this.count(key) >= n; }
+    add(key,count=1){
+      const max=maxStack(key), isTool=!!REG[key].tool;
+      if(!isTool){
+        for(const s of this.slots) if(s&&s.key===key&&s.count<max){ const c=Math.min(count,max-s.count); s.count+=c; count-=c; if(count<=0) return 0; }
+      }
+      for(let i=0;i<this.slots.length;i++) if(!this.slots[i]){
+        const c=Math.min(count,max); this.slots[i]={key,count:c}; if(isTool) this.slots[i].dur=REG[key].durability;
+        count-=c; if(count<=0) return 0;
+      }
+      return count;
+    }
+    remove(key,n){
+      for(let i=0;i<this.slots.length;i++){ const s=this.slots[i]; if(s&&s.key===key){ const c=Math.min(n,s.count); s.count-=c; n-=c; if(s.count<=0) this.slots[i]=null; if(n<=0) return true; } }
+      return n<=0;
+    }
+  }
+  const inv = new Inventory(27);                  // first 9 slots = survival hotbar
+  let creativeHotbar = CREATIVE_DEFAULT.slice();  // creative hotbar (independent)
+
+  const RECIPES = [
+    { out:['planks',4],        in:[['log',1]],               table:false },
+    { out:['stick',4],         in:[['planks',2]],            table:false },
+    { out:['crafting_table',1],in:[['planks',4]],            table:false },
+    { out:['wood_pickaxe',1],  in:[['planks',3],['stick',2]],table:true },
+    { out:['wood_axe',1],      in:[['planks',3],['stick',2]],table:true },
+    { out:['wood_shovel',1],   in:[['planks',1],['stick',2]],table:true },
+  ];
+  const CraftingSystem = {
+    canCraft(r){
+      if(r.table && !inv.has('crafting_table',1)) return false;
+      return r.in.every(([k,n]) => inv.has(k,n));
+    },
+    craft(r){
+      if(!this.canCraft(r)) return false;
+      r.in.forEach(([k,n]) => inv.remove(k,n));
+      inv.add(r.out[0], r.out[1]);
+      audio.click();
+      return true;
+    }
+  };
+
+  // ======================= GAME MODE MANAGER =======================
+  const mode = {
+    value:'survival',
+    set(m){ this.value=m; },
+    get survival(){ return this.value==='survival'; },
+    get creative(){ return this.value==='creative'; },
+    get canFly(){ return this.value==='creative'; },
+    get invincible(){ return this.value==='creative'; },
+    get instantBreak(){ return this.value==='creative'; },
+    get infiniteBlocks(){ return this.value==='creative'; },
+  };
+
+  // ======================= PLAYER CONTROLLER =======================
+  class Player {
+    constructor(){
+      this.pos = new THREE.Vector3();
+      this.vel = new THREE.Vector3();
+      this.spawn = new THREE.Vector3();
+      this.yaw=0; this.pitch=0;
+      this.onGround=false; this.flying=false;   // flying = isFlying (creative only)
+      this.health=20; this.maxHealth=20;
+      this.oxygen=MAX_OXY; this.drownAcc=0;      // survival oxygen state
+      this.fallPeak=0; this.stepT=0;
+    }
+    findSpawn(){
+      // Search a small spiral for a dry land column; fall back to centre.
+      let best=null;
+      for(let r=0;r<8 && !best;r++) for(let dx=-r;dx<=r && !best;dx++) for(let dz=-r;dz<=r && !best;dz++){
+        const X=dx, Z=dz, top=heightAt(X,Z);
+        if(worldType==='flat' || top>=SEA) best={X,top};
+        if(best){ best.X=X+0.5; best.Z=Z+0.5; best.top=Math.max(top,SEA); }
+      }
+      if(!best) best={X:0.5, Z:0.5, top:heightAt(0,0)};
+      this.spawn.set(best.X, best.top+1.2, best.Z);
+      this.respawn();
+    }
+    respawn(){ this.pos.copy(this.spawn); this.vel.set(0,0,0); this.onGround=false; this.flying=false; this.fallPeak=this.pos.y; this.health=this.maxHealth; this.oxygen=MAX_OXY; this.drownAcc=0; }
+    hurt(n){ if(mode.invincible || n<=0) return; this.health=clamp(this.health-n,0,this.maxHealth); audio.hurt(); if(this.health<=0) this.respawn(); ui.renderHealth(); }
+
+    // Move one axis then push the AABB out of any solid cell it overlaps.
+    moveAxis(axis,amount){
+      if(amount===0) return;
+      const p=this.pos; p[axis]+=amount;
+      const minX=p.x-PW,maxX=p.x+PW,minY=p.y,maxY=p.y+PH,minZ=p.z-PW,maxZ=p.z+PW,e=1e-4;
+      const x0=Math.floor(minX),x1=Math.floor(maxX-e),y0=Math.floor(minY),y1=Math.floor(maxY-e),z0=Math.floor(minZ),z1=Math.floor(maxZ-e);
+      let hit=false;
+      for(let bx=x0;bx<=x1&&!hit;bx++) for(let by=y0;by<=y1&&!hit;by++) for(let bz=z0;bz<=z1&&!hit;bz++) if(world.solidAt(bx,by,bz)) hit=true;
+      if(!hit) return;
+      const EPS=1e-3;
+      if(axis==='x'){ p.x = amount>0 ? Math.floor(maxX)-PW-EPS : Math.floor(minX)+1+PW+EPS; this.vel.x=0; }
+      else if(axis==='z'){ p.z = amount>0 ? Math.floor(maxZ)-PW-EPS : Math.floor(minZ)+1+PW+EPS; this.vel.z=0; }
+      else { if(amount>0){ p.y=Math.floor(maxY)-PH-EPS; } else { p.y=Math.floor(minY)+1+EPS; this.onGround=true; } this.vel.y=0; }
+    }
+
+    update(dt){
+      const k=input.keys, sin=Math.sin(this.yaw), cos=Math.cos(this.yaw);
+      const fwd=(k['KeyW']?1:0)-(k['KeyS']?1:0), str=(k['KeyD']?1:0)-(k['KeyA']?1:0);
+      let dx=-sin*fwd+cos*str, dz=-cos*fwd-sin*str; const L=Math.hypot(dx,dz); if(L>0){dx/=L;dz/=L;}
+      const fast = !!k['ShiftLeft'];   // Shift = sprint on foot / fast-flight in the air
+      const inWater = world.getBlock(Math.floor(this.pos.x),Math.floor(this.pos.y+0.1),Math.floor(this.pos.z))===WATER;
+
+      // Horizontal speed. Creative flight is its own (faster) regime; Shift boosts it.
+      let speed;
+      if(this.flying){ speed = FLY_H * (fast?FLY_FAST:1); }
+      else { speed = fast?SPRINT:WALK; if(inWater) speed*=0.6; }
+      this.vel.x=dx*speed; this.vel.z=dz*speed;
+
+      // Vertical movement.
+      if(this.flying){
+        // No gravity. Space = up, Ctrl/C = down, Shift = faster.
+        const up=(k['Space']?1:0), down=((k['ControlLeft']||k['ControlRight']||k['KeyC'])?1:0);
+        this.vel.y=(up-down)*FLY_V*(fast?FLY_FAST:1);
+      } else if(inWater){
+        this.vel.y += -GRAVITY*0.25*dt; this.vel.y=Math.max(this.vel.y,-3);
+        if(k['Space']) this.vel.y=SWIM_UP; this.vel.y*=0.92;
+      } else {
+        this.vel.y -= GRAVITY*dt;
+        if(k['Space']&&this.onGround){ this.vel.y=JUMP; this.onGround=false; audio.jump(); }
+      }
+
+      const wasOn=this.onGround; this.onGround=false;
+      this.moveAxis('x',this.vel.x*dt); this.moveAxis('z',this.vel.z*dt); this.moveAxis('y',this.vel.y*dt);
+
+      // Fall-distance tracking. Reset while grounded, flying, or in water so those
+      // never accrue a dangerous fall; damage applies only to a real landing on land.
+      if(this.onGround || this.flying || inWater) this.fallPeak=this.pos.y;
+      else this.fallPeak=Math.max(this.fallPeak,this.pos.y);
+      if(!wasOn && this.onGround){
+        const fell=this.fallPeak-this.pos.y;
+        if(fell>0.6) audio.land();
+        if(mode.survival && !inWater && fell>SAFE_FALL) this.hurt(Math.ceil(fell-SAFE_FALL));
+        this.fallPeak=this.pos.y;
+      }
+
+      // Footsteps.
+      const hs=Math.hypot(this.vel.x,this.vel.z);
+      if(this.onGround && !this.flying && hs>0.3){ this.stepT+=dt; const iv=(fast?0.30:0.42); if(this.stepT>=iv){ this.stepT=0; audio.step(); } }
+      else this.stepT=0.25;
+
+      // Survival-only oxygen; creative stays topped up.
+      if(mode.survival) this.updateOxygen(dt);
+      else { this.oxygen=MAX_OXY; this.drownAcc=0; }
+
+      camera.position.set(this.pos.x,this.pos.y+EYE,this.pos.z);
+      camera.rotation.set(this.pitch,this.yaw,0);
+      // Keep the sun (and its shadow frustum) following the player.
+      sun.position.set(this.pos.x+60, 120, this.pos.z+30);
+      sun.target.position.set(this.pos.x, 0, this.pos.z);
+    }
+    // Oxygen drains while the head (camera) is in water, refills above it, and
+    // deals periodic drowning damage at zero. Survival only.
+    updateOxygen(dt){
+      const head = world.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y+EYE), Math.floor(this.pos.z))===WATER;
+      if(head){
+        this.oxygen=Math.max(0,this.oxygen-OXY_DRAIN*dt);
+        if(this.oxygen<=0){ this.drownAcc+=dt; if(this.drownAcc>=DROWN_INTERVAL){ this.drownAcc-=DROWN_INTERVAL; this.hurt(DROWN_DMG); } }
+      } else {
+        this.oxygen=Math.min(MAX_OXY,this.oxygen+OXY_REFILL*dt); this.drownAcc=0;
+      }
+    }
+  }
+  const player = new Player();
+
+  // =========================== INTERACTION ===========================
+  function lookDir(){
+    const cp=Math.cos(player.pitch);
+    return new THREE.Vector3(-Math.sin(player.yaw)*cp, Math.sin(player.pitch), -Math.cos(player.yaw)*cp);
+  }
+  function raycast(){
+    const o=new THREE.Vector3(player.pos.x,player.pos.y+EYE,player.pos.z), d=lookDir();
+    let x=Math.floor(o.x),y=Math.floor(o.y),z=Math.floor(o.z);
+    const sX=Math.sign(d.x),sY=Math.sign(d.y),sZ=Math.sign(d.z), inf=Infinity;
+    const tdX=d.x!==0?Math.abs(1/d.x):inf, tdY=d.y!==0?Math.abs(1/d.y):inf, tdZ=d.z!==0?Math.abs(1/d.z):inf;
+    let tmX=d.x!==0?((sX>0?x+1-o.x:o.x-x)/Math.abs(d.x)):inf;
+    let tmY=d.y!==0?((sY>0?y+1-o.y:o.y-y)/Math.abs(d.y)):inf;
+    let tmZ=d.z!==0?((sZ>0?z+1-o.z:o.z-z)/Math.abs(d.z)):inf;
+    let face=[0,0,0], t=0;
+    while(t<=REACH){
+      if(world.solidAt(x,y,z)) return {x,y,z,nx:face[0],ny:face[1],nz:face[2]};
+      if(tmX<tmY&&tmX<tmZ){ x+=sX; t=tmX; tmX+=tdX; face=[-sX,0,0]; }
+      else if(tmY<tmZ){ y+=sY; t=tmY; tmY+=tdY; face=[0,-sY,0]; }
+      else { z+=sZ; t=tmZ; tmZ+=tdZ; face=[0,0,-sZ]; }
+    }
+    return null;
+  }
+
+  const interaction = {
+    target:null,
+    // Survival break state. Every field is reset by resetBreak() on any stop/transition,
+    // so nothing (accumulator, duration, target, tool) can leak into the next block.
+    brkKey:null, brkTool:null, brkSelected:null, brkBlock:AIR, brkTime:1, brkNoDrop:false, brkAccum:0,
+    creativeBreakAt:0,   // timestamp of last creative break (drives the cooldown)
+    selectedKey(){ return mode.creative ? creativeHotbar[ui.sel] : (inv.slots[ui.sel] ? inv.slots[ui.sel].key : null); },
+    selectedToolSlot(){
+      if(mode.creative) return null;
+      const s=inv.slots[ui.sel];
+      // IMPORTANT: block definitions also use REG[key].tool to describe the *preferred* tool
+      // for mining them (e.g. dirt.tool = 'shovel'). That does NOT mean the block item is a tool.
+      // Only actual tool items have durability in this registry, so use durability as the tool-item test.
+      return (s && REG[s.key].tool && REG[s.key].durability) ? s : null;
+    },
+    removeBlock(t){ world.setBlock(t.x,t.y,t.z,AIR); dirtyAround(t.x,t.z); },
+
+    updateHighlight(){
+      if(this.target){ highlight.visible=true; highlight.position.set(this.target.x+0.5,this.target.y+0.5,this.target.z+0.5); }
+      else highlight.visible=false;
+    },
+    instantBreak(t){ const key=BLOCK_KEY[world.getBlock(t.x,t.y,t.z)]; this.removeBlock(t); audio.breakSfx(key); },
+    completeSurvivalBreak(t,reg,noDrop){
+      const tool=this.selectedToolSlot();
+      this.removeBlock(t);
+      if(reg.drop && !noDrop){ inv.add(reg.drop,1); ui.renderHotbar(); }
+      if(tool && reg.tool && tool.key && REG[tool.key].tool===reg.tool){ tool.dur--; if(tool.dur<=0){ inv.slots[ui.sel]=null; ui.renderHotbar(); } }
+      audio.breakSfx(BLOCK_KEY[reg.block]);
+    },
+    resetBreak(){ this.brkKey=null; this.brkTool=null; this.brkSelected=null; this.brkBlock=AIR; this.brkTime=1; this.brkNoDrop=false; this.brkAccum=0; hideCrack(); },
+    // Break time + drop rules computed fresh from the block and the held tool.
+    breakInfo(reg){
+      const tool=this.selectedToolSlot(); let speed=1, noDrop=false;
+      if(reg.tool){ if(tool && REG[tool.key].tool===reg.tool) speed=3; else if(reg.needTool){ speed=0.3; noDrop=true; } }
+      return { time: reg.hardness/speed, noDrop, toolKey: tool?tool.key:null };
+    },
+    // Creative: instant break, but rate-limited so holding can't mass-delete terrain.
+    tryCreativeBreak(){
+      if(!this.target) return;
+      const now=performance.now();
+      if(now-this.creativeBreakAt < CREATIVE_BREAK_CD*1000) return;
+      this.creativeBreakAt=now; this.instantBreak(this.target);
+    },
+    // Survival: progress is accumulated from the game-loop dt only.
+    // This avoids wall-clock/start-time state leaking between blocks after a block is destroyed,
+    // after pointer lock is lost, or after the browser briefly stalls.
+    updateSurvivalBreak(dt){
+      if(!input.mouseLeft || !this.target){ this.resetBreak(); return; }
+      const t=this.target;
+      const blockId = world.getBlock(t.x,t.y,t.z);
+      const reg = REG[BLOCK_KEY[blockId]];
+      if(!reg || reg.unbreakable){ this.resetBreak(); return; }
+
+      const tk = t.x+','+t.y+','+t.z;
+      const selected = this.selectedKey();
+      const info = this.breakInfo(reg);
+
+      // A change of target, block id, selected item, or effective tool starts a completely new attempt.
+      // Do not only compare toolKey: switching between two non-tool items would otherwise keep progress.
+      if(tk!==this.brkKey || blockId!==this.brkBlock || selected!==this.brkSelected || info.toolKey!==this.brkTool){
+        this.brkKey = tk;
+        this.brkBlock = blockId;
+        this.brkSelected = selected;
+        this.brkTool = info.toolKey;
+        this.brkTime = Math.max(info.time, 0.001);
+        this.brkNoDrop = info.noDrop;
+        this.brkAccum = 0;
+      }
+
+      this.brkAccum += Math.min(dt, 0.05);
+      const progress = this.brkAccum / this.brkTime;
+      showCrack(t, progress);
+      if(progress>=1){ this.completeSurvivalBreak(t, reg, this.brkNoDrop); this.resetBreak(); }
+    },
+
+    placeBlock(){
+      if(!this.target) return;
+      const t=this.target, px=t.x+t.nx, py=t.y+t.ny, pz=t.z+t.nz;
+      if(py<0||py>=H) return;
+      if(world.getBlock(px,py,pz)!==AIR) return;
+      const key=this.selectedKey(); if(!key) return; const reg=REG[key];
+      if(reg.block===undefined) return;                       // not a placeable block
+      if(reg.block!==WATER){                                   // don't bury the player
+        const minX=player.pos.x-PW,maxX=player.pos.x+PW,minY=player.pos.y,maxY=player.pos.y+PH,minZ=player.pos.z-PW,maxZ=player.pos.z+PW;
+        if(px<maxX&&px+1>minX&&py<maxY&&py+1>minY&&pz<maxZ&&pz+1>minZ) return;
+      }
+      if(mode.survival){ if(!inv.has(key,1)) return; inv.remove(key,1); ui.renderHotbar(); }
+      world.setBlock(px,py,pz,reg.block); dirtyAround(px,pz); audio.place();
+    },
+
+    onMouseDown(button){
+      this.target=raycast();
+      if(button===0){ if(mode.creative) this.tryCreativeBreak(); }   // survival break is hold-to-break in update()
+      else if(button===2){ this.placeBlock(); }
+    },
+
+    update(dt){
+      this.target=raycast(); this.updateHighlight();
+      if(mode.creative){
+        if(input.mouseLeft) this.tryCreativeBreak();   // hold = one break per cooldown
+        this.resetBreak();                             // ensure no survival crack lingers
+        return;
+      }
+      this.updateSurvivalBreak(dt);
+    }
+  };
+
+  // ============================ INPUT ============================
+  const input = { keys:{}, mouseLeft:false, mouseRight:false, locked:false };
+  let uiState='title', worldActive=false, prevState='paused', lastSpace=0;
+  let selType='natural', selMode='survival';
+
+  document.addEventListener('keydown', e=>{
+    input.keys[e.code]=true;
+    if(uiState==='playing'){
+      if(!input.locked) return;
+      if(e.code.startsWith('Digit')){ const n=+e.code.slice(5); if(n>=1&&n<=9) ui.select(n-1); }
+      else if(e.code==='KeyE'){ openInventory(); }
+      else if(e.code==='KeyF'){ if(mode.canFly) player.flying=!player.flying; }
+      else if(e.code==='KeyO'){ toggleShadows(); }
+      else if(e.code==='Space'){ e.preventDefault();
+        if(mode.canFly && !e.repeat){ const now=performance.now(); if(now-lastSpace<300) player.flying=!player.flying; lastSpace=now; } }
+    } else {
+      if(e.code==='Escape'){
+        if(uiState==='inventory') closeInventory();
+        else if(uiState==='settings') settingsBackFn();
+        // Do not resume gameplay from Esc. After pointer lock is released by Esc,
+        // browsers require a fresh direct click gesture, so only the Resume button should relock.
+      } else if(e.code==='KeyE' && uiState==='inventory') closeInventory();
+    }
+  });
+  document.addEventListener('keyup', e=>{ input.keys[e.code]=false; });
+
+  document.addEventListener('mousemove', e=>{
+    if(uiState!=='playing' || !input.locked) return;
+    player.yaw  -= e.movementX*ui.sens;
+    player.pitch-= e.movementY*ui.sens;
+    const lim=Math.PI/2-0.01; player.pitch=clamp(player.pitch,-lim,lim);
+  });
+  renderer.domElement.addEventListener('mousedown', e=>{
+    if(uiState!=='playing' || !input.locked) return;
+    if(e.button===0){ input.mouseLeft=true; interaction.resetBreak(); }   // fresh press → start the break timer clean
+    else if(e.button===2) input.mouseRight=true;
+    interaction.onMouseDown(e.button);
+  });
+  window.addEventListener('mouseup', e=>{
+    if(e.button===0){ input.mouseLeft=false; interaction.resetBreak(); }   // release → reset break progress
+    else if(e.button===2) input.mouseRight=false;
+  });
+  renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault());
+  renderer.domElement.addEventListener('click', ()=>{ if(uiState==='playing' && !input.locked) requestLock(); });
+  window.addEventListener('wheel', e=>{ if(uiState==='playing' && input.locked) ui.select(ui.sel+(e.deltaY>0?1:-1)); }, {passive:true});
+
+  // Pointer lock is the single source of truth for "in gameplay". We only switch to
+  // the playing state when lock is actually CONFIRMED here — never optimistically — so
+  // a refused re-lock can never strand the game in a controls-dead state.
+  // (Touch play has no pointer lock: the touch code calls onLockChange() itself — see TOUCH.)
+  function onLockChange(lockedNow){
+    input.locked = lockedNow;
+    if(lockedNow){
+      // Entering gameplay: clear stale held inputs from the menu/pause click, then show the HUD.
+      resetTransientState();
+      input.locked = true;
+      uiState='playing';
+      showScreen('playing');
+      return;
+    }
+    // Lock lost (Esc, focus loss, a menu opening, or a refused request):
+    resetTransientState();   // drop held keys, mouse buttons, and any break progress
+    if(worldActive && uiState!=='inventory' && uiState!=='settings' && uiState!=='title' && uiState!=='setup'){
+      uiState='paused'; showScreen('paused');
+    }
+  }
+  document.addEventListener('pointerlockchange', ()=>onLockChange(document.pointerLockElement===renderer.domElement));
+  document.addEventListener('pointerlockerror', ()=>{
+    input.locked=false;
+    resetTransientState();
+    if(worldActive && uiState!=='inventory' && uiState!=='settings' && uiState!=='title' && uiState!=='setup'){
+      uiState='paused'; showScreen('paused');
+    }
+  });
+  // Request lock from a direct user gesture only. Do not optimistically set uiState to playing;
+  // pointerlockchange is the only place that confirms successful re-entry.
+  function requestLock(){
+    if(input.locked || document.pointerLockElement===renderer.domElement) return;
+    touchMode = lastPtr==='touch' || lastPtr==='pen' || !renderer.domElement.requestPointerLock;
+    if(touchMode){ onLockChange(true); return; }   // touch: no pointer lock, enter play directly
+    try{
+      renderer.domElement.focus({preventScroll:true});
+      const p=renderer.domElement.requestPointerLock();
+      if(p && typeof p.catch==='function') p.catch(()=>{
+        input.locked=false;
+        if(worldActive){ uiState='paused'; showScreen('paused'); }
+      });
+    } catch(e){ input.locked=false; if(worldActive){ uiState='paused'; showScreen('paused'); } }
+  }
+  // One place that clears EVERY breaking variable, and one that also clears input.
+  function resetBreakingState(){ interaction.resetBreak(); interaction.creativeBreakAt=0; }
+  function resetTransientState(){ input.keys={}; input.mouseLeft=false; input.mouseRight=false; resetBreakingState(); }
+  function toggleShadows(){ shadowsOn=!shadowsOn; renderer.shadowMap.enabled=shadowsOn; scene.traverse(o=>{ if(o.isMesh&&o.material) o.material.needsUpdate=true; }); }
+  window.addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+  // ============================ UI MANAGER ============================
+  const ui = {
+    sel:0, sens:0.002, fps:60, _t:0,
+    select(i){ this.sel=((i%9)+9)%9; resetBreakingState(); this.renderHotbar(); },
+    selectedName(){ const k=interaction.selectedKey(); return k?REG[k].name:null; },
+    renderHotbar(){
+      const el=document.getElementById('hotbar'); el.innerHTML='';
+      for(let i=0;i<9;i++){
+        const item = mode.creative ? (creativeHotbar[i]?{key:creativeHotbar[i],count:Infinity}:null) : inv.slots[i];
+        const slot=document.createElement('div'); slot.className='slot'+(i===this.sel?' selected':'');
+        if(item){ slot.appendChild(iconClone(item.key));
+          if(mode.survival && item.count>1){ const c=document.createElement('div'); c.className='cnt'; c.textContent=item.count; slot.appendChild(c); } }
+        const num=document.createElement('div'); num.className='num'; num.textContent=i+1; slot.appendChild(num);
+        slot.addEventListener('click', ()=>{ if(!input.locked) this.select(i); });
+        el.appendChild(slot);
+      }
+    },
+    renderHealth(){
+      const el=document.getElementById('health'); el.innerHTML='';
+      if(!mode.survival) return; const hp=player.health;
+      for(let i=0;i<10;i++){ const v=hp-i*2; const seg=document.createElement('div');
+        seg.className='seg'+(v>=2?' on':v>=1?' half':''); el.appendChild(seg); }
+    },
+    renderOxygen(){
+      const el=document.getElementById('oxygen');
+      if(!mode.survival || player.oxygen>=MAX_OXY){ el.style.display='none'; return; }
+      el.style.display='flex'; el.innerHTML='';
+      const on=Math.ceil(player.oxygen/10);
+      for(let i=0;i<10;i++){ const d=document.createElement('div'); d.className='bub'+(i<on?' on':''); el.appendChild(d); }
+    },
+    renderInventory(){
+      const title=document.getElementById('invTitle'), cont=document.getElementById('invContent'); cont.innerHTML='';
+      if(mode.creative){
+        title.textContent='Creative — '+(touchUI?'tap':'click')+' an item to fill the selected hotbar slot ('+(this.sel+1)+')';
+        const grid=document.createElement('div'); grid.className='invgrid';
+        PALETTE.forEach(key=>{
+          const cell=document.createElement('div'); cell.className='icell';
+          cell.appendChild(iconClone(key));
+          const nm=document.createElement('div'); nm.className='nm'; nm.textContent=REG[key].name; cell.appendChild(nm);
+          cell.addEventListener('click',()=>{ creativeHotbar[this.sel]=key; this.renderHotbar(); audio.click(); });
+          grid.appendChild(cell);
+        });
+        cont.appendChild(grid);
+      } else {
+        title.textContent='Inventory';
+        const grid=document.createElement('div'); grid.className='invgrid';
+        for(let i=0;i<inv.slots.length;i++){
+          const s=inv.slots[i], cell=document.createElement('div'); cell.className='icell'+(i===this.sel?' sel':'');
+          if(s){ cell.appendChild(iconClone(s.key));
+            if(s.count>1){ const c=document.createElement('div'); c.className='cnt'; c.textContent=s.count; cell.appendChild(c); }
+            const nm=document.createElement('div'); nm.className='nm'; nm.textContent=REG[s.key].name; cell.appendChild(nm); }
+          cell.addEventListener('click',()=>{ if(i<9) this.select(i); this.renderInventory(); });
+          grid.appendChild(cell);
+        }
+        cont.appendChild(grid);
+        const sh=document.createElement('div'); sh.className='subhead'; sh.textContent='Crafting (first 9 slots are your hotbar)'; cont.appendChild(sh);
+        const list=document.createElement('div'); list.className='craftlist';
+        RECIPES.forEach(r=>{
+          const row=document.createElement('div'); row.className='recipe';
+          const desc=document.createElement('div'); desc.className='desc';
+          const ins=r.in.map(p=>p[1]+'x '+REG[p[0]].name).join(' + ');
+          desc.innerHTML='<b>'+REG[r.out[0]].name+'</b> ×'+r.out[1]+'<br><small>'+ins+(r.table?'  · needs crafting table':'')+'</small>';
+          const btn=document.createElement('button'); btn.textContent='Craft'; btn.disabled=!CraftingSystem.canCraft(r);
+          btn.addEventListener('click',()=>{ if(CraftingSystem.craft(r)){ this.renderHotbar(); this.renderInventory(); } });
+          row.appendChild(desc); row.appendChild(btn); list.appendChild(row);
+        });
+        cont.appendChild(list);
+      }
+    },
+    updateHud(dt){
+      this.fps += ((1/Math.max(dt,1e-4))-this.fps)*0.1;
+      this._t+=dt; if(this._t<0.2) return; this._t=0;
+      const p=player.pos, name=this.selectedName();
+      document.getElementById('info').textContent =
+        'FPS '+this.fps.toFixed(0)+'\n'+
+        'XYZ '+p.x.toFixed(1)+' '+p.y.toFixed(1)+' '+p.z.toFixed(1)+'\n'+
+        'World '+worldType+'   Mode '+mode.value+(mode.creative&&player.flying?' (flying)':'')+'\n'+
+        'Chunks '+chunks.meshes.size+'   Holding '+(name||'-');
+      this.renderOxygen();
+      document.getElementById('flyhint').style.display = (mode.creative && player.flying) ? 'block' : 'none';
+    }
+  };
+
+  // ===================== SCREEN / STATE FLOW =====================
+  function showScreen(s){
+    // NOTE: the element id is 'pause' but the state value is 'paused' — they must be
+    // matched explicitly, otherwise the pause menu is hidden and Esc strands the game.
+    document.getElementById('title').classList.toggle('hidden', s!=='title');
+    document.getElementById('setup').classList.toggle('hidden', s!=='setup');
+    document.getElementById('pause').classList.toggle('hidden', s!=='paused');
+    document.getElementById('settings').classList.toggle('hidden', s!=='settings');
+    document.getElementById('inv').classList.toggle('hidden', s!=='inventory');
+    document.getElementById('crosshair').classList.toggle('hidden', s!=='playing');
+    document.getElementById('info').classList.toggle('hidden', s!=='playing');
+    document.getElementById('hotbar').classList.toggle('hidden', !(worldActive && (s==='playing'||s==='inventory')));
+    document.getElementById('health').classList.toggle('hidden', !(worldActive && mode.survival && s!=='title' && s!=='setup'));
+    document.getElementById('soundBtn').classList.toggle('hidden', !worldActive);
+    if(s!=='playing'){ document.getElementById('breakbar').style.display='none';
+      document.getElementById('oxygen').style.display='none'; document.getElementById('flyhint').style.display='none'; }
+    if(s==='paused') document.getElementById('pauseInfo').textContent='World: '+worldType+'   ·   Mode: '+mode.value;
+    syncTouch(s);
+  }
+  function go(s){ uiState=s; showScreen(s); }
+  // Enter gameplay from a user gesture: show the pause overlay as a fallback surface,
+  // then request pointer lock. pointerlockchange promotes us to 'playing' once the
+  // lock is granted; if the browser refuses, the overlay stays so Resume can retry.
+  function enterPlay(){
+    if(!worldActive) return;
+    resetTransientState();
+    if(document.pointerLockElement===renderer.domElement){ input.locked=true; uiState='playing'; showScreen('playing'); return; }
+    uiState='paused';
+    showScreen('paused');
+    requestLock();
+  }
+  function resumePlay(){ enterPlay(); }
+  function openInventory(){ resetTransientState(); uiState='inventory'; showScreen('inventory'); ui.renderInventory(); audio.uiOpen(); if(document.exitPointerLock) document.exitPointerLock(); touchUnlock(); }
+  function closeInventory(){ audio.uiClose(); enterPlay(); }
+  function settingsBackFn(){ go(prevState||'paused'); }
+  function exitToTitle(){ resetTransientState(); worldActive=false; chunks.clearAll(); world.reset(); go('title'); }
+  function hashString(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+  function updateSoundBtn(){ document.getElementById('soundBtn').textContent='Sound: '+(audio.muted?'Off':'On'); }
+
+  function createWorld(){
+    audio.ensure(); audio.click();
+    worldType=selType; mode.set(selMode);
+    const s=document.getElementById('seedInput').value.trim();
+    SEED = s ? hashString(s) : (Math.random()*1e9|0);
+    world.reset(); chunks.clearAll();
+    inv.clear(); creativeHotbar=CREATIVE_DEFAULT.slice(); ui.sel=0;
+    player.findSpawn();
+    worldActive=true;
+    ui.renderHotbar(); ui.renderHealth(); updateSoundBtn();
+    resetTransientState();   // fresh input + breaking state for the new world & mode
+    enterPlay();
+  }
+
+  // ---- Menu wiring ----
+  document.getElementById('startBtn').onclick=()=>{ audio.ensure(); audio.click(); go('setup'); };
+  document.getElementById('backToTitle').onclick=()=>{ audio.click(); go('title'); };
+  document.getElementById('createBtn').onclick=()=>createWorld();
+  document.getElementById('resumeBtn').onclick=()=>{ audio.click(); resumePlay(); };
+  document.getElementById('settingsBtn').onclick=()=>{ audio.click(); prevState=uiState; go('settings'); };
+  document.getElementById('titleBtn').onclick=()=>{ audio.click(); exitToTitle(); };
+  document.getElementById('settingsBack').onclick=()=>{ audio.click(); settingsBackFn(); };
+  document.getElementById('invClose').onclick=()=>{ closeInventory(); };
+  document.getElementById('soundBtn').onclick=()=>{ audio.ensure(); audio.setMuted(!audio.muted); document.getElementById('muteChk').checked=audio.muted; updateSoundBtn(); };
+
+  document.querySelectorAll('#typeOpts .opt').forEach(o=>o.addEventListener('click',()=>{
+    document.querySelectorAll('#typeOpts .opt').forEach(x=>x.classList.remove('sel')); o.classList.add('sel'); selType=o.dataset.type; audio.click(); }));
+  document.querySelectorAll('#modeOpts .opt').forEach(o=>o.addEventListener('click',()=>{
+    document.querySelectorAll('#modeOpts .opt').forEach(x=>x.classList.remove('sel')); o.classList.add('sel'); selMode=o.dataset.mode; audio.click(); }));
+
+  document.getElementById('sensRange').oninput=e=>{ ui.sens = 0.0004 + (e.target.value/100)*0.004; };
+  document.getElementById('volRange').oninput=e=>{ audio.ensure(); audio.setVolume(e.target.value/100); };
+  document.getElementById('muteChk').onchange=e=>{ audio.ensure(); audio.setMuted(e.target.checked); updateSoundBtn(); };
+
+  // ============================ TOUCH ============================
+  // Phones/tablets play without pointer lock (a virtual lock stands in for it). Left floating
+  // stick = WASD, drag anywhere else = look, BREAK / PLACE = left / right click at the crosshair
+  // (slide BREAK to aim while mining), JUMP = Space (UP while flying; double-tap flies in Creative),
+  // DOWN = C, RUN = Shift (toggle), FLY = F, INV = E, SHADE = O, ❚❚ = Esc (pause),
+  // tap a hotbar slot = 1-9. Controls only show during touch gameplay.
+  let lastPtr='', touchMode=false, touchUI=matchMedia('(pointer: coarse)').matches, rotDismissed=false;
+  addEventListener('pointerdown', e=>{ lastPtr=e.pointerType; }, true);
+  const clickAt=(type,button)=>TouchKit.mouse(type==='mousedown'?renderer.domElement:window, type,
+    innerWidth/2, innerHeight/2, { button, buttons: type==='mouseup'?0:(button===2?2:1) });
+  const kit=TouchKit.create({
+    show:'manual', landscape:true,
+    sticks:[{ id:'move', side:'left', label:'MOVE', keys:'wasd' }],
+    buttons:[
+      { id:'brk',   label:'BREAK', icon:'⛏', size:'l', row:0, onDown:()=>clickAt('mousedown',0), onUp:()=>clickAt('mouseup',0) },
+      { id:'down',  label:'DOWN',  icon:'▼', size:'s', row:0, key:'KeyC' },
+      { id:'jump',  label:'JUMP',  icon:'▲', row:1, key:'Space' },
+      { id:'place', label:'PLACE', icon:'■', row:1, onDown:()=>clickAt('mousedown',2), onUp:()=>clickAt('mouseup',2) },
+      { id:'run',   label:'RUN',   icon:'»', size:'s', row:2, key:'ShiftLeft', toggle:true },
+      { id:'fly',   label:'FLY',   icon:'✈', size:'s', row:2, key:'KeyF', tap:true },
+      { id:'pause', icon:'❚❚', size:'s', place:'top-right', onDown:()=>touchUnlock() },
+      { id:'inv',   label:'INV',   icon:'▦', size:'s', place:'top-right', key:'KeyE', tap:true },
+      { id:'shade', label:'SHADE', icon:'☀', size:'s', place:'top-right', key:'KeyO', tap:true },
+    ]
+  });
+  const rot=document.querySelector('.tk-rot'), lookZone=document.getElementById('lookZone');
+  const brkEl=kit.buttons.brk.el, jumpLab=kit.buttons.jump.el.querySelector('span');
+  if(rot) rot.querySelector('button').addEventListener('click', ()=>{ rotDismissed=true; });
+  let lookId=null, lookX=0, lookY=0, brkId=null, brkX=0, brkY=0, tState=-1;
+  function touchPlaying(){ return touchMode && uiState==='playing' && input.locked; }
+  // From showScreen(): controls only during touch gameplay; the rotate hint stays up (menus too) until dismissed.
+  function syncTouch(s){
+    const on=touchPlaying(), flip=on!==kit.visible;
+    if(flip) kit.show(on);
+    if(rot) rot.classList.toggle('need', touchUI && !rotDismissed);
+    lookZone.style.display=on?'block':'none';
+    if(!on) lookId=brkId=null;
+    if(s==='inventory') document.getElementById('invTip').textContent='';
+    document.body.classList.toggle('touch', touchUI);
+    document.body.classList.toggle('tp', touchMode);
+    document.body.classList.toggle('tpa', on);
+    tState=-1;
+    if(flip && on) dispatchEvent(new Event('resize'));   // the kit re-measures its idle stick (it was hidden at create)
+  }
+  function touchUnlock(){ if(touchMode && input.locked) onLockChange(false); }   // = the pointer lock being released
+  // Per frame while the controls are up: FLY only in Creative, DOWN only while flying.
+  function touchTick(){
+    const s=(mode.canFly?1:0)+(player.flying?2:0); if(s===tState) return; tState=s;
+    kit.buttons.fly.el.style.display=mode.canFly?'':'none';
+    kit.buttons.down.el.style.display=player.flying?'':'none';
+    jumpLab.textContent=player.flying?'UP':'JUMP';
+  }
+  function lookBy(dx,dy){                      // a full-screen swipe turns ~180° at the default sensitivity
+    if(!touchPlaying()) return;
+    const s=3.2/Math.max(innerWidth,innerHeight)*(ui.sens/0.002);
+    player.yaw-=dx*s; player.pitch-=dy*s;
+    const lim=Math.PI/2-0.01; player.pitch=clamp(player.pitch,-lim,lim);
+  }
+  lookZone.addEventListener('pointerdown', e=>{
+    e.preventDefault(); if(lookId!==null) return;
+    lookId=e.pointerId; lookX=e.clientX; lookY=e.clientY;
+    try{ lookZone.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  lookZone.addEventListener('pointermove', e=>{
+    if(e.pointerId!==lookId) return;
+    lookBy(e.clientX-lookX, e.clientY-lookY); lookX=e.clientX; lookY=e.clientY;
+  });
+  const lookEnd=e=>{ if(e.pointerId===lookId) lookId=null; };
+  lookZone.addEventListener('pointerup', lookEnd); lookZone.addEventListener('pointercancel', lookEnd);
+  lookZone.addEventListener('contextmenu', e=>e.preventDefault());
+  brkEl.addEventListener('pointerdown', e=>{ if(brkId===null){ brkId=e.pointerId; brkX=e.clientX; brkY=e.clientY; } });
+  brkEl.addEventListener('pointermove', e=>{
+    if(e.pointerId!==brkId) return;
+    lookBy(e.clientX-brkX, e.clientY-brkY); brkX=e.clientX; brkY=e.clientY;
+  });
+  const brkEnd=e=>{ if(e.pointerId===brkId) brkId=null; };
+  brkEl.addEventListener('pointerup', brkEnd); brkEl.addEventListener('pointercancel', brkEnd);
+  // Hotbar: tap a slot while playing (= number keys)
+  document.getElementById('hotbar').addEventListener('pointerdown', e=>{
+    if(!touchPlaying()) return;
+    const s=e.target.closest('.slot'); if(!s) return;
+    e.preventDefault(); ui.select(Array.prototype.indexOf.call(s.parentNode.children, s));
+  });
+  // Inventory: a mouse sees item names on hover; on touch the tapped item's name is shown above the grid
+  document.getElementById('invContent').addEventListener('click', e=>{
+    if(!touchUI) return;
+    const c=e.target.closest && e.target.closest('.icell'); if(!c) return;
+    const nm=c.querySelector('.nm'); document.getElementById('invTip').textContent=nm?nm.textContent:'';
+  });
+  // Sound button during touch play: the kit swallows clicks for 450 ms after one of its buttons is released, so a
+  // quick tap here (e.g. right after JUMP) reacts to the touch itself; the compatibility click that may follow is ignored.
+  const sndBtn=document.getElementById('soundBtn'); let sndPid=null, sndTapAt=-1e9;
+  sndBtn.addEventListener('pointerdown', e=>{ if(e.pointerType!=='mouse') sndPid=e.pointerId; });
+  sndBtn.addEventListener('pointercancel', ()=>{ sndPid=null; });
+  sndBtn.addEventListener('pointerup', e=>{ if(e.pointerId!==sndPid) return; sndPid=null; sndTapAt=performance.now(); sndBtn.onclick(); });
+  sndBtn.addEventListener('click', e=>{ if(performance.now()-sndTapAt<800) e.stopImmediatePropagation(); }, true);
+  addEventListener('touchstart', ()=>{ if(!touchUI){ touchUI=true; syncTouch(uiState); } }, {passive:true});
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) touchUnlock(); });
+  // turned upright mid-game while the rotate hint is still wanted: it covers the game, so pause under it
+  addEventListener('resize', ()=>{ if(rot && rot.classList.contains('need') && matchMedia('(orientation: portrait)').matches) touchUnlock(); });
+
+  // ============================ LOOP ============================
+  // Exactly one rAF chain. The guard makes any second startLoop() call a no-op, so no
+  // matter how often the player pauses/resumes, only one update loop ever runs.
+  let last=performance.now(), loopRunning=false;
+  function frame(now){
+    requestAnimationFrame(frame);
+    let dt=Math.min((now-last)/1000,0.05); last=now;
+    if(worldActive){
+      if(uiState==='playing' && input.locked){ player.update(dt); interaction.update(dt); }
+      if(kit.visible) touchTick();
+      chunks.update(player.pos.x, player.pos.z);
+      chunks.process(now, 6);
+      ui.updateHud(dt);
+    }
+    renderer.render(scene,camera);
+  }
+  function startLoop(){ if(loopRunning) return; loopRunning=true; requestAnimationFrame(frame); }
+  startLoop();
+
+  // Boot at the title screen.
+  showScreen('title');
+  </script>
+</body>
+</html>

@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>Arcade Flight Simulator</title>
+<style>
+  /* 기본 리셋 및 풀스크린 캔버스 설정 */
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color: #fff;
+    user-select: none;
+  }
+  canvas { display: block; }
+
+  /* HUD 컨테이너 */
+  #hud {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* 좌측 상단 계기 패널 */
+  .panel {
+    position: absolute;
+    background: rgba(0, 20, 40, 0.35);
+    border: 1px solid rgba(120, 200, 255, 0.5);
+    border-radius: 8px;
+    padding: 10px 14px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 0 10px rgba(0, 150, 255, 0.2);
+  }
+  #info-left  { top: calc(20px + env(safe-area-inset-top)); left: calc(20px + env(safe-area-inset-left)); min-width: 180px; }
+  #info-right { top: calc(20px + env(safe-area-inset-top)); right: calc(20px + env(safe-area-inset-right)); min-width: 180px; text-align: right; }
+  #info-bottom{ bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); text-align: center; }
+  #controls   { bottom: calc(20px + env(safe-area-inset-bottom)); right: calc(20px + env(safe-area-inset-right)); font-size: 12px; line-height: 1.6; }
+
+  .label { font-size: 11px; color: #8fd2ff; letter-spacing: 1px; }
+  .value { font-size: 22px; color: #fff; font-weight: bold; text-shadow: 0 0 6px #4af; }
+  .small { font-size: 14px; }
+
+  /* 중앙 십자선 */
+  #crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 40px; height: 40px;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(120, 220, 255, 0.6);
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0, 150, 255, 0.6);
+  }
+  #crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(120, 220, 255, 0.6);
+  }
+  #crosshair::before { top: 50%; left: -10px; width: 10px; height: 2px; }
+  #crosshair::after  { top: 50%; right: -10px; width: 10px; height: 2px; }
+
+  /* 경고 텍스트 (저고도) */
+  #warning {
+    position: absolute;
+    top: 25%; left: 50%;
+    transform: translateX(-50%);
+    color: #ff5555;
+    font-size: 28px;
+    font-weight: bold;
+    text-shadow: 0 0 10px #f00;
+    display: none;
+    letter-spacing: 3px;
+    animation: blink 0.6s infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* 콤보/점수 팝업 */
+  #popup {
+    position: absolute;
+    top: 35%; left: 50%;
+    transform: translateX(-50%);
+    color: #ffe066;
+    font-size: 36px;
+    font-weight: bold;
+    text-shadow: 0 0 15px #ffa500;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  /* 시작/종료 화면 오버레이 */
+  .overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(135deg, rgba(0, 30, 60, 0.85), rgba(20, 0, 40, 0.85));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    pointer-events: all;
+    text-align: center;
+  }
+  .overlay h1 {
+    font-size: 60px;
+    margin: 0 0 10px;
+    color: #fff;
+    text-shadow: 0 0 20px #4af;
+    letter-spacing: 6px;
+  }
+  .overlay h2 {
+    font-size: 24px;
+    color: #8fd2ff;
+    margin: 0 0 30px;
+    letter-spacing: 3px;
+  }
+  .overlay p { font-size: 16px; color: #cfe8ff; line-height: 1.8; max-width: 600px; }
+  .overlay button {
+    margin-top: 20px;
+    padding: 12px 36px;
+    font-size: 18px;
+    background: linear-gradient(135deg, #1a4a80, #2a7ac0);
+    color: #fff;
+    border: 1px solid #4af;
+    border-radius: 6px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    box-shadow: 0 0 15px rgba(0, 150, 255, 0.5);
+    transition: all 0.2s;
+  }
+  .overlay button:hover {
+    background: linear-gradient(135deg, #2a6aa0, #3a8ad0);
+    transform: scale(1.05);
+  }
+  .hidden { display: none !important; }
+
+  .keys { font-family: 'Courier New', monospace; color: #ffe066; }
+
+  /* ===== 모바일(터치) 대응 ===== */
+  html, body { -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+  canvas { touch-action: none; }
+  #hud { -webkit-user-select: none; }
+  /* 터치 기기에서는 키 안내 대신 터치 안내 */
+  .touch-only { display: none; }
+  html.touch .touch-only { display: block; }
+  html.touch .kbd-only, html.touch #controls { display: none; }
+  /* 터치: 하단 중앙 패널은 상단으로 (하단은 스틱·버튼 자리), 우측 패널은 CAM/RESET 버튼 아래로 */
+  html.touch #info-bottom { top: calc(8px + env(safe-area-inset-top)); bottom: auto; white-space: nowrap; }
+  html.touch #info-right  { top: calc(66px + env(safe-area-inset-top)); }
+  @media (orientation: portrait) {
+    html.touch #info-bottom { top: calc(174px + env(safe-area-inset-top)); }
+  }
+  /* 터치 버튼 글자는 12px 이상 */
+  .tk-root .tk-btn span, .tk-root .tk-lab { font-size: 12px; }
+
+  /* 작은 화면(휴대폰): HUD·오버레이 축소, 넘치면 스크롤 */
+  @media (max-width: 700px), (max-height: 500px) {
+    .panel { padding: 6px 10px; }
+    #info-left, #info-right { min-width: 0; }
+    #info-left  { top: calc(8px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); }
+    #info-right { right: calc(10px + env(safe-area-inset-right)); }
+    html:not(.touch) #info-right { top: calc(8px + env(safe-area-inset-top)); }
+    #info-bottom { bottom: calc(10px + env(safe-area-inset-bottom)); white-space: nowrap; }
+    .label { font-size: 12px; letter-spacing: 0.5px; line-height: 16px; }
+    .value { font-size: 18px; line-height: 22px; }
+    .small { font-size: 14px; line-height: 18px; }
+    #warning { font-size: 18px; letter-spacing: 2px; white-space: nowrap; }
+    #popup { font-size: 24px; white-space: nowrap; }
+    .overlay {
+      box-sizing: border-box;
+      justify-content: flex-start;
+      overflow-y: auto;
+      padding: calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right))
+               calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));
+    }
+    .overlay > :first-child { margin-top: auto; }
+    .overlay > :last-child { margin-bottom: auto; }
+    .overlay h1 { font-size: 40px; letter-spacing: 4px; }
+    .overlay h2 { font-size: 16px; margin-bottom: 12px; }
+    .overlay p { font-size: 13px; line-height: 1.6; margin: 8px 0; }
+    .overlay button { margin-top: 12px; min-height: 48px; }
+    #finalScore { font-size: 52px !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="crosshair"></div>
+
+  <div class="panel" id="info-left">
+    <div class="label">SPEED (KM/H)</div>
+    <div class="value" id="speed">0</div>
+    <div class="label" style="margin-top:8px;">THRUST</div>
+    <div class="value small" id="thrust">0%</div>
+  </div>
+
+  <div class="panel" id="info-right">
+    <div class="label">ALTITUDE (M)</div>
+    <div class="value" id="altitude">0</div>
+    <div class="label" style="margin-top:8px;">SCORE</div>
+    <div class="value small" id="score">0</div>
+  </div>
+
+  <div class="panel" id="info-bottom">
+    <span class="label">TIME</span>
+    <span class="value small" id="time">90</span>
+    &nbsp;&nbsp;|&nbsp;&nbsp;
+    <span class="label">CHECKPOINT</span>
+    <span class="value small" id="checkpoint">1 / 0</span>
+    &nbsp;&nbsp;|&nbsp;&nbsp;
+    <span class="label">COMBO</span>
+    <span class="value small" id="combo">x1</span>
+  </div>
+
+  <div class="panel" id="controls">
+    <div><span class="keys">W/S</span> 피치</div>
+    <div><span class="keys">A/D</span> 롤</div>
+    <div><span class="keys">Q/E</span> 요잉</div>
+    <div><span class="keys">Shift/Ctrl</span> 추력</div>
+    <div><span class="keys">Space</span> 부스터</div>
+    <div><span class="keys">C</span> 카메라  <span class="keys">R</span> 리셋</div>
+  </div>
+
+  <div id="warning">⚠ PULL UP - LOW ALTITUDE ⚠</div>
+  <div id="popup"></div>
+</div>
+
+<!-- 시작 화면 -->
+<div class="overlay" id="startScreen">
+  <h1>SKY ACE</h1>
+  <h2>ARCADE FLIGHT SIMULATOR</h2>
+  <p>
+    푸른 하늘을 가로질러 빛나는 링 체크포인트를 차례로 통과하세요.<br>
+    제한 시간 내에 최대한 많은 체크포인트를 통과해 최고 점수를 노리세요!<br>
+    낮은 고도 고속 비행 시 위험 보너스를 획득할 수 있습니다.
+  </p>
+  <p class="kbd-only" style="margin-top:20px;">
+    <span class="keys">W/A/S/D</span> 피치 & 롤 &nbsp;|&nbsp;
+    <span class="keys">Q/E</span> 요잉 &nbsp;|&nbsp;
+    <span class="keys">Shift/Ctrl</span> 추력 &nbsp;|&nbsp;
+    <span class="keys">Space</span> 부스터<br>
+    <span class="keys">C</span> 카메라 전환 &nbsp;|&nbsp;
+    <span class="keys">R</span> 리셋
+  </p>
+  <p class="touch-only" style="margin-top:20px;">
+    <span class="keys">FLY</span> 스틱 피치 & 롤 (조종간처럼 위로 밀면 기수 하강) &nbsp;|&nbsp;
+    <span class="keys">◀ ▶</span> 요잉<br>
+    <span class="keys">▲ ▼</span> 추력 &nbsp;|&nbsp;
+    <span class="keys">BOOST</span> 부스터 &nbsp;|&nbsp;
+    <span class="keys">CAM</span> 카메라 전환 &nbsp;|&nbsp;
+    <span class="keys">RESET</span> 리셋
+  </p>
+  <button id="startBtn">▶ TAKEOFF</button>
+</div>
+
+<!-- 게임 오버 화면 -->
+<div class="overlay hidden" id="endScreen">
+  <h1 id="endTitle">MISSION COMPLETE</h1>
+  <h2 id="endSubtitle">Final Score</h2>
+  <div style="font-size:80px; color:#ffe066; text-shadow:0 0 25px #ffa500;" id="finalScore">0</div>
+  <p id="endStats" style="margin-top:20px;"></p>
+  <button id="restartBtn">▶ RESTART</button>
+</div>
+
+<!-- 에러 표시 오버레이 -->
+<div id="errorOverlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(40,0,0,0.92); color:#fff; z-index:9999; padding:40px; box-sizing:border-box; font-family:monospace; overflow:auto;">
+  <h2 style="color:#ff6666;">⚠ 게임 실행 오류</h2>
+  <div id="errorMessage" style="white-space:pre-wrap; font-size:13px; line-height:1.5;"></div>
+  <p style="color:#ffcc66; margin-top:20px;">
+    문제 해결:<br>
+    1. 인터넷에 연결되어 있는지 확인하세요 (Three.js CDN 로드 필요).<br>
+    2. 브라우저(Chrome, Edge, Firefox 최신 버전)에서 실행하세요.<br>
+    3. 파일을 더블클릭하거나 브라우저로 끌어다 놓으세요.
+  </p>
+</div>
+
+<!-- shared touch-kit from the aemtti site kit -->
+<script>
+/* touch-kit.js — on-screen touch controls for keyboard/mouse web games. No dependencies.
+ * Inline it into a single-file game (inside a script tag) or load it next to the game.
+ *
+ *   const kit = TouchKit.create({
+ *     sticks: [
+ *       { id: 'move', side: 'left',  label: 'MOVE', keys: 'wasd' },            // 'wasd' | 'arrows' | {up,down,left,right} codes
+ *       { id: 'aim',  side: 'right', label: 'AIM',  onMove: (x, y, on) => {} } // analog -1..1, on=false when released
+ *     ],
+ *     buttons: [ { id: 'fire', label: 'FIRE', icon: '✦', key: 'Space' },      // key: KeyboardEvent.code to hold while pressed
+ *                { id: 'map', label: 'MAP', key: 'KeyM', place: 'top-right' } ],
+ *     landscape: true,        // ask to rotate when the phone is held upright
+ *   })
+ *   kit.show(false)           // hide in menus, kit.show(true) in gameplay (default: shown on touch devices)
+ *   kit.stick('aim')          // → { x, y, on }   kit.pressed('fire') → boolean
+ *
+ * Buttons without `key` can use onDown/onUp. Sticks with `keys` send keydown/keyup (8 directions) and still report analog x/y.
+ * Keys are dispatched as KeyboardEvents (key, code, keyCode, which) on document, so window/document listeners receive them.
+ * Everything else on the page keeps working: the kit only captures touches that start on its own zones/buttons.
+ */
+(function () {
+  'use strict'
+  if (window.TouchKit) return
+  const KEYS = { Space: [' ', 32], Enter: ['Enter', 13], Escape: ['Escape', 27], Tab: ['Tab', 9], ShiftLeft: ['Shift', 16],
+    ControlLeft: ['Control', 17], AltLeft: ['Alt', 18], ArrowLeft: ['ArrowLeft', 37], ArrowUp: ['ArrowUp', 38],
+    ArrowRight: ['ArrowRight', 39], ArrowDown: ['ArrowDown', 40], Backspace: ['Backspace', 8] }
+  const keyInfo = code => {
+    if (KEYS[code]) return KEYS[code]
+    if (/^Key[A-Z]$/.test(code)) return [code[3].toLowerCase(), code.charCodeAt(3)]
+    if (/^Digit\d$/.test(code)) return [code[5], code.charCodeAt(5)]
+    return [code, 0]
+  }
+  const held = new Map()                                   // code → count of sources holding it
+  function sendKey(type, code) {
+    const [key, kc] = keyInfo(code)
+    const ev = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true, composed: true })
+    try { Object.defineProperty(ev, 'keyCode', { get: () => kc }); Object.defineProperty(ev, 'which', { get: () => kc }) } catch (e) {}
+    const t = document.activeElement && document.activeElement !== document.body ? document.activeElement : document
+    t.dispatchEvent(ev)
+  }
+  function press(code) { const n = held.get(code) || 0; held.set(code, n + 1); if (n === 0) sendKey('keydown', code) }
+  function release(code) { const n = held.get(code) || 0; if (n <= 1) { held.delete(code); if (n === 1) sendKey('keyup', code) } else held.set(code, n - 1) }
+  function tapKey(code) { press(code); setTimeout(() => release(code), 80) }
+
+  const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
+  const CSS = `
+.tk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:600 11px/1 system-ui,-apple-system,'Segoe UI',sans-serif;
+  letter-spacing:.06em;color:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tk-root.tk-off{display:none}
+.tk-zone{position:absolute;bottom:0;top:22%;pointer-events:auto;touch-action:none}
+.tk-zone.l{left:0;width:42%}.tk-zone.r{right:0;width:42%}
+.tk-base{position:absolute;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;border:2px solid rgba(255,255,255,.28);
+  background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,.02) 70%);transition:opacity .15s;opacity:.55}
+.tk-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
+  background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.55);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.tk-base.on{opacity:.95}
+.tk-lab{position:absolute;left:0;right:0;top:50%;margin-top:-5px;text-align:center;opacity:.75;text-shadow:0 1px 2px #000;pointer-events:none}
+.tk-btns{position:absolute;display:flex;gap:12px;pointer-events:none}
+.tk-btns.br{right:calc(18px + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse;align-items:flex-end}
+.tk-btns.tr{right:calc(12px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));flex-direction:row-reverse}
+.tk-btns.tl{left:calc(12px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top))}
+.tk-btns.bl{left:calc(18px + env(safe-area-inset-left));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse}
+.tk-row{display:flex;gap:12px;flex-direction:row-reverse;align-items:flex-end}
+.tk-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
+  background:rgba(20,22,30,.42);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.tk-btn.s{width:48px;height:48px;font-size:9px}.tk-btn.l{width:84px;height:84px}
+.tk-btn i{font-style:normal;font-size:22px;line-height:1}.tk-btn.s i{font-size:17px}
+.tk-btn.on{background:rgba(255,255,255,.34);border-color:#fff;transform:scale(.94)}
+.tk-rot{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+  background:rgba(8,9,14,.94);color:#eee;font:500 16px/1.5 system-ui,sans-serif;text-align:center;pointer-events:auto;padding:24px}
+.tk-rot b{font-size:44px;display:block;animation:tkr 1.8s ease-in-out infinite}
+.tk-rot button{margin-top:6px;background:none;border:1px solid #666;color:#bbb;border-radius:20px;padding:8px 18px;font:inherit;font-size:13px}
+@keyframes tkr{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait){.tk-rot.need{display:flex}}
+`
+  // A tap on a kit button is followed by a compatibility `click` at the same spot ~100–300 ms later. If the button just
+  // opened a game overlay/menu under the finger, that click would hit it (and often close it). Swallow it.
+  let clickBlockUntil = 0
+  function suppressClick() { clickBlockUntil = Date.now() + 450 }
+  document.addEventListener('click', e => {
+    if (Date.now() < clickBlockUntil && !(e.target && e.target.closest && e.target.closest('.tk-root'))) { e.stopPropagation(); e.preventDefault() }
+  }, true)
+
+  function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e }
+
+  function create(opt) {
+    opt = opt || {}
+    if (!document.getElementById('tk-style')) { const st = el('style'); st.id = 'tk-style'; st.textContent = CSS; document.head.appendChild(st) }
+    const root = el('div', 'tk-root', document.body)
+    const api = { root, sticks: {}, buttons: {}, visible: false }
+
+    // ---- sticks: floating — the base appears where the thumb lands inside its half of the screen
+    for (const s of opt.sticks || []) {
+      const side = s.side === 'right' ? 'r' : 'l'
+      const zone = el('div', 'tk-zone ' + side, root)
+      if (s.zone) Object.assign(zone.style, s.zone)
+      const base = el('div', 'tk-base', zone), knob = el('div', 'tk-knob', base)
+      if (s.label) el('div', 'tk-lab', knob, s.label)
+      const R = s.radius || 52, dz = s.deadzone == null ? 0.3 : s.deadzone
+      const keys = s.keys === 'wasd' ? { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }
+        : s.keys === 'arrows' ? { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } : s.keys || null
+      const st = { x: 0, y: 0, on: false, pid: null, cx: 0, cy: 0, dirs: {} }
+      api.sticks[s.id || side] = st
+      const rest = () => {                                   // idle hint position; keeps clear of the bottom-right buttons
+        const zr = zone.getBoundingClientRect(); let x = side === 'l' ? 96 : zr.width - 96
+        if (side === 'r' && groups.br) { const gr = groups.br.getBoundingClientRect(); if (gr.width) x = Math.min(x, gr.left - zr.left - 80) }
+        base.style.left = x + 'px'; base.style.top = (zr.height - 110) + 'px'
+      }
+      const setDirs = (want) => {
+        if (!keys) return
+        for (const d of ['up', 'down', 'left', 'right']) {
+          if (want[d] && !st.dirs[d]) { st.dirs[d] = true; press(keys[d]) }
+          else if (!want[d] && st.dirs[d]) { st.dirs[d] = false; release(keys[d]) }
+        }
+      }
+      const move = (px, py) => {
+        let dx = px - st.cx, dy = py - st.cy; const d = Math.hypot(dx, dy)
+        if (d > R) { dx *= R / d; dy *= R / d }
+        knob.style.transform = `translate(${dx}px,${dy}px)`
+        st.x = dx / R; st.y = dy / R
+        const m = Math.hypot(st.x, st.y), a = Math.atan2(st.y, st.x)
+        const want = { up: false, down: false, left: false, right: false }
+        if (m > dz) { const oct = Math.round(a / (Math.PI / 4)); // 8 directions
+          want.right = [0, 1, -1].includes(oct); want.left = [4, -4, 3, -3].includes(oct); want.down = [1, 2, 3].includes(oct); want.up = [-1, -2, -3].includes(oct) }
+        setDirs(want)
+        if (s.onMove) s.onMove(st.x, st.y, true)
+      }
+      zone.addEventListener('pointerdown', e => {
+        if (st.pid !== null) return
+        e.preventDefault(); st.pid = e.pointerId; try { zone.setPointerCapture(e.pointerId) } catch (x) {}
+        const zr = zone.getBoundingClientRect(); st.cx = e.clientX; st.cy = e.clientY
+        base.style.left = (e.clientX - zr.left) + 'px'; base.style.top = (e.clientY - zr.top) + 'px'
+        base.classList.add('on'); st.on = true; move(e.clientX, e.clientY)
+        if (s.onStart) s.onStart()
+      })
+      zone.addEventListener('pointermove', e => { if (e.pointerId === st.pid) { e.preventDefault(); move(e.clientX, e.clientY) } })
+      const end = e => {
+        if (e.pointerId !== st.pid) return
+        st.pid = null; st.on = false; st.x = st.y = 0; knob.style.transform = ''; base.classList.remove('on'); setDirs({}); rest()
+        if (s.onMove) s.onMove(0, 0, false); if (s.onEnd) s.onEnd()
+      }
+      zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end)
+      st.reset = () => { if (st.pid !== null) end({ pointerId: st.pid }) }
+      requestAnimationFrame(rest); addEventListener('resize', rest)
+    }
+
+    // ---- buttons: grouped by place (default bottom-right cluster)
+    const groups = {}
+    for (const b of opt.buttons || []) {
+      const place = b.place || 'bottom-right', code = { 'bottom-right': 'br', 'top-right': 'tr', 'top-left': 'tl', 'bottom-left': 'bl' }[place] || 'br'
+      if (!groups[code]) groups[code] = el('div', 'tk-btns ' + code, root)
+      let parent = groups[code]
+      if (code === 'br' && b.row != null) { parent = groups['br' + b.row] || (groups['br' + b.row] = el('div', 'tk-row', groups.br)) }
+      const btn = el('div', 'tk-btn' + (b.size ? ' ' + b.size : ''), parent, (b.icon ? `<i>${b.icon}</i>` : '') + (b.label ? `<span>${b.label}</span>` : ''))
+      const bs = { down: false, pid: null, el: btn }
+      api.buttons[b.id || b.label] = bs
+      const down = e => {
+        e.preventDefault(); e.stopPropagation()
+        if (b.toggle) { bs.down = !bs.down; btn.classList.toggle('on', bs.down); if (b.key) (bs.down ? press : release)(b.key); (bs.down ? b.onDown : b.onUp) && (bs.down ? b.onDown : b.onUp)(); return }
+        if (bs.pid !== null) return
+        bs.pid = e.pointerId; try { btn.setPointerCapture(e.pointerId) } catch (x) {}
+        bs.down = true; btn.classList.add('on')
+        if (b.key) { if (b.tap) tapKey(b.key); else press(b.key) }
+        if (b.onDown) b.onDown()
+        if (navigator.vibrate && b.buzz !== false) try { navigator.vibrate(8) } catch (x) {}
+      }
+      const up = e => {
+        suppressClick()
+        if (b.toggle || e.pointerId !== bs.pid) return
+        bs.pid = null; bs.down = false; btn.classList.remove('on')
+        if (b.key && !b.tap) release(b.key)
+        if (b.onUp) b.onUp()
+      }
+      btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up)
+      btn.addEventListener('contextmenu', e => e.preventDefault())
+    }
+
+    // ---- portrait → ask to rotate (can be dismissed)
+    let rot = null, rotDismissed = false                      // once dismissed, show(true) must not bring the hint back
+    if (opt.landscape) {
+      rot = el('div', 'tk-rot', document.body, `<b>⟳</b><div>${opt.rotateText || '휴대폰을 가로로 돌려 주세요'}<br><small style="opacity:.6">Rotate your phone</small></div><button type="button">그래도 세로로 하기</button>`)
+      rot.querySelector('button').addEventListener('click', () => { rotDismissed = true; rot.classList.remove('need') })
+    }
+
+    // ---- page hygiene for touch play: no pinch/double-tap zoom, no pull-to-refresh, no long-press menu on the game
+    if (opt.preventGestures !== false) {
+      document.documentElement.style.overscrollBehavior = 'none'
+      document.addEventListener('gesturestart', e => e.preventDefault())
+      let lastT = 0
+      document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastT < 300 && !(e.target.closest && e.target.closest('input,textarea,select,a,button'))) e.preventDefault(); lastT = now }, { passive: false })
+    }
+
+    api.show = on => {
+      api.visible = on; root.classList.toggle('tk-off', !on); if (rot) rot.classList.toggle('need', on && !!opt.landscape && !rotDismissed)
+      if (!on) { for (const s of Object.values(api.sticks)) s.reset && s.reset(); for (const [code] of held) sendKey('keyup', code); held.clear()
+        for (const b of Object.values(api.buttons)) { b.down = false; b.pid = null; b.el.classList.remove('on') } }
+    }
+    api.stick = id => api.sticks[id] || { x: 0, y: 0, on: false }
+    api.pressed = id => !!(api.buttons[id] && api.buttons[id].down)
+    api.destroy = () => { api.show(false); root.remove(); if (rot) rot.remove() }
+    const mode = opt.show || 'auto'
+    api.show(mode === 'always' || (mode === 'auto' && isTouch()))
+    if (mode === 'auto' && !api.visible) addEventListener('touchstart', function once() { removeEventListener('touchstart', once); api.show(true) }, { passive: true })
+    return api
+  }
+
+  // Helpers for games that read the mouse: fire mouse events at a point (client coords).
+  function mouse(target, type, x, y, extra) {
+    const ev = new MouseEvent(type, Object.assign({ clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1 }, extra || {}))
+    ;(target || document.elementFromPoint(x, y) || document).dispatchEvent(ev)
+  }
+  // Resume every AudioContext the game creates, on the first real touch (iOS/Android need a user gesture).
+  function unlockAudio() {
+    const ctxs = new Set(), AC = window.AudioContext || window.webkitAudioContext
+    if (AC && !AC.__tk) { const W = function (...a) { const c = new AC(...a); ctxs.add(c); return c }; W.prototype = AC.prototype; W.__tk = true; window.AudioContext = W; if (window.webkitAudioContext) window.webkitAudioContext = W }
+    const go = () => { for (const c of ctxs) if (c.state === 'suspended') c.resume().catch(() => {}) }
+    addEventListener('pointerdown', go, true); addEventListener('touchend', go, true)
+  }
+  window.TouchKit = { create, press, release, tapKey, sendKey, mouse, unlockAudio, isTouch }
+})()
+</script>
+
+<!-- Three.js — 여러 CDN 시도 -->
+<script>
+  // Three.js 로더: 여러 CDN을 순차적으로 시도
+  (function loadThree() {
+    const sources = [
+      'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+      'https://unpkg.com/three@0.128.0/build/three.min.js',
+      'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+    ];
+    let idx = 0;
+    function tryNext() {
+      if (idx >= sources.length) {
+        showError('Three.js 라이브러리를 불러올 수 없습니다.\n인터넷 연결을 확인하세요.');
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = sources[idx++];
+      s.onload = function() {
+        // Three.js 로드 성공 → 게임 시작
+        try {
+          startSkyAce();
+        } catch (err) {
+          showError('게임 초기화 중 오류:\n' + (err && err.stack ? err.stack : err));
+        }
+      };
+      s.onerror = tryNext;
+      document.head.appendChild(s);
+    }
+    tryNext();
+  })();
+
+  function showError(msg) {
+    const el = document.getElementById('errorOverlay');
+    document.getElementById('errorMessage').textContent = msg;
+    if (el) el.style.display = 'block';
+  }
+  // 전역 에러도 캐치
+  window.addEventListener('error', function(e) {
+    showError('JavaScript 오류:\n' + (e.error && e.error.stack ? e.error.stack : e.message));
+  });
+</script>
+
+<script>
+/* ============================================================
+   SKY ACE — Arcade Flight Simulator
+   - Three.js r128
+   - 단일 HTML 파일, CDN만 외부
+   ============================================================ */
+function startSkyAce() {
+
+// ===== 전역 변수 =====
+let scene, camera, renderer;
+let clock = new THREE.Clock();
+
+let plane;            // 플레이어 기체 (Group)
+let planeBody;        // 동체 메쉬 (참고용)
+let enginePlume;      // 부스터 불꽃
+let propeller;        // 프로펠러/팬
+
+let ocean, terrain;   // 환경
+let clouds = [];      // 구름 오브젝트 배열
+let checkpoints = []; // 링 체크포인트
+let currentCheckpoint = 0;
+
+// 비행 물리 상태
+const physics = {
+  velocity: new THREE.Vector3(0, 0, 0),
+  speed: 0,            // 단위: world units / sec (km/h로 표시는 *3.6)
+  thrust: 0.4,         // 0~1
+  boost: 0,            // 부스터 잔량 0~1
+  maxBoost: 1.0,
+  isBoosting: false,
+  pitchInput: 0,
+  rollInput: 0,
+  yawInput: 0,
+  pitchVel: 0,
+  rollVel: 0,
+  yawVel: 0,
+};
+
+// 게임 상태
+const game = {
+  state: 'menu',       // menu | playing | over
+  score: 0,
+  combo: 1,
+  comboTimer: 0,
+  timeLeft: 90,
+  passed: 0,
+  startTime: 0,
+};
+
+// 입력 상태
+const keys = {};
+
+// 카메라 모드
+let cameraMode = 0;     // 0: chase, 1: cockpit
+const cameraTarget = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
+let cameraShake = 0;
+
+// 부스터 파티클
+const particles = [];
+
+// 상수
+const WORLD_SIZE = 8000;
+const SEA_LEVEL = 0;
+
+// ===== 초기화 =====
+function init() {
+  // 씬
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x88c8ff);
+  scene.fog = new THREE.Fog(0x88c8ff, 800, 4500);
+
+  // 카메라
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.5, 12000);
+  camera.position.set(0, 200, -300);
+
+  // 렌더러
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 휴대폰 성능: 최대 2배
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = false; // 성능 우선
+  document.body.appendChild(renderer.domElement);
+
+  // 조명
+  const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+  scene.add(ambient);
+
+  const sun = new THREE.DirectionalLight(0xfff2cc, 1.0);
+  sun.position.set(2000, 3000, 1500);
+  scene.add(sun);
+
+  // 태양 메쉬 (시각용)
+  const sunMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(180, 24, 24),
+    new THREE.MeshBasicMaterial({ color: 0xfff2a8 })
+  );
+  sunMesh.position.copy(sun.position).multiplyScalar(1.4);
+  scene.add(sunMesh);
+
+  // 헬퍼: 환경
+  createOcean();
+  createTerrain();
+  createClouds();
+  createIslands();
+  createCity();
+  createRunway();
+
+  // 플레이어 비행기
+  createPlane();
+
+  // 체크포인트들
+  createCheckpoints();
+
+  // 이벤트
+  window.addEventListener('resize', onResize);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+
+  // UI 버튼
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  const restartBtn = document.getElementById('restartBtn');
+  const restart = () => {
+    if (game.state !== 'over') return;    // 터치의 pointerup 뒤에 오는 click 으로 두 번 시작하지 않게
+    document.getElementById('endScreen').classList.add('hidden');
+    startGame();
+  };
+  restartBtn.addEventListener('click', restart);
+  // 터치: 시간 종료 순간 BOOST 등을 누르고 있다 떼면 터치 킷이 450ms 동안 click 을 막으므로,
+  // 이 버튼 위에서 시작하고 끝난 탭은 pointerup 으로 바로 처리 (마우스는 기존 click 그대로)
+  let restartPid = null;
+  restartBtn.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') restartPid = e.pointerId; });
+  restartBtn.addEventListener('pointerup', e => { if (e.pointerId === restartPid) { restartPid = null; restart(); } });
+  restartBtn.addEventListener('pointercancel', () => { restartPid = null; });
+
+  // 터치 조작 (휴대폰/태블릿)
+  initTouch();
+
+  // 메뉴에서도 천천히 도는 카메라
+  animate();
+}
+
+// ===== 환경 생성 =====
+function createOcean() {
+  // 바다 평면 (광활한 푸른색)
+  const geo = new THREE.PlaneGeometry(WORLD_SIZE * 3, WORLD_SIZE * 3, 50, 50);
+  // 살짝 굴곡 추가
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    pos.setZ(i, Math.sin(pos.getX(i) * 0.002) * 2 + Math.cos(pos.getY(i) * 0.0025) * 2);
+  }
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshLambertMaterial({ color: 0x1a5a9a });
+  ocean = new THREE.Mesh(geo, mat);
+  ocean.rotation.x = -Math.PI / 2;
+  ocean.position.y = SEA_LEVEL;
+  scene.add(ocean);
+}
+
+function createTerrain() {
+  // 멀리 있는 산맥 (랜덤한 원뿔/피라미드 묶음)
+  terrain = new THREE.Group();
+  const colors = [0x2d5a3d, 0x3a6d4a, 0x4a7d5a, 0x6b8b6b];
+  for (let i = 0; i < 60; i++) {
+    const r = 200 + Math.random() * 400;
+    const h = 200 + Math.random() * 800;
+    const geo = new THREE.ConeGeometry(r, h, 6 + Math.floor(Math.random() * 4));
+    const mat = new THREE.MeshLambertMaterial({
+      color: colors[Math.floor(Math.random() * colors.length)],
+      flatShading: true
+    });
+    const m = new THREE.Mesh(geo, mat);
+    // 멀리 가장자리 쪽에 배치
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 2000 + Math.random() * 3500;
+    m.position.set(Math.cos(angle) * dist, h / 2 - 5, Math.sin(angle) * dist);
+    m.rotation.y = Math.random() * Math.PI;
+    terrain.add(m);
+  }
+  scene.add(terrain);
+}
+
+function createIslands() {
+  // 가까운 섬들 (낮은 녹색 원뿔/돔)
+  for (let i = 0; i < 15; i++) {
+    const r = 150 + Math.random() * 250;
+    const h = 30 + Math.random() * 80;
+    const geo = new THREE.ConeGeometry(r, h, 8);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x4a8a4a, flatShading: true });
+    const m = new THREE.Mesh(geo, mat);
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 800 + Math.random() * 1500;
+    m.position.set(Math.cos(angle) * dist, h / 2, Math.sin(angle) * dist);
+    scene.add(m);
+
+    // 모래사장 링
+    const beachGeo = new THREE.RingGeometry(r * 0.9, r * 1.2, 24);
+    const beachMat = new THREE.MeshLambertMaterial({ color: 0xe8d8a0, side: THREE.DoubleSide });
+    const beach = new THREE.Mesh(beachGeo, beachMat);
+    beach.rotation.x = -Math.PI / 2;
+    beach.position.set(m.position.x, 1, m.position.z);
+    scene.add(beach);
+  }
+}
+
+function createCity() {
+  // 도시 블록 — 한 군데에 빌딩 묶음
+  const cityCenter = new THREE.Vector3(-1200, 0, 800);
+  const cityGroup = new THREE.Group();
+  // 바닥
+  const baseGeo = new THREE.BoxGeometry(800, 5, 800);
+  const baseMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+  const base = new THREE.Mesh(baseGeo, baseMat);
+  base.position.set(cityCenter.x, 2, cityCenter.z);
+  scene.add(base);
+
+  for (let i = 0; i < 50; i++) {
+    const w = 30 + Math.random() * 50;
+    const d = 30 + Math.random() * 50;
+    const h = 60 + Math.random() * 220;
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const colorShade = 0x666688 + Math.floor(Math.random() * 0x222222);
+    const mat = new THREE.MeshLambertMaterial({ color: colorShade });
+    const b = new THREE.Mesh(geo, mat);
+    b.position.set(
+      cityCenter.x + (Math.random() - 0.5) * 700,
+      h / 2 + 5,
+      cityCenter.z + (Math.random() - 0.5) * 700
+    );
+    cityGroup.add(b);
+  }
+  scene.add(cityGroup);
+}
+
+function createRunway() {
+  // 활주로 (긴 회색 직사각형 + 흰 차선)
+  const rwGeo = new THREE.PlaneGeometry(60, 800);
+  const rwMat = new THREE.MeshLambertMaterial({ color: 0x222226 });
+  const rw = new THREE.Mesh(rwGeo, rwMat);
+  rw.rotation.x = -Math.PI / 2;
+  rw.position.set(1200, 1, -400);
+  scene.add(rw);
+
+  // 활주로 차선
+  for (let i = -350; i < 350; i += 60) {
+    const lineGeo = new THREE.PlaneGeometry(3, 20);
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const line = new THREE.Mesh(lineGeo, lineMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(1200, 1.2, -400 + i);
+    scene.add(line);
+  }
+}
+
+function createClouds() {
+  // 구름: 흰색 구의 무리
+  for (let i = 0; i < 60; i++) {
+    const cloud = new THREE.Group();
+    const puffCount = 4 + Math.floor(Math.random() * 5);
+    for (let j = 0; j < puffCount; j++) {
+      const r = 40 + Math.random() * 60;
+      const geo = new THREE.SphereGeometry(r, 8, 6);
+      const mat = new THREE.MeshLambertMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.85
+      });
+      const puff = new THREE.Mesh(geo, mat);
+      puff.position.set(
+        (Math.random() - 0.5) * 150,
+        (Math.random() - 0.5) * 30,
+        (Math.random() - 0.5) * 150
+      );
+      cloud.add(puff);
+    }
+    cloud.position.set(
+      (Math.random() - 0.5) * WORLD_SIZE,
+      300 + Math.random() * 700,
+      (Math.random() - 0.5) * WORLD_SIZE
+    );
+    cloud.userData.drift = (Math.random() - 0.5) * 5;
+    scene.add(cloud);
+    clouds.push(cloud);
+  }
+}
+
+// ===== 비행기 모델 =====
+function createPlane() {
+  plane = new THREE.Group();
+
+  // 동체
+  const bodyGeo = new THREE.CylinderGeometry(2, 1.5, 18, 12);
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xdddde0 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.rotation.x = Math.PI / 2;
+  plane.add(body);
+  planeBody = body;
+
+  // 콕핏 (캐노피)
+  const cockpitGeo = new THREE.SphereGeometry(2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  const cockpitMat = new THREE.MeshLambertMaterial({ color: 0x224488, transparent: true, opacity: 0.7 });
+  const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
+  cockpit.position.set(0, 1.5, 1);
+  plane.add(cockpit);
+
+  // 앞 노즈콘
+  const noseGeo = new THREE.ConeGeometry(1.5, 4, 12);
+  const nose = new THREE.Mesh(noseGeo, bodyMat);
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, 0, 11);
+  plane.add(nose);
+
+  // 주 날개
+  const wingGeo = new THREE.BoxGeometry(22, 0.5, 4);
+  const wingMat = new THREE.MeshLambertMaterial({ color: 0xc0c0c4 });
+  const wing = new THREE.Mesh(wingGeo, wingMat);
+  wing.position.set(0, 0, 0);
+  plane.add(wing);
+
+  // 날개 끝 (탱크)
+  for (let s of [-1, 1]) {
+    const tipGeo = new THREE.CylinderGeometry(0.4, 0.4, 3, 8);
+    const tip = new THREE.Mesh(tipGeo, bodyMat);
+    tip.rotation.x = Math.PI / 2;
+    tip.position.set(s * 10.5, 0, 0);
+    plane.add(tip);
+  }
+
+  // 꼬리 수평 안정판
+  const tailWingGeo = new THREE.BoxGeometry(8, 0.4, 2);
+  const tailWing = new THREE.Mesh(tailWingGeo, wingMat);
+  tailWing.position.set(0, 0.5, -7);
+  plane.add(tailWing);
+
+  // 꼬리 수직 안정판
+  const finGeo = new THREE.BoxGeometry(0.4, 3, 3);
+  const fin = new THREE.Mesh(finGeo, bodyMat);
+  fin.position.set(0, 2, -7);
+  plane.add(fin);
+
+  // 색상 줄무늬
+  const stripeGeo = new THREE.BoxGeometry(22.1, 0.6, 0.6);
+  const stripeMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+  const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+  stripe.position.set(0, 0.3, 0.5);
+  plane.add(stripe);
+
+  // 엔진 불꽃 (부스터)
+  const plumeGeo = new THREE.ConeGeometry(1.2, 4, 8);
+  const plumeMat = new THREE.MeshBasicMaterial({
+    color: 0xffaa33, transparent: true, opacity: 0.8
+  });
+  enginePlume = new THREE.Mesh(plumeGeo, plumeMat);
+  enginePlume.rotation.x = -Math.PI / 2;
+  enginePlume.position.set(0, 0, -11);
+  enginePlume.scale.set(1, 1, 0.1);
+  plane.add(enginePlume);
+
+  // 프로펠러 (앞)
+  const propGeo = new THREE.BoxGeometry(6, 0.2, 0.4);
+  const propMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+  propeller = new THREE.Mesh(propGeo, propMat);
+  propeller.position.set(0, 0, 13.2);
+  plane.add(propeller);
+
+  // 초기 위치
+  resetPlane();
+  scene.add(plane);
+}
+
+// ===== 체크포인트 (링) 생성 =====
+function createCheckpoints() {
+  // 체크포인트들을 곡선처럼 배치
+  const positions = [
+    [0, 300, 600],
+    [400, 400, 1200],
+    [200, 350, 2000],
+    [-400, 500, 2400],
+    [-800, 450, 1800],
+    [-1200, 400, 1000],
+    [-1000, 300, 0],
+    [-400, 350, -500],
+    [400, 500, -800],
+    [1000, 450, -200],
+    [1200, 350, 800],
+    [800, 400, 1600],
+  ];
+
+  positions.forEach((p, i) => {
+    const ringGroup = new THREE.Group();
+    const ringGeo = new THREE.TorusGeometry(40, 4, 12, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffe066 });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ringGroup.add(ring);
+
+    // 안쪽 발광 (얇은 디스크)
+    const glowGeo = new THREE.RingGeometry(30, 40, 32);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0xffffaa, transparent: true, opacity: 0.25, side: THREE.DoubleSide
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    ringGroup.add(glow);
+
+    ringGroup.position.set(p[0], p[1], p[2]);
+
+    // 다음 체크포인트를 향해 약간 회전
+    if (i < positions.length - 1) {
+      const dx = positions[i + 1][0] - p[0];
+      const dz = positions[i + 1][2] - p[2];
+      ringGroup.rotation.y = Math.atan2(dx, dz);
+    }
+
+    ringGroup.userData = {
+      index: i,
+      active: i === 0,
+      passed: false,
+      ring: ring,
+      glow: glow,
+      baseColor: 0xffe066,
+    };
+    scene.add(ringGroup);
+    checkpoints.push(ringGroup);
+  });
+
+  updateCheckpointColors();
+}
+
+function updateCheckpointColors() {
+  checkpoints.forEach((cp, i) => {
+    if (cp.userData.passed) {
+      cp.userData.ring.material.color.setHex(0x33ff66);
+      cp.userData.glow.material.color.setHex(0x66ff99);
+      cp.userData.glow.material.opacity = 0.1;
+    } else if (i === currentCheckpoint) {
+      cp.userData.ring.material.color.setHex(0xff66ff);
+      cp.userData.glow.material.color.setHex(0xff99ff);
+      cp.userData.glow.material.opacity = 0.4;
+    } else {
+      cp.userData.ring.material.color.setHex(0xffe066);
+      cp.userData.glow.material.color.setHex(0xffffaa);
+      cp.userData.glow.material.opacity = 0.2;
+    }
+  });
+}
+
+// ===== 입력 =====
+function onKeyDown(e) {
+  keys[e.code] = true;
+  keys[e.key.toLowerCase()] = true;
+  // ArrowKey 스크롤 방지
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+    e.preventDefault();
+  }
+
+  if (e.code === 'KeyC' && game.state === 'playing') {
+    cameraMode = (cameraMode + 1) % 2;
+  }
+  if (e.code === 'KeyR' && game.state === 'playing') {
+    resetPlane();
+    showPopup('POSITION RESET', '#8fd2ff');
+  }
+}
+function onKeyUp(e) {
+  keys[e.code] = false;
+  keys[e.key.toLowerCase()] = false;
+}
+
+// ===== 터치 조작 (휴대폰/태블릿) =====
+// 왼쪽 스틱: 조종간(아날로그 피치/롤) — 오른쪽 버튼: 부스터·추력·요잉 — 우상단: 카메라·리셋
+// 버튼은 키보드 키를 그대로 눌러 주므로 기존 입력 처리를 그대로 탄다.
+let touchKit = null;
+let touchMode = false;   // 터치 UI 사용 중 (HUD 배치 전환용 html.touch 클래스)
+function setTouchMode(on) {
+  touchMode = on;
+  document.documentElement.classList.toggle('touch', on);
+}
+function initTouch() {
+  if (!window.TouchKit) return;
+  touchKit = TouchKit.create({
+    sticks: [
+      { id: 'fly', side: 'left', label: 'FLY' },
+    ],
+    buttons: [
+      { id: 'boost',   label: 'BOOST', icon: '🔥', key: 'Space',       size: 'l', row: 0 },
+      { id: 'thrUp',   label: 'THR',   icon: '▲',  key: 'ShiftLeft',   size: 's', row: 0 },
+      { id: 'thrDown', label: 'THR',   icon: '▼',  key: 'ControlLeft', size: 's', row: 0 },
+      { id: 'yawR',    label: 'YAW',   icon: '▶',  key: 'KeyE',        size: 's', row: 1 },
+      { id: 'yawL',    label: 'YAW',   icon: '◀',  key: 'KeyQ',        size: 's', row: 1 },
+      { id: 'cam',     label: 'CAM',   icon: '🎥', key: 'KeyC', tap: true, size: 's', place: 'top-right' },
+      { id: 'reset',   label: 'RESET', icon: '↺',  key: 'KeyR', tap: true, size: 's', place: 'top-right' },
+    ],
+    landscape: true,   // 가로 화면 권장 (세로는 안내를 닫고 계속 가능)
+  });
+  setTouchMode(TouchKit.isTouch());
+  touchKit.show(false);  // 메뉴에서는 숨김 — 비행 중에만 표시
+  addEventListener('touchstart', () => {
+    if (!touchMode) setTouchMode(true);
+    if (touchKit.visible && game.state !== 'playing') touchKit.show(false);
+  }, { passive: true });
+}
+// 스틱 값(-1..1) → 조종 입력: 데드존 + 가운데가 부드러운 곡선 (끝까지 밀면 키 입력과 같은 1)
+function stickAxis(v) {
+  const a = Math.abs(v);
+  if (a < 0.12) return 0;
+  const t = Math.min(1, (a - 0.12) / 0.88);
+  return Math.sign(v) * t * (0.45 + 0.55 * t);
+}
+
+// ===== 비행기 리셋 =====
+function resetPlane() {
+  plane.position.set(0, 250, 0);
+  plane.rotation.set(0, 0, 0);
+  plane.quaternion.identity();
+  physics.velocity.set(0, 0, 80); // 초기 전방 속도
+  physics.speed = 80;
+  physics.thrust = 0.5;
+  physics.pitchVel = physics.rollVel = physics.yawVel = 0;
+}
+
+// ===== 게임 시작 =====
+function startGame() {
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+
+  game.state = 'playing';
+  game.score = 0;
+  game.combo = 1;
+  game.comboTimer = 0;
+  game.timeLeft = 90;
+  game.passed = 0;
+  game.startTime = performance.now();
+  currentCheckpoint = 0;
+  checkpoints.forEach(cp => { cp.userData.passed = false; });
+  updateCheckpointColors();
+  resetPlane();
+  cameraMode = 0;
+  if (touchKit) {                           // 비행 중 터치 조작 표시
+    touchKit.show(touchMode);
+    // 킷은 resize 때 스틱 대기 위치를 잡는데, 메뉴에서 숨겨져(크기 0) 있을 때 잰 값이라 다시 재게 함
+    if (touchMode) window.dispatchEvent(new Event('resize'));
+  }
+}
+
+// ===== 게임 종료 =====
+function endGame(reason) {
+  if (game.state !== 'playing') return;
+  game.state = 'over';
+  if (touchKit) touchKit.show(false);       // 결과 화면에서는 숨김 (눌린 키도 해제)
+  document.getElementById('endTitle').textContent =
+    reason === 'crash' ? '💥 CRASHED' :
+    reason === 'time'  ? '⏱ TIME UP' : 'MISSION COMPLETE';
+  document.getElementById('endSubtitle').textContent = 'Final Score';
+  document.getElementById('finalScore').textContent = Math.floor(game.score);
+  document.getElementById('endStats').innerHTML =
+    `Checkpoints passed: <b>${game.passed}</b> / ${checkpoints.length}<br>` +
+    `Elapsed: <b>${(90 - game.timeLeft).toFixed(1)}</b>s`;
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+
+// ===== 윈도우 리사이즈 =====
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ===== 메인 업데이트 (비행기 물리) =====
+function updatePlane(dt) {
+  // 입력 → 회전 가속 (키가 없으면 터치 스틱의 아날로그 값: 위로 밀면 기수 하강, 좌우는 그쪽으로 기울기)
+  const fly = touchKit ? touchKit.stick('fly') : null;
+  const pitchKey = (keys['KeyW'] || keys['ArrowUp']) ? 1 : (keys['KeyS'] || keys['ArrowDown']) ? -1 : (fly && fly.on ? stickAxis(-fly.y) : 0);
+  const rollKey  = (keys['KeyA'] || keys['ArrowLeft']) ? 1 : (keys['KeyD'] || keys['ArrowRight']) ? -1 : (fly && fly.on ? stickAxis(fly.x) : 0);
+  const yawKey   = (keys['KeyQ']) ? 1 : (keys['KeyE']) ? -1 : 0;
+
+  // 입력 가속도
+  const ROT_ACCEL = 3.5;
+  const ROT_DAMP = 2.5;
+
+  physics.pitchVel += pitchKey * ROT_ACCEL * dt;
+  physics.rollVel  += rollKey  * ROT_ACCEL * dt;
+  physics.yawVel   += yawKey   * ROT_ACCEL * dt * 0.6;
+
+  // 댐핑
+  physics.pitchVel *= Math.max(0, 1 - ROT_DAMP * dt);
+  physics.rollVel  *= Math.max(0, 1 - ROT_DAMP * dt);
+  physics.yawVel   *= Math.max(0, 1 - ROT_DAMP * dt);
+
+  // 최대 회전 속도 제한
+  physics.pitchVel = THREE.MathUtils.clamp(physics.pitchVel, -1.2, 1.2);
+  physics.rollVel  = THREE.MathUtils.clamp(physics.rollVel,  -2.0, 2.0);
+  physics.yawVel   = THREE.MathUtils.clamp(physics.yawVel,   -0.8, 0.8);
+
+  // 자동 롤 복원이 약간 있는 아케이드 느낌
+  // (롤 입력이 없을 때 약하게 수평으로 회복)
+  // -> 생략: 자유 비행감이 더 좋다
+
+  // 기체의 로컬 회전 적용 (quaternion 사용)
+  const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), physics.pitchVel * dt);
+  const qYaw   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), physics.yawVel * dt);
+  const qRoll  = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), physics.rollVel * dt);
+  plane.quaternion.multiply(qPitch);
+  plane.quaternion.multiply(qYaw);
+  plane.quaternion.multiply(qRoll);
+
+  // 추력 조정
+  if (keys['ShiftLeft'] || keys['ShiftRight']) physics.thrust += 0.4 * dt;
+  if (keys['ControlLeft'] || keys['ControlRight']) physics.thrust -= 0.4 * dt;
+  physics.thrust = THREE.MathUtils.clamp(physics.thrust, 0, 1);
+
+  // 부스터
+  physics.isBoosting = !!keys['Space'] && physics.boost > 0;
+  if (physics.isBoosting) {
+    physics.boost = Math.max(0, physics.boost - dt * 0.5);
+  } else {
+    physics.boost = Math.min(physics.maxBoost, physics.boost + dt * 0.2);
+  }
+
+  // 비행 물리 — 추력, 항력, 양력, 중력
+  // 전방 단위벡터 (월드 좌표)
+  const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(plane.quaternion);
+  const up      = new THREE.Vector3(0, 1, 0).applyQuaternion(plane.quaternion);
+
+  // 목표 속도
+  const baseMax = 220;
+  const boostMax = 380;
+  const targetMaxSpeed = physics.isBoosting ? boostMax : baseMax;
+  const targetSpeed = 30 + physics.thrust * (targetMaxSpeed - 30);
+
+  // 속도가 목표에 점진 수렴 (가속/감속 느낌)
+  const accelRate = physics.isBoosting ? 90 : 35;
+  if (physics.speed < targetSpeed) physics.speed += accelRate * dt;
+  else physics.speed -= 20 * dt;
+  physics.speed = Math.max(10, physics.speed);
+
+  // 속도 벡터 = 전방 * speed
+  // 중력: 속도가 낮으면 양력 부족 → 떨어짐
+  const liftFactor = THREE.MathUtils.clamp(physics.speed / 100, 0, 1.2);
+  const gravityPull = (1 - liftFactor) * 35; // m/s 정도 느낌의 하강 가속
+
+  // 이동
+  const move = forward.clone().multiplyScalar(physics.speed * dt);
+  // 약간의 중력 추가 (양력이 부족할 때)
+  move.y -= gravityPull * dt;
+
+  plane.position.add(move);
+
+  // 월드 경계: 너무 멀리 가면 반대편으로 (또는 클램프)
+  const limit = WORLD_SIZE / 2;
+  plane.position.x = THREE.MathUtils.clamp(plane.position.x, -limit, limit);
+  plane.position.z = THREE.MathUtils.clamp(plane.position.z, -limit, limit);
+
+  // 천장 (너무 높이 못 올라가게)
+  plane.position.y = Math.min(plane.position.y, 1800);
+
+  // 프로펠러 회전
+  if (propeller) {
+    propeller.rotation.z += (4 + physics.thrust * 30 + (physics.isBoosting ? 20 : 0)) * dt;
+  }
+
+  // 부스터 불꽃
+  const targetPlumeZ = physics.isBoosting ? 3.5 : (0.3 + physics.thrust * 1.5);
+  enginePlume.scale.z += (targetPlumeZ - enginePlume.scale.z) * Math.min(1, dt * 8);
+  enginePlume.material.color.setHex(physics.isBoosting ? 0x66ddff : 0xffaa33);
+  enginePlume.scale.x = enginePlume.scale.y = 1 + Math.random() * 0.3 + (physics.isBoosting ? 0.4 : 0);
+
+  // 부스터 파티클 (간단 트레일)
+  if (physics.isBoosting) {
+    spawnBoostParticle();
+  }
+
+  // 충돌 판정 — 바다 또는 지면
+  if (plane.position.y < 6) {
+    crash();
+  }
+
+  // 도시 빌딩 충돌 간단 체크 (도시 영역 + 높이)
+  // 도시 중심 (-1200, 0, 800), 범위 ±400, 높이 < 280
+  if (
+    plane.position.x > -1600 && plane.position.x < -800 &&
+    plane.position.z > 400 && plane.position.z < 1200 &&
+    plane.position.y < 280
+  ) {
+    crash();
+  }
+}
+
+// ===== 부스트 파티클 =====
+function spawnBoostParticle() {
+  const geo = new THREE.SphereGeometry(1.2, 6, 6);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0x66ddff, transparent: true, opacity: 0.9
+  });
+  const p = new THREE.Mesh(geo, mat);
+  // 비행기 뒤쪽 위치 (월드 좌표)
+  const back = new THREE.Vector3(0, 0, -11).applyQuaternion(plane.quaternion).add(plane.position);
+  p.position.copy(back);
+  p.userData.life = 0;
+  p.userData.maxLife = 0.5 + Math.random() * 0.3;
+  // 약간의 분산 속도
+  p.userData.vel = new THREE.Vector3(
+    (Math.random() - 0.5) * 5,
+    (Math.random() - 0.5) * 5,
+    -10 + (Math.random() - 0.5) * 5
+  ).applyQuaternion(plane.quaternion);
+  scene.add(p);
+  particles.push(p);
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.userData.life += dt;
+    p.position.addScaledVector(p.userData.vel, dt);
+    const t = p.userData.life / p.userData.maxLife;
+    p.material.opacity = 0.9 * (1 - t);
+    p.scale.setScalar(1 + t * 2);
+    if (p.userData.life >= p.userData.maxLife) {
+      scene.remove(p);
+      p.geometry.dispose();
+      p.material.dispose();
+      particles.splice(i, 1);
+    }
+  }
+}
+
+// ===== 충돌 =====
+function crash() {
+  if (game.state !== 'playing') return;
+  cameraShake = 1.5;
+  showPopup('💥 CRASH!', '#ff4444');
+  // 콤보 리셋
+  game.combo = 1;
+  // 패널티 점수
+  game.score = Math.max(0, game.score - 100);
+  // 잠시 후 리셋
+  setTimeout(() => {
+    if (game.state === 'playing') resetPlane();
+  }, 600);
+}
+
+// ===== 체크포인트 통과 판정 =====
+function checkCheckpoints() {
+  if (currentCheckpoint >= checkpoints.length) return;
+  const cp = checkpoints[currentCheckpoint];
+  // 링 평면 좌표계 기준으로 비행기가 링을 통과했는지 확인
+  // 단순화: 거리 + 링 방향 평면 통과
+  const toPlane = plane.position.clone().sub(cp.position);
+  const ringForward = new THREE.Vector3(0, 0, 1).applyQuaternion(cp.quaternion);
+  const distAlong = toPlane.dot(ringForward);
+  const lateral = toPlane.clone().sub(ringForward.clone().multiplyScalar(distAlong)).length();
+
+  // 통과 조건: 평면 근접 & 링 안쪽
+  if (!cp.userData.passed && Math.abs(distAlong) < 25 && lateral < 38) {
+    cp.userData.passed = true;
+    game.passed++;
+    currentCheckpoint++;
+    // 점수 계산: 기본 + 콤보 + 속도 + 저고도 보너스
+    const speedBonus = Math.floor(physics.speed * 0.5);
+    const lowAltBonus = (plane.position.y < 120) ? 50 : 0;
+    const earned = (100 + speedBonus + lowAltBonus) * game.combo;
+    game.score += earned;
+    // 콤보 증가
+    game.combo = Math.min(8, game.combo + 1);
+    game.comboTimer = 5; // 5초 안에 다음 통과 시 콤보 유지
+    // 시간 보너스
+    game.timeLeft = Math.min(120, game.timeLeft + 5);
+
+    showPopup(`+${earned}  x${game.combo - 1}${lowAltBonus ? '  ⚡ LOW' : ''}`, '#ffe066');
+    cameraShake = Math.max(cameraShake, 0.4);
+
+    updateCheckpointColors();
+
+    // 모두 통과
+    if (currentCheckpoint >= checkpoints.length) {
+      // 코스 반복: 다시 처음부터
+      checkpoints.forEach(c => { c.userData.passed = false; });
+      currentCheckpoint = 0;
+      updateCheckpointColors();
+      game.score += 500;
+      showPopup('🏆 COURSE CLEAR +500', '#66ff99');
+    }
+  }
+}
+
+// ===== 카메라 업데이트 =====
+function updateCamera(dt) {
+  if (!plane) return;
+
+  const camOffset = new THREE.Vector3();
+  const lookOffset = new THREE.Vector3();
+
+  if (cameraMode === 0) {
+    // 후방 추적 카메라
+    camOffset.set(0, 8, -28);
+    lookOffset.set(0, 2, 30);
+  } else {
+    // 1인칭 콕핏
+    camOffset.set(0, 2.2, 2);
+    lookOffset.set(0, 2.2, 30);
+  }
+
+  // 월드 좌표로 변환
+  const desiredPos = camOffset.clone().applyQuaternion(plane.quaternion).add(plane.position);
+  const desiredLook = lookOffset.clone().applyQuaternion(plane.quaternion).add(plane.position);
+
+  // 부드러운 보간
+  const lerpFactor = cameraMode === 0 ? Math.min(1, dt * 6) : Math.min(1, dt * 15);
+  cameraTarget.pos.lerp(desiredPos, lerpFactor);
+  cameraTarget.look.lerp(desiredLook, lerpFactor);
+
+  // 카메라 흔들림
+  if (cameraShake > 0) {
+    const shake = cameraShake;
+    cameraTarget.pos.x += (Math.random() - 0.5) * shake * 2;
+    cameraTarget.pos.y += (Math.random() - 0.5) * shake * 2;
+    cameraShake = Math.max(0, cameraShake - dt * 2);
+  }
+
+  camera.position.copy(cameraTarget.pos);
+  camera.lookAt(cameraTarget.look);
+
+  // 속도에 따른 FOV 변화
+  const speedNorm = THREE.MathUtils.clamp(physics.speed / 380, 0, 1);
+  const targetFov = 70 + speedNorm * 25 + (physics.isBoosting ? 5 : 0);
+  camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 4);
+  camera.updateProjectionMatrix();
+}
+
+// ===== HUD 업데이트 =====
+function updateHUD() {
+  const speedKmh = Math.floor(physics.speed * 3.6);
+  document.getElementById('speed').textContent = speedKmh;
+  document.getElementById('altitude').textContent = Math.max(0, Math.floor(plane.position.y));
+  document.getElementById('thrust').textContent =
+    physics.isBoosting ? 'BOOST!' : Math.floor(physics.thrust * 100) + '%';
+  document.getElementById('score').textContent = Math.floor(game.score);
+  document.getElementById('time').textContent = Math.max(0, game.timeLeft).toFixed(1);
+  document.getElementById('checkpoint').textContent = `${currentCheckpoint + 1} / ${checkpoints.length}`;
+  document.getElementById('combo').textContent = `x${game.combo}`;
+
+  // 저고도 경고
+  const warningEl = document.getElementById('warning');
+  if (plane.position.y < 80 && game.state === 'playing') {
+    warningEl.style.display = 'block';
+  } else {
+    warningEl.style.display = 'none';
+  }
+}
+
+let popupTimer = 0;
+function showPopup(text, color) {
+  const el = document.getElementById('popup');
+  el.textContent = text;
+  el.style.color = color || '#ffe066';
+  el.style.opacity = '1';
+  popupTimer = 1.2;
+}
+
+// ===== 메인 루프 =====
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta()); // 큰 dt 클램프
+
+  // 메뉴에서는 카메라가 천천히 회전
+  if (game.state === 'menu') {
+    const t = performance.now() * 0.0002;
+    camera.position.set(Math.cos(t) * 400, 250, Math.sin(t) * 400);
+    camera.lookAt(0, 200, 0);
+    // 구름 살짝 이동
+    clouds.forEach(c => { c.position.x += c.userData.drift * dt; });
+    renderer.render(scene, camera);
+    return;
+  }
+
+  if (game.state === 'playing') {
+    updatePlane(dt);
+    checkCheckpoints();
+
+    // 시간 차감
+    game.timeLeft -= dt;
+    if (game.timeLeft <= 0) {
+      game.timeLeft = 0;
+      endGame('time');
+    }
+
+    // 콤보 타이머
+    if (game.comboTimer > 0) {
+      game.comboTimer -= dt;
+      if (game.comboTimer <= 0) {
+        game.combo = 1;
+      }
+    }
+  }
+
+  updateCamera(dt);
+  updateParticles(dt);
+
+  // 구름 드리프트
+  clouds.forEach(c => {
+    c.position.x += c.userData.drift * dt;
+    if (c.position.x > WORLD_SIZE / 2) c.position.x = -WORLD_SIZE / 2;
+    if (c.position.x < -WORLD_SIZE / 2) c.position.x = WORLD_SIZE / 2;
+  });
+
+  // 체크포인트 링 천천히 회전 (시각적 어필)
+  checkpoints.forEach((cp, i) => {
+    if (i === currentCheckpoint) {
+      cp.userData.ring.rotation.z += dt * 1.5;
+    } else if (!cp.userData.passed) {
+      cp.userData.ring.rotation.z += dt * 0.4;
+    }
+  });
+
+  // 팝업 페이드
+  if (popupTimer > 0) {
+    popupTimer -= dt;
+    if (popupTimer <= 0) {
+      document.getElementById('popup').style.opacity = '0';
+    }
+  }
+
+  updateHUD();
+  renderer.render(scene, camera);
+}
+
+// 테스트용 읽기 전용 상태 조회 (게임 동작에는 영향 없음)
+window.__mg = { get s() {
+  const q = plane.quaternion;
+  return { state: game.state, score: game.score, time: game.timeLeft, passed: game.passed, startTime: game.startTime,
+    speed: physics.speed, thrust: physics.thrust, boosting: physics.isBoosting, boost: physics.boost,
+    pitchVel: physics.pitchVel, rollVel: physics.rollVel, yawVel: physics.yawVel, cameraMode,
+    pos: [plane.position.x, plane.position.y, plane.position.z], quat: [q.x, q.y, q.z, q.w],
+    touchMode, kit: !!(touchKit && touchKit.visible) };
+} };
+
+// 시작!
+init();
+} // end of startSkyAce()
+</script>
+</body>
+</html>

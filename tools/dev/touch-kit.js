@@ -43,7 +43,7 @@
 
   const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
   const CSS = `
-.tk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:600 11px/1 system-ui,-apple-system,'Segoe UI',sans-serif;
+.tk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:600 12px/1 system-ui,-apple-system,'Segoe UI',sans-serif;
   letter-spacing:.06em;color:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .tk-root.tk-off{display:none}
 .tk-zone{position:absolute;bottom:0;top:22%;pointer-events:auto;touch-action:none}
@@ -63,13 +63,13 @@
 .tk-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
   background:rgba(20,22,30,.42);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   box-shadow:0 2px 12px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
-.tk-btn.s{width:48px;height:48px;font-size:9px}.tk-btn.l{width:84px;height:84px}
+.tk-btn.s{width:54px;height:54px;font-size:12px}.tk-btn.l{width:84px;height:84px}
 .tk-btn i{font-style:normal;font-size:22px;line-height:1}.tk-btn.s i{font-size:17px}
 .tk-btn.on{background:rgba(255,255,255,.34);border-color:#fff;transform:scale(.94)}
 .tk-rot{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
   background:rgba(8,9,14,.94);color:#eee;font:500 16px/1.5 system-ui,sans-serif;text-align:center;pointer-events:auto;padding:24px}
 .tk-rot b{font-size:44px;display:block;animation:tkr 1.8s ease-in-out infinite}
-.tk-rot button{margin-top:6px;background:none;border:1px solid #666;color:#bbb;border-radius:20px;padding:8px 18px;font:inherit;font-size:13px}
+.tk-rot button{margin-top:6px;background:none;border:1px solid #666;color:#bbb;border-radius:22px;padding:10px 20px;min-height:44px;font:inherit;font-size:14px}
 @keyframes tkr{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
 @media (orientation:portrait){.tk-rot.need{display:flex}}
 `
@@ -88,6 +88,7 @@
     if (!document.getElementById('tk-style')) { const st = el('style'); st.id = 'tk-style'; st.textContent = CSS; document.head.appendChild(st) }
     const root = el('div', 'tk-root', document.body)
     const api = { root, sticks: {}, buttons: {}, visible: false }
+    const rests = []                                         // idle-position functions, re-run when shown
 
     // ---- sticks: floating — the base appears where the thumb lands inside its half of the screen
     for (const s of opt.sticks || []) {
@@ -141,7 +142,7 @@
       }
       zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end)
       st.reset = () => { if (st.pid !== null) end({ pointerId: st.pid }) }
-      requestAnimationFrame(rest); addEventListener('resize', rest)
+      rests.push(rest); requestAnimationFrame(rest); addEventListener('resize', rest)
     }
 
     // ---- buttons: grouped by place (default bottom-right cluster)
@@ -191,7 +192,7 @@
     }
 
     api.show = on => {
-      api.visible = on; root.classList.toggle('tk-off', !on); if (rot) rot.classList.toggle('need', on && !!opt.landscape && !rotDismissed)
+      api.visible = on; root.classList.toggle('tk-off', !on); if (on) requestAnimationFrame(() => rests.forEach(f => f())); if (rot) rot.classList.toggle('need', on && !!opt.landscape && !rotDismissed)
       if (!on) { for (const s of Object.values(api.sticks)) s.reset && s.reset(); for (const [code] of held) sendKey('keyup', code); held.clear()
         for (const b of Object.values(api.buttons)) { b.down = false; b.pid = null; b.el.classList.remove('on') } }
     }

@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>Casino Defense: Destiny Edition</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --accent: #f1c40f;
+            --danger: #e74c3c;
+            --success: #2ecc71;
+            --rare: #9b59b6;
+            --text: #ecf0f1;
+            --card-width: 50px;
+            --card-height: 70px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; user-select: none; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- LAYOUT --- */
+        #game-wrapper { display: flex; width: 100%; height: 100%; }
+
+        /* LEFT: TOWER DEFENSE */
+        #td-container {
+            flex: 1;
+            position: relative;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-right: 4px solid #000;
+        }
+
+        canvas {
+            background: #2d3436;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: crosshair;
+        }
+
+        /* HUD */
+        #td-ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-panel {
+            background: rgba(0,0,0,0.8);
+            padding: 8px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--accent);
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .global-btn {
+            pointer-events: auto;
+            background: #8e44ad;
+            border: none;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: 0.2s;
+        }
+        .global-btn:hover { background: #9b59b6; }
+
+        #wave-control {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+        }
+
+        .btn-start-wave {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background: linear-gradient(to bottom, #e67e22, #d35400);
+            color: white;
+            border: 3px solid white;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 900;
+            box-shadow: 0 0 20px rgba(230, 126, 34, 0.5);
+            animation: pulse 1.5s infinite;
+            text-transform: uppercase;
+        }
+        @media (hover: hover) {
+            .btn-start-wave:hover { transform: translateX(-50%) scale(1.1); }
+        }
+        .hidden { display: none !important; }
+
+        /* CONTEXT MENU */
+        #context-menu {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 100;
+            width: 180px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        .menu-header { font-size: 0.8rem; text-align: center; color: #aaa; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 5px; }
+        
+        .upgrade-option {
+            background: #333;
+            border: 1px solid #555;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+        .upgrade-option:hover { background: #444; border-color: white; }
+        .cost { color: var(--accent); font-weight: bold; font-size: 0.85rem; }
+        
+        .menu-divider { height: 1px; background: #555; margin: 5px 0; }
+        .sell-option { border-color: #e74c3c; color: #e74c3c; }
+        .sell-option:hover { background: #3d1a1a; border-color: #ff6b6b; }
+        .sell-val { color: #2ecc71; font-weight: bold; }
+
+        /* RIGHT: BLACKJACK SIDEBAR */
+        #bj-sidebar {
+            width: 340px;
+            background: radial-gradient(circle, #277714 0%, #1b520e 100%);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            border-left: 2px solid #fff;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            z-index: 30;
+            position: relative;
+        }
+
+        #bj-header { text-align: center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; }
+        .bj-table { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        .hand-area { min-height: 90px; display: flex; flex-direction: column; align-items: center; }
+        .cards-row { display: flex; justify-content: center; gap: 5px; margin-top: 5px; perspective: 800px; }
+        
+        .card {
+            width: var(--card-width);
+            height: var(--card-height);
+            background: white;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #333;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            animation: popIn 0.3s ease-out;
+            cursor: default;
+        }
+        .card.red { color: var(--danger); }
+        .card-back { background: repeating-linear-gradient(45deg, #606dbc, #606dbc 5px, #465298 5px, #465298 10px); }
+
+        .controls { margin-top: auto; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        .bet-row, .action-row { display: flex; gap: 10px; width: 100%; justify-content: center; }
+        input[type="number"] { width: 80px; padding: 8px; border-radius: 4px; border: none; text-align: center; font-weight: bold; }
+        button { padding: 10px 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; flex: 1; transition: 0.1s; }
+        button:active { transform: scale(0.95); }
+        button:disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(100%); }
+        
+        .btn-green { background: var(--success); color: white; }
+        .btn-red { background: var(--danger); color: white; }
+        .btn-gold { background: var(--accent); color: #222; }
+        #bj-message { min-height: 20px; text-align: center; font-weight: bold; color: var(--accent); margin-bottom: 10px; font-size: 0.9rem; }
+
+        /* POWER UP PANEL */
+        #powerup-panel {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 5px;
+            width: 100%;
+        }
+        .btn-powerup {
+            font-size: 0.75rem;
+            padding: 8px 4px;
+            background: #2c3e50;
+            color: #888;
+            border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1.2;
+            transition: all 0.3s;
+        }
+        /* Style for owning the item (Always visible) */
+        .btn-powerup.has-item {
+            color: var(--rare);
+            border: 1px solid var(--rare);
+            background: #34495e;
+            opacity: 1 !important; /* Force visible even if functionally disabled */
+            filter: grayscale(0%) !important;
+        }
+        .btn-powerup:hover.has-item { background: #4a69bd; }
+        .shield-active { box-shadow: 0 0 10px var(--rare) inset; border-color: white; }
+
+        /* --- DESTINY MODAL --- */
+        #destiny-modal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .destiny-title { color: var(--rare); font-size: 1.5rem; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px var(--rare); }
+        #destiny-cards { display: flex; gap: 20px; }
+        .destiny-choice { 
+            transform: scale(1.5); 
+            cursor: pointer; 
+            transition: 0.2s;
+            border: 2px solid transparent;
+        }
+        .destiny-choice:hover { transform: scale(1.7); border-color: var(--rare); box-shadow: 0 0 20px var(--rare); }
+
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+
+        /* --- PHONES & TOUCH (the desktop layout above is unchanged) --- */
+        body { height: 100vh; height: 100dvh; }
+        #td-container { min-width: 0; min-height: 0; }
+        canvas { touch-action: manipulation; -webkit-touch-callout: none; }
+        button, input, .upgrade-option, .destiny-choice { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .touch button { min-height: 44px; }
+        .touch .global-btn { padding: 8px 12px; }
+        .touch .upgrade-option { min-height: 44px; padding: 10px; }
+        .touch input[type="number"] { min-height: 44px; font-size: 16px; }
+
+        /* phone portrait: HUD / map / wave button / blackjack stacked */
+        .m-port #td-container, .m-land #td-container { display: contents; }
+        .m-port #game-wrapper, .m-land #game-wrapper {
+            display: grid;
+            position: relative;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+        .m-port #game-wrapper {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: auto auto auto minmax(0, 1fr);
+            grid-template-areas: "hud" "map" "wave" "bj";
+        }
+        /* phone landscape: map on the left, HUD / wave button / blackjack on the right */
+        .m-land #game-wrapper {
+            grid-template-columns: auto minmax(0, 1fr);
+            grid-template-rows: auto auto minmax(0, 1fr);
+            grid-template-areas: "map hud" "map wave" "map bj";
+        }
+        .m-port canvas, .m-land canvas { grid-area: map; justify-self: center; align-self: center; }
+        .m-port #td-ui, .m-land #td-ui {
+            grid-area: hud; position: static; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 6px 8px;
+        }
+        .m-port .hud-panel, .m-land .hud-panel { margin: 0; padding: 4px 8px; font-size: 0.85rem; gap: 6px; }
+        .m-port #wave-control, .m-land #wave-control {
+            grid-area: wave; position: static; transform: none; display: flex; justify-content: center; align-items: center; height: 52px;
+        }
+        .m-port .btn-start-wave, .m-land .btn-start-wave { padding: 8px 26px; font-size: 1.05rem; border-width: 2px; }
+        .m-port #bj-sidebar, .m-land #bj-sidebar { grid-area: bj; width: auto; min-height: 0; overflow: hidden; padding: 10px 12px; }
+        .m-port #bj-sidebar { border-left: none; border-top: 2px solid #fff; }
+        .m-port #bj-header, .m-land #bj-header { margin-bottom: 6px; padding-bottom: 6px; }
+        .m-port #bj-header h3, .m-land #bj-header h3 { font-size: 0.95rem; }
+        .m-port #bj-message, .m-land #bj-message { margin-bottom: 6px; }
+        /* the hands scroll if space runs out, so HIT / STAND / power-ups always stay on screen */
+        .m-port .bj-table, .m-land .bj-table { flex-direction: row; gap: 8px; min-height: 0; overflow-y: auto; }
+        .m-port .hand-area, .m-land .hand-area { flex: 1; min-width: 0; min-height: 0; }
+        .m-port .cards-row, .m-land .cards-row { flex-wrap: wrap; }
+        .m-port { --card-width: 40px; --card-height: 56px; }
+        .m-port .card { font-size: 1rem; }
+        .m-port #powerup-panel, .m-land #powerup-panel { margin-top: 8px; padding-top: 8px; }
+        .m-land { --card-width: 34px; --card-height: 48px; }
+        .m-land .card { font-size: 0.85rem; }
+        .m-land #td-ui { gap: 4px; padding: 5px 8px 2px; }
+        .m-land .hud-panel { font-size: 0.8rem; padding: 3px 7px; }
+        .m-land #wave-control { height: 48px; }
+        .m-land #bj-sidebar { padding: 6px 10px; }
+        .m-land #bj-header { margin-bottom: 3px; padding-bottom: 3px; }
+        .m-land #bj-header h3 { font-size: 0.85rem; }
+        .m-land #bj-message { margin-bottom: 3px; font-size: 0.85rem; }
+        .m-land .controls { gap: 6px; }
+        .m-land #powerup-panel { margin-top: 4px; padding-top: 4px; }
+
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div id="td-container">
+        <canvas id="td-canvas" width="800" height="600"></canvas>
+        
+        <div id="td-ui">
+            <div class="hud-panel">❤️ Lives: <span id="lives-display">20</span></div>
+            <div class="hud-panel">🌊 Wave: <span id="wave-display">1</span></div>
+            <div class="hud-panel">💰 Gold: $<span id="gold-display">200</span></div>
+            <div class="hud-panel">
+                ⚡ <span id="global-level">Lvl 1</span>
+                <button class="global-btn" id="btn-global-upgrade" onclick="upgradeGlobal()">All +10% ($300)</button>
+            </div>
+        </div>
+
+        <div id="wave-control">
+            <button id="btn-start-wave" class="btn-start-wave" onclick="startWave()">START WAVE 1</button>
+        </div>
+
+        <div id="context-menu">
+            <div class="menu-header">UPGRADE TOWER</div>
+            <div class="upgrade-option" onclick="selectUpgrade('frost')">
+                <span>❄️ Frost</span> <span class="cost">$150</span>
+            </div>
+            <div class="upgrade-option" onclick="selectUpgrade('bomber')">
+                <span>💣 Bomb</span> <span class="cost">$200</span>
+            </div>
+            <div class="upgrade-option" onclick="selectUpgrade('sniper')">
+                <span>⚡ Snipe</span> <span class="cost">$250</span>
+            </div>
+            <div class="menu-divider"></div>
+            <div class="upgrade-option sell-option" onclick="sellTower()">
+                <span>💸 Sell</span> <span id="sell-price" class="sell-val">+$50</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="bj-sidebar">
+        <div id="destiny-modal" class="hidden">
+            <div class="destiny-title">Choose Your Destiny</div>
+            <div id="destiny-cards">
+                </div>
+            <div style="color: #ccc; font-size: 0.8rem;">Click a card to add it to your hand</div>
+        </div>
+
+        <div id="bj-header">
+            <h3>CASINO DEFENSE</h3>
+        </div>
+        <div id="bj-message">Place bet to deal</div>
+        
+        <div class="bj-table">
+            <div class="hand-area">
+                <small>Dealer</small>
+                <div class="cards-row" id="dealer-cards"></div>
+                <div id="dealer-score">0</div>
+            </div>
+            <div class="hand-area">
+                <small>Player</small>
+                <div class="cards-row" id="player-cards"></div>
+                <div id="player-score">0</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="bet-row" id="bet-panel">
+                <input type="number" id="bet-input" value="50" step="10" min="10" inputmode="numeric">
+                <button class="btn-gold" id="btn-deal">DEAL</button>
+            </div>
+            <div class="action-row" id="action-panel" style="display:none;">
+                <button class="btn-green" id="btn-hit">HIT</button>
+                <button class="btn-red" id="btn-stand">STAND</button>
+            </div>
+            
+            <div id="powerup-panel">
+                <button id="btn-oracle" class="btn-powerup" disabled>
+                    👁️ Oracle<br>(x0)
+                </button>
+                <button id="btn-destiny" class="btn-powerup" disabled>
+                    🔮 Destiny<br>(x0)
+                </button>
+                <button id="btn-shield" class="btn-powerup" disabled>
+                    🛡️ Shield<br>(x0)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* ============================
+       GLOBAL STATE & UI
+       ============================ */
+    const gameState = {
+        gold: 200, lives: 20, wave: 1, waveActive: false,
+        enemiesRemaining: 0, globalMultipliers: { damage: 1.0, range: 1.0 }, globalLevel: 1,
+        // Renamed 'saboteur' to 'destiny'
+        inventory: { oracle: 0, destiny: 0, shield: 0 },
+        activeShield: false
+    };
+
+    const uiGold = document.getElementById('gold-display');
+    const uiLives = document.getElementById('lives-display');
+    const uiWave = document.getElementById('wave-display');
+    const btnStartWave = document.getElementById('btn-start-wave');
+    const contextMenu = document.getElementById('context-menu');
+    const btnGlobal = document.getElementById('btn-global-upgrade');
+    const uiGlobalLvl = document.getElementById('global-level');
+    const sellPriceEl = document.getElementById('sell-price');
+    
+    // Powerup UIs
+    const btnOracle = document.getElementById('btn-oracle');
+    const btnDestiny = document.getElementById('btn-destiny'); // Renamed
+    const btnShield = document.getElementById('btn-shield');
+    const destinyModal = document.getElementById('destiny-modal');
+    const destinyCardsContainer = document.getElementById('destiny-cards');
+
+    function updateGlobalUI() {
+        uiGold.innerText = Math.floor(gameState.gold);
+        uiLives.innerText = gameState.lives;
+        uiWave.innerText = gameState.wave;
+        
+        // Update Inventory Text
+        btnOracle.innerHTML = `👁️ Oracle<br>(x${gameState.inventory.oracle})`;
+        btnDestiny.innerHTML = `🔮 Destiny<br>(x${gameState.inventory.destiny})`;
+        btnShield.innerHTML = `🛡️ Shield<br>(x${gameState.inventory.shield})`;
+
+        // --- NEW UI LOGIC: Highlight if owned, regardless of game state ---
+        updateInventoryVisuals(btnOracle, gameState.inventory.oracle);
+        updateInventoryVisuals(btnDestiny, gameState.inventory.destiny);
+        updateInventoryVisuals(btnShield, gameState.inventory.shield);
+    }
+
+    function updateInventoryVisuals(btn, count) {
+        if (count > 0) {
+            btn.classList.add('has-item');
+            // We do NOT set disabled = false here. 
+            // Disabled is controlled by the Blackjack state (bjActive).
+            // CSS handles the visual override.
+        } else {
+            btn.classList.remove('has-item');
+        }
+    }
+
+    /* ============================
+       TOWER DEFENSE LOGIC
+       ============================ */
+    const canvas = document.getElementById('td-canvas');
+    const ctx = canvas.getContext('2d');
+
+    /* ============================
+       MOBILE LAYOUT & TOUCH
+       The map keeps its 800x600 world; on small screens the canvas is scaled to fit
+       (never above 1:1, so the desktop view is unchanged) and input is mapped back.
+       ============================ */
+    const TD_W = 800, TD_H = 600;
+    let tdScale = 1;                       // CSS px per map unit
+    let tdTextFont = 'bold 14px Arial';    // floating text, kept >= 12 CSS px on phones
+    if (matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0) document.body.classList.add('touch');
+
+    function layoutGame() {
+        const w = window.innerWidth, h = window.innerHeight;
+        const mode = (h > w && w < 1000) ? 'm-port' : (w > h && h <= 520) ? 'm-land' : '';
+        document.body.classList.toggle('m-port', mode === 'm-port');
+        document.body.classList.toggle('m-land', mode === 'm-land');
+        let aw, ah;
+        if (mode) {
+            const cs = getComputedStyle(document.getElementById('game-wrapper'));
+            const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+            const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+            if (mode === 'm-port') { aw = w - padX; ah = (h - padY) * 0.5; }
+            else { aw = w - padX - 270; ah = h - padY; }   // 270px: blackjack column
+        } else {
+            canvas.style.width = canvas.style.height = '1px'; // measure the free container, not the old canvas size
+            const c = document.getElementById('td-container');
+            aw = c.clientWidth; ah = c.clientHeight;
+        }
+        tdScale = Math.max(0.2, Math.min(1, aw / TD_W, ah / TD_H));
+        canvas.style.width = Math.round(TD_W * tdScale) + 'px';
+        canvas.style.height = Math.round(TD_H * tdScale) + 'px';
+        const k = Math.max(1, Math.min(2, (window.devicePixelRatio || 1) * tdScale)); // backing store, capped at 2x
+        canvas.width = Math.round(TD_W * k); canvas.height = Math.round(TD_H * k);
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        tdTextFont = `bold ${Math.round(Math.max(14, 12 / tdScale))}px Arial`;
+    }
+    layoutGame();
+    window.addEventListener('resize', layoutGame);
+    window.addEventListener('orientationchange', () => setTimeout(layoutGame, 250));
+    // phones: no long-press menu on the map
+    canvas.addEventListener('contextmenu', e => { if (document.body.classList.contains('touch')) e.preventDefault(); });
+
+    const CONFIG = {
+        towerCost: 50, pathWidth: 40,
+        costs: { frost: 150, bomber: 200, sniper: 250 },
+        path: [{x: 0, y: 100}, {x: 200, y: 100}, {x: 200, y: 450}, {x: 600, y: 450}, {x: 600, y: 150}, {x: 800, y: 150}]
+    };
+
+    let towers = [], enemies = [], bullets = [], particles = [];
+    let spawnTimer = 0, enemiesToSpawn = 0, selectedTower = null;
+
+    function distToSegment(px, py, x1, y1, x2, y2) {
+        let l2 = (x2 - x1)**2 + (y2 - y1)**2;
+        if (l2 === 0) return Math.hypot(px - x1, py - y1);
+        let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+    }
+
+    function isPointOnPath(x, y, buffer) {
+        for (let i = 0; i < CONFIG.path.length - 1; i++) {
+            const p1 = CONFIG.path[i]; const p2 = CONFIG.path[i+1];
+            if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) < (20 + buffer)) return true;
+        }
+        return false;
+    }
+
+    class Enemy {
+        constructor(wave) {
+            this.pathIndex = 0; this.x = CONFIG.path[0].x; this.y = CONFIG.path[0].y;
+            this.baseSpeed = 1.5 + (wave * 0.1); this.speed = this.baseSpeed;
+            this.hp = 20 + (Math.pow(wave, 2) * 2); this.maxHp = this.hp;
+            this.radius = 12; this.markedForDeletion = false; this.slowTimer = 0;
+        }
+        update() {
+            this.speed = this.slowTimer > 0 ? this.baseSpeed * 0.5 : this.baseSpeed;
+            if (this.slowTimer > 0) this.slowTimer--;
+            const target = CONFIG.path[this.pathIndex + 1];
+            if (!target) { this.markedForDeletion = true; gameState.lives--; updateGlobalUI(); checkWaveEnd(); return; }
+            const dx = target.x - this.x, dy = target.y - this.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < this.speed) { this.x = target.x; this.y = target.y; this.pathIndex++; }
+            else { this.x += (dx / dist) * this.speed; this.y += (dy / dist) * this.speed; }
+        }
+        draw() {
+            ctx.fillStyle = this.slowTimer > 0 ? '#00d2d3' : '#e74c3c';
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+            const pct = Math.max(0, this.hp / this.maxHp);
+            ctx.fillStyle = 'red'; ctx.fillRect(this.x - 10, this.y - 20, 20, 4);
+            ctx.fillStyle = '#2ecc71'; ctx.fillRect(this.x - 10, this.y - 20, 20 * pct, 4);
+        }
+    }
+
+    class Tower {
+        constructor(x, y) {
+            this.x = x; this.y = y; this.type = 'basic';
+            this.range = 100; this.damage = 10; this.cooldown = 40; this.timer = 0;
+            this.totalSpent = CONFIG.towerCost; 
+        }
+        applyType(type) {
+            this.type = type;
+            this.totalSpent += CONFIG.costs[type];
+            if (type === 'frost') { this.damage = 5; this.range = 120; this.cooldown = 45; }
+            else if (type === 'bomber') { this.damage = 30; this.range = 110; this.cooldown = 90; }
+            else if (type === 'sniper') { this.damage = 50; this.range = 250; this.cooldown = 60; }
+        }
+        update() {
+            this.timer++;
+            const effRange = this.range * gameState.globalMultipliers.range;
+            if (this.timer >= this.cooldown) {
+                const target = enemies.find(e => Math.hypot(e.x - this.x, e.y - this.y) <= effRange);
+                if (target) {
+                    const dmg = this.damage * gameState.globalMultipliers.damage;
+                    bullets.push(new Bullet(this.x, this.y, target, dmg, this.type));
+                    this.timer = 0;
+                }
+            }
+        }
+        draw() {
+            if (selectedTower === this) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.range * gameState.globalMultipliers.range, 0, Math.PI*2); ctx.stroke();
+            }
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '28px Segoe UI Emoji';
+            let icon = '🏹';
+            if (this.type === 'frost') icon = '❄️';
+            if (this.type === 'bomber') icon = '💣';
+            if (this.type === 'sniper') icon = '⚡';
+            ctx.fillText(icon, this.x, this.y);
+        }
+    }
+
+    class Bullet {
+        constructor(x, y, target, damage, type) {
+            this.x = x; this.y = y; this.target = target; this.damage = damage; this.type = type; this.active = true;
+            this.speed = type === 'sniper' ? 15 : (type === 'bomber' ? 4 : 8);
+        }
+        update() {
+            if (!this.target || this.target.markedForDeletion) { this.active = false; return; }
+            const dx = this.target.x - this.x, dy = this.target.y - this.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < this.speed) this.hitTarget();
+            else { this.x += (dx/dist) * this.speed; this.y += (dy/dist) * this.speed; }
+        }
+        hitTarget() {
+            this.active = false;
+            if (this.type === 'bomber') {
+                createExplosion(this.x, this.y);
+                enemies.forEach(e => { if (Math.hypot(e.x - this.x, e.y - this.y) < 60) { e.hp -= this.damage; checkKill(e); } });
+            } else {
+                this.target.hp -= this.damage;
+                if (this.type === 'frost') this.target.slowTimer = 90;
+                checkKill(this.target);
+            }
+        }
+        draw() {
+            ctx.fillStyle = '#f1c40f';
+            if (this.type === 'frost') ctx.fillStyle = '#00d2d3';
+            if (this.type === 'bomber') ctx.fillStyle = '#e74c3c';
+            if (this.type === 'sniper') ctx.fillStyle = '#a29bfe';
+            let r = this.type === 'bomber' ? 6 : 3;
+            ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI*2); ctx.fill();
+        }
+    }
+
+    function checkKill(enemy) {
+        if (enemy.hp <= 0 && !enemy.markedForDeletion) {
+            enemy.markedForDeletion = true;
+            gameState.gold += 5;
+            spawnFloatingText(enemy.x, enemy.y, "+$5", "#2ecc71");
+            
+            // Drop Rate
+            if (Math.random() < 0.05) { // Increased to 5% for testing fun
+                const types = ['oracle', 'destiny', 'shield'];
+                const dropped = types[Math.floor(Math.random() * types.length)];
+                gameState.inventory[dropped]++;
+                let icon = '🛡️';
+                if (dropped === 'oracle') icon = '👁️';
+                if (dropped === 'destiny') icon = '🔮';
+                spawnFloatingText(enemy.x, enemy.y - 20, `${icon} DROP!`, "#9b59b6");
+            }
+
+            updateGlobalUI();
+            checkWaveEnd();
+        }
+    }
+
+    function createExplosion(x, y) { particles.push({x, y, life: 15, type: 'explosion'}); }
+    function spawnFloatingText(x, y, text, color) { particles.push({x, y, text, color, life: 40, type: 'text'}); }
+
+    function startWave() {
+        if (gameState.waveActive) return;
+        gameState.waveActive = true;
+        enemiesToSpawn = 5 + (gameState.wave * 3);
+        gameState.enemiesRemaining = enemiesToSpawn;
+        btnStartWave.classList.add('hidden');
+    }
+
+    function checkWaveEnd() {
+        setTimeout(() => {
+            const alive = enemies.filter(e => !e.markedForDeletion).length;
+            if (alive === 0 && enemiesToSpawn === 0 && gameState.waveActive) {
+                gameState.waveActive = false;
+                gameState.wave++;
+                btnStartWave.innerText = "START WAVE " + gameState.wave;
+                btnStartWave.classList.remove('hidden');
+                updateGlobalUI();
+            }
+        }, 100);
+    }
+
+    function upgradeGlobal() {
+        const cost = 300 * gameState.globalLevel;
+        if (gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.globalLevel++;
+            gameState.globalMultipliers.damage += 0.1;
+            gameState.globalMultipliers.range += 0.05;
+            uiGlobalLvl.innerText = "Lvl " + gameState.globalLevel;
+            btnGlobal.innerText = `All +10% ($${300 * gameState.globalLevel})`;
+            updateGlobalUI();
+            spawnFloatingText(400, 300, "GLOBAL UPGRADE!", "#8e44ad");
+        }
+    }
+
+    function closeMenu() { contextMenu.style.display = 'none'; selectedTower = null; }
+    
+    window.selectUpgrade = function(type) {
+        if (!selectedTower) return;
+        const cost = CONFIG.costs[type];
+        if (gameState.gold >= cost) {
+            const tower = selectedTower; // closeMenu() clears selectedTower
+            gameState.gold -= cost; tower.applyType(type);
+            updateGlobalUI(); closeMenu();
+            spawnFloatingText(tower.x, tower.y, type.toUpperCase(), "#fff");
+        }
+    };
+
+    window.sellTower = function() {
+        if (!selectedTower) return;
+        let refund = selectedTower.type === 'basic' ? selectedTower.totalSpent : Math.floor(selectedTower.totalSpent * 0.75);
+        gameState.gold += refund;
+        updateGlobalUI();
+        spawnFloatingText(selectedTower.x, selectedTower.y, `+$${refund}`, "#2ecc71");
+        const index = towers.indexOf(selectedTower);
+        if (index > -1) towers.splice(index, 1);
+        closeMenu();
+    };
+
+    window.upgradeGlobal = upgradeGlobal; window.startWave = startWave;
+
+    canvas.addEventListener('mousedown', e => {
+        const rect = canvas.getBoundingClientRect();
+        // screen → map units (the canvas may be scaled down on small screens)
+        const mouseX = (e.clientX - rect.left) * TD_W / rect.width; const mouseY = (e.clientY - rect.top) * TD_H / rect.height;
+        // tap radius grows on a scaled-down map (finger-sized), but stays below the 35px tower spacing
+        const hitR = Math.max(25, Math.min(34, 22 / tdScale));
+        let clickedTower = null, bestD = hitR;
+        towers.forEach(t => { const d = Math.hypot(t.x - mouseX, t.y - mouseY); if (d < bestD) { bestD = d; clickedTower = t; } });
+
+        if (clickedTower) {
+            selectedTower = clickedTower;
+            let potentialRefund = selectedTower.type === 'basic' ? selectedTower.totalSpent : Math.floor(selectedTower.totalSpent * 0.75);
+            sellPriceEl.innerText = `+$${potentialRefund}`;
+            contextMenu.style.display = 'flex';
+            // place next to the pointer, kept inside the play area
+            const host = (contextMenu.offsetParent || document.body).getBoundingClientRect();
+            const mx = Math.min(e.clientX - host.left + 10, host.width - contextMenu.offsetWidth - 4);
+            const my = Math.min(e.clientY - host.top + 10, host.height - contextMenu.offsetHeight - 4);
+            contextMenu.style.left = Math.max(4, mx) + 'px'; contextMenu.style.top = Math.max(4, my) + 'px';
+            return;
+        }
+        closeMenu();
+        if (isPointOnPath(mouseX, mouseY, 15)) { spawnFloatingText(mouseX, mouseY, "BLOCKED", "#e74c3c"); return; }
+        if (gameState.gold >= CONFIG.towerCost) {
+            const tooClose = towers.some(t => Math.hypot(t.x - mouseX, t.y - mouseY) < 35);
+            if (!tooClose) {
+                gameState.gold -= CONFIG.towerCost;
+                towers.push(new Tower(mouseX, mouseY));
+                updateGlobalUI();
+            }
+        } else { spawnFloatingText(mouseX, mouseY, "No Gold!", "#f1c40f"); }
+    });
+
+    function gameLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#555'; ctx.lineWidth = CONFIG.pathWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(CONFIG.path[0].x, CONFIG.path[0].y);
+        for(let i=1; i<CONFIG.path.length; i++) ctx.lineTo(CONFIG.path[i].x, CONFIG.path[i].y);
+        ctx.stroke();
+        ctx.strokeStyle = '#777'; ctx.lineWidth = 2; ctx.setLineDash([10, 10]); ctx.stroke(); ctx.setLineDash([]);
+
+        if (gameState.waveActive && enemiesToSpawn > 0) {
+            spawnTimer++;
+            if (spawnTimer > 60) { enemies.push(new Enemy(gameState.wave)); enemiesToSpawn--; spawnTimer = 0; }
+        }
+
+        towers.forEach(t => { t.update(); t.draw(); });
+        bullets.forEach((b, i) => { b.update(); b.draw(); if(!b.active) bullets.splice(i, 1); });
+        enemies.forEach((e, i) => { e.update(); e.draw(); if(e.markedForDeletion) enemies.splice(i, 1); });
+        
+        particles.forEach((p, i) => {
+            if (p.type === 'text') {
+                ctx.fillStyle = p.color; ctx.font = tdTextFont; ctx.fillText(p.text, p.x, p.y); p.y -= 1;
+            } else if (p.type === 'explosion') {
+                ctx.fillStyle = `rgba(231, 76, 60, ${p.life/15})`; ctx.beginPath(); ctx.arc(p.x, p.y, 40 - p.life, 0, Math.PI*2); ctx.fill();
+            }
+            p.life--; if(p.life <= 0) particles.splice(i, 1);
+        });
+    }
+
+    // 60 game steps per second on every display (a 120 Hz phone would otherwise run the game at double speed)
+    const STEP_MS = 1000 / 60;
+    let stepLast = 0, stepAcc = 0;
+    function frame(now) {
+        stepAcc = Math.min(stepAcc + (stepLast ? now - stepLast : STEP_MS), STEP_MS * 4);
+        stepLast = now;
+        let steps = Math.round(stepAcc / STEP_MS);
+        stepAcc -= steps * STEP_MS;
+        while (steps-- > 0) gameLoop();
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    /* ============================
+       BLACKJACK LOGIC
+       ============================ */
+    const suits = ['♠', '♥', '♦', '♣'];
+    const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+    let deck = [], playerHand = [], dealerHand = [], currentBet = 0, bjActive = false;
+    
+    const els = {
+        dCards: document.getElementById('dealer-cards'), pCards: document.getElementById('player-cards'),
+        dScore: document.getElementById('dealer-score'), pScore: document.getElementById('player-score'),
+        msg: document.getElementById('bj-message'), betInput: document.getElementById('bet-input'),
+        btnDeal: document.getElementById('btn-deal'), btnHit: document.getElementById('btn-hit'),
+        btnStand: document.getElementById('btn-stand'), betPanel: document.getElementById('bet-panel'),
+        actionPanel: document.getElementById('action-panel')
+    };
+
+    function togglePowerupButtons(enable) {
+        // We only change the 'disabled' attribute to prevent CLICKING.
+        // Visuals are handled by updateGlobalUI via classes.
+        btnOracle.disabled = !(enable && gameState.inventory.oracle > 0);
+        btnDestiny.disabled = !(enable && gameState.inventory.destiny > 0);
+        btnShield.disabled = !(enable && gameState.inventory.shield > 0);
+        if (gameState.activeShield) btnShield.disabled = true;
+    }
+
+    function createDeck() {
+        let d = [];
+        suits.forEach(s => values.forEach(v => {
+            let w = parseInt(v); if (['J','Q','K'].includes(v)) w = 10; if (v === 'A') w = 11;
+            d.push({val: v, suit: s, weight: w});
+        }));
+        return d.sort(() => Math.random() - 0.5);
+    }
+
+    function getScore(hand) {
+        let s = 0, a = 0;
+        hand.forEach(c => { s += c.weight; if(c.val === 'A') a++; });
+        while(s > 21 && a > 0) { s -= 10; a--; }
+        return s;
+    }
+
+    function renderBJ(reveal = false) {
+        els.dCards.innerHTML = ''; els.pCards.innerHTML = '';
+        dealerHand.forEach((c, i) => {
+            const div = document.createElement('div');
+            if (i === 1 && !reveal) div.className = 'card card-back';
+            else { div.className = `card ${['♥','♦'].includes(c.suit)?'red':''}`; div.innerText = c.val + c.suit; }
+            els.dCards.appendChild(div);
+        });
+        playerHand.forEach(c => {
+            const div = document.createElement('div');
+            div.className = `card ${['♥','♦'].includes(c.suit)?'red':''}`;
+            div.innerText = c.val + c.suit;
+            els.pCards.appendChild(div);
+        });
+        els.pScore.innerText = getScore(playerHand);
+        els.dScore.innerText = reveal ? getScore(dealerHand) : "?";
+    }
+
+    els.btnDeal.addEventListener('click', () => {
+        const bet = parseInt(els.betInput.value);
+        if (bet > gameState.gold) { els.msg.innerText = "Insufficient Funds!"; return; }
+        
+        gameState.gold -= bet; currentBet = bet; 
+        deck = createDeck(); playerHand = [deck.pop(), deck.pop()]; dealerHand = [deck.pop(), deck.pop()];
+        bjActive = true; gameState.activeShield = false; btnShield.classList.remove('shield-active');
+        
+        updateGlobalUI();
+        els.betPanel.style.display = 'none'; els.actionPanel.style.display = 'flex';
+        els.msg.innerText = "Hit or Stand?"; 
+        renderBJ(false);
+        togglePowerupButtons(true);
+
+        if (getScore(playerHand) === 21) endRound();
+    });
+
+    els.btnHit.addEventListener('click', () => {
+        playerHand.push(deck.pop()); renderBJ(false);
+        if (getScore(playerHand) > 21) endRound();
+    });
+
+    els.btnStand.addEventListener('click', () => {
+        let ds = getScore(dealerHand);
+        while(ds < 17) { dealerHand.push(deck.pop()); ds = getScore(dealerHand); }
+        endRound(true);
+    });
+
+    btnOracle.addEventListener('click', () => {
+        if (gameState.inventory.oracle > 0 && bjActive) {
+            gameState.inventory.oracle--;
+            const nextCard = deck[deck.length - 1];
+            const color = ['♥','♦'].includes(nextCard.suit) ? 'red' : 'black';
+            els.msg.innerHTML = `Oracle sees: <span style="color:${color}">${nextCard.val}${nextCard.suit}</span>`;
+            updateGlobalUI();
+            togglePowerupButtons(true);
+        }
+    });
+
+    // --- NEW DESTINY DRAW LOGIC ---
+    btnDestiny.addEventListener('click', () => {
+        if (gameState.inventory.destiny > 0 && bjActive) {
+            gameState.inventory.destiny--;
+            triggerDestinyDraw();
+            updateGlobalUI();
+            togglePowerupButtons(true);
+        }
+    });
+
+    function triggerDestinyDraw() {
+        destinyCardsContainer.innerHTML = '';
+        destinyModal.classList.remove('hidden');
+        
+        // Generate 3 random cards for selection
+        for (let i = 0; i < 3; i++) {
+            // Pull from a separate fresh deck instance or random generation so we don't mess up main deck probabilities too much
+            const randomVal = values[Math.floor(Math.random() * values.length)];
+            const randomSuit = suits[Math.floor(Math.random() * suits.length)];
+            let w = parseInt(randomVal);
+            if (['J','Q','K'].includes(randomVal)) w = 10;
+            if (randomVal === 'A') w = 11;
+            
+            const cardObj = { val: randomVal, suit: randomSuit, weight: w };
+            
+            const cardEl = document.createElement('div');
+            cardEl.className = `card destiny-choice ${['♥','♦'].includes(randomSuit)?'red':''}`;
+            cardEl.innerText = randomVal + randomSuit;
+            
+            cardEl.onclick = () => selectDestinyCard(cardObj);
+            destinyCardsContainer.appendChild(cardEl);
+        }
+    }
+
+    function selectDestinyCard(card) {
+        destinyModal.classList.add('hidden');
+        playerHand.push(card);
+        renderBJ(false);
+        els.msg.innerText = "Destiny Chosen!";
+        // Check bust/21 immediately
+        if (getScore(playerHand) > 21) endRound();
+    }
+
+    btnShield.addEventListener('click', () => {
+        if (gameState.inventory.shield > 0 && bjActive && !gameState.activeShield) {
+            gameState.inventory.shield--;
+            gameState.activeShield = true;
+            btnShield.classList.add('shield-active');
+            els.msg.innerText = "Shield Active: Loss becomes Push";
+            updateGlobalUI(); togglePowerupButtons(true);
+        }
+    });
+
+    function endRound(stand = false) {
+        renderBJ(true);
+        const ps = getScore(playerHand), ds = getScore(dealerHand);
+        let win = 0, msg = "";
+        
+        if (ps > 21) msg = "Bust! You lose.";
+        else if (stand && ds > 21) { msg = "Dealer Bust! You Win!"; win = 2; }
+        else if (ps === 21 && playerHand.length === 2) { msg = "Blackjack! 3:2 Payout!"; win = 2.5; }
+        else if (stand && ps > ds) { msg = "You Win!"; win = 2; }
+        else if (stand && ps < ds) msg = "Dealer Wins.";
+        else { msg = "Push."; win = 1; }
+
+        if (win === 0 && gameState.activeShield) { win = 1; msg += " (SHIELD SAVED!)"; }
+
+        if (win > 0) {
+            const profit = Math.floor(currentBet * win);
+            gameState.gold += profit; updateGlobalUI();
+            spawnFloatingText(400, 300, `WON $${profit}!`, "#f1c40f");
+        }
+
+        bjActive = false; togglePowerupButtons(false);
+        gameState.activeShield = false; btnShield.classList.remove('shield-active');
+        
+        els.msg.innerText = msg; els.actionPanel.style.display = 'none';
+        setTimeout(() => els.betPanel.style.display = 'flex', 2000);
+    }
+
+</script>
+</body>
+</html>

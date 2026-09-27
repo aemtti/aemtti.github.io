@@ -639,6 +639,186 @@
    "desktop": "클릭해 마우스 고정 · WASD · 마우스 시점 · 좌클릭 발사 · 1-3 무기",
    "url": "play/crimson-depths/",
    "thumb": "thumbs/crimson-depths.jpg"
+  },
+  {
+   "slug": "mini-games",
+   "title": "미니 게임 13종",
+   "en": "Mini Games",
+   "kind": "collection",
+   "desc": "한 파일짜리 게임 모음 — 좀비 기지 방어, FPS, 복셀, 타워 디펜스, 벽돌깨기, 배구, 카드 게임까지",
+   "url": "play/mini-games/",
+   "thumb": "thumbs/mini-games.jpg",
+   "items": [
+    {
+     "slug": "mini-games/night-siege",
+     "title": "나이트 시즈",
+     "en": "NIGHT SIEGE",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "낮엔 파밍, 해질녘엔 건설, 밤엔 좀비 웨이브를 막는 기지 생존 슈터",
+     "mobile": "왼쪽 드래그 이동 · 오른쪽 드래그 조준·사격 · 버튼으로 채집·건설",
+     "desktop": "WASD 이동 · 마우스 조준·사격 · B 건설 · C 제작",
+     "url": "play/mini-games/night-siege/",
+     "thumb": "thumbs/mini-games--night-siege.jpg"
+    },
+    {
+     "slug": "mini-games/void-breach-fps",
+     "title": "보이드 브리치",
+     "en": "VOID BREACH",
+     "kind": "game",
+     "orientation": "landscape",
+     "desc": "차원의 균열에서 쏟아지는 기하학 이형체를 막아내는 웨이브 FPS",
+     "mobile": "왼쪽 스틱 이동 · 오른쪽 드래그 시점 · FIRE·JUMP 버튼",
+     "desktop": "WASD · 마우스 시점 · 좌클릭 사격 · 1 2 3 무기",
+     "url": "play/mini-games/void-breach-fps/",
+     "thumb": "thumbs/mini-games--void-breach-fps.jpg"
+    },
+    {
+     "slug": "mini-games/voxel-sandbox",
+     "title": "복셀 샌드박스",
+     "en": "Voxel Sandbox",
+     "kind": "game",
+     "orientation": "landscape",
+     "desc": "끝없는 블록 세계에서 캐고, 짓고, 제작하는 샌드박스",
+     "mobile": "왼쪽 스틱 이동 · 드래그 시점 · BREAK·PLACE·JUMP 버튼",
+     "desktop": "WASD · 마우스 시점 · 좌클릭 캐기 · 우클릭 놓기",
+     "url": "play/mini-games/voxel-sandbox/",
+     "thumb": "thumbs/mini-games--voxel-sandbox.jpg"
+    },
+    {
+     "slug": "mini-games/raycombat",
+     "title": "레이컴뱃",
+     "en": "RAYCOMBAT",
+     "kind": "game",
+     "orientation": "landscape",
+     "desc": "끝없이 몰려오는 드론 웨이브를 막아내는 레이캐스팅 미니 FPS",
+     "mobile": "왼쪽 스틱 이동 · 오른쪽 드래그 시야 · FIRE·RELOAD 버튼",
+     "desktop": "WASD · 마우스 시야 · 좌클릭 발사 · R 재장전",
+     "url": "play/mini-games/raycombat/",
+     "thumb": "thumbs/mini-games--raycombat.jpg"
+    },
+    {
+     "slug": "mini-games/asteroid-bounty-hunter",
+     "title": "소행성 현상금 사냥꾼",
+     "en": "Asteroid Bounty Hunter",
+     "kind": "game",
+     "orientation": "landscape",
+     "desc": "해적을 격추해 부품을 모으고 비컨에 인계해 함선을 강화하는 우주 슈팅",
+     "mobile": "왼쪽 스틱 추진 · 오른쪽 스틱 조준·사격 · SHOP·DEPOSIT 버튼",
+     "desktop": "WASD 이동 · 마우스 조준 · 클릭/Space 사격",
+     "url": "play/mini-games/asteroid-bounty-hunter/",
+     "thumb": "thumbs/mini-games--asteroid-bounty-hunter.jpg"
+    },
+    {
+     "slug": "mini-games/arcade-flight-simulator",
+     "title": "아케이드 비행 시뮬레이터",
+     "en": "SKY ACE",
+     "kind": "game",
+     "orientation": "landscape",
+     "desc": "90초 안에 링 체크포인트를 차례로 통과하는 3D 아케이드 비행",
+     "mobile": "왼쪽 스틱 피치·롤 · BOOST · 추력 버튼",
+     "desktop": "W/S 피치 · A/D 롤 · Space 부스터",
+     "url": "play/mini-games/arcade-flight-simulator/",
+     "thumb": "thumbs/mini-games--arcade-flight-simulator.jpg"
+    },
+    {
+     "slug": "mini-games/arcane-path-defense",
+     "title": "아케인 패스 디펜스",
+     "en": "Arcane Path Defense",
+     "kind": "game",
+     "orientation": "landscape",
+     "desc": "궁수·냉기·대포·저격 마법 탑으로 20웨이브를 막아내는 타워 디펜스",
+     "mobile": "탑 선택 → 타일을 두 번 탭해 건설 · 탑을 탭해 강화",
+     "desktop": "1~4 탑 선택 · 클릭 건설 · Space 시작",
+     "url": "play/mini-games/arcane-path-defense/",
+     "thumb": "thumbs/mini-games--arcane-path-defense.jpg"
+    },
+    {
+     "slug": "mini-games/casino-defense",
+     "title": "카지노 디펜스",
+     "en": "Casino Defense",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "블랙잭으로 번 골드로 탑을 세워 적을 막는 카지노 타워 디펜스",
+     "mobile": "맵을 탭해 탑 설치 · 블랙잭 버튼 탭",
+     "desktop": "맵 클릭 설치 · 블랙잭 버튼 클릭",
+     "url": "play/mini-games/casino-defense/",
+     "thumb": "thumbs/mini-games--casino-defense.jpg"
+    },
+    {
+     "slug": "mini-games/neon-breakout",
+     "title": "네온 브레이크아웃",
+     "en": "Neon Breakout",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "패들 확장·5연발·멀티볼 아이템과 5단계 스테이지의 네온 벽돌깨기",
+     "mobile": "좌우로 드래그해 패들 이동 · 탭으로 발사",
+     "desktop": "←→ 또는 마우스로 패들 · 클릭 발사",
+     "url": "play/mini-games/neon-breakout/",
+     "thumb": "thumbs/mini-games--neon-breakout.jpg"
+    },
+    {
+     "slug": "mini-games/pocket-volley",
+     "title": "포켓 발리",
+     "en": "Pocket Volley",
+     "kind": "game",
+     "orientation": "landscape",
+     "desc": "두 꼬마 동물이 모래사장에서 겨루는 1:1 배구 (CPU/2인)",
+     "mobile": "‹ › 이동 · UP 점프 · HIT 스파이크",
+     "desktop": "A/D 이동 · W 점프 · S 스파이크",
+     "url": "play/mini-games/pocket-volley/",
+     "thumb": "thumbs/mini-games--pocket-volley.jpg"
+    },
+    {
+     "slug": "mini-games/sdf-physics-lab",
+     "title": "SDF 물리 실험실",
+     "en": "SDF Physics Lab",
+     "kind": "toy",
+     "orientation": "any",
+     "desc": "SDF 레이마칭으로 그린 구·박스·토러스·폭탄·액체를 떨어뜨리고 끌어 보는 샌드박스",
+     "mobile": "빈 곳 드래그 회전 · 물체 드래그 이동 · 하단 버튼으로 생성",
+     "desktop": "물체 드래그 · 빈 곳 드래그 회전 · 패널로 생성",
+     "url": "play/mini-games/sdf-physics-lab/",
+     "thumb": "thumbs/mini-games--sdf-physics-lab.jpg"
+    },
+    {
+     "slug": "mini-games/blackjack",
+     "title": "블랙잭",
+     "en": "Blackjack",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "싱글 덱 블랙잭 — 베팅하고 히트·스탠드로 딜러와 겨루기",
+     "mobile": "Place Bet · Hit · Stand 버튼",
+     "desktop": "H 히트 · S 스탠드 · N 새 게임",
+     "url": "play/mini-games/blackjack/",
+     "thumb": "thumbs/mini-games--blackjack.jpg"
+    },
+    {
+     "slug": "mini-games/number-baseball",
+     "title": "숫자 야구",
+     "en": "Number Baseball",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "스트라이크·볼 힌트로 숨겨진 숫자를 맞히는 추리 게임 (3~8자리)",
+     "mobile": "화면 숫자 패드로 입력 후 확인",
+     "desktop": "숫자 입력 후 Enter",
+     "url": "play/mini-games/number-baseball/",
+     "thumb": "thumbs/mini-games--number-baseball.jpg"
+    },
+    {
+     "slug": "mini-games/low-poly-flight-sim",
+     "title": "저폴리 비행 시뮬레이터",
+     "en": "Low-Poly Flight Sim",
+     "kind": "game",
+     "orientation": "landscape",
+     "desc": "복엽기 비행 시뮬레이터 (별도 항목과 같은 게임)",
+     "mobile": "왼쪽 스틱 · 스로틀 레버",
+     "desktop": "W/S·A/D · X/Z 스로틀",
+     "url": "play/mini-games/low-poly-flight-sim/",
+     "thumb": "thumbs/mini-games--low-poly-flight-sim.jpg",
+     "hidden": true
+    }
+   ]
   }
  ]
 }

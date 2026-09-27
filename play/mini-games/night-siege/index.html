@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>NIGHT SIEGE — 좀비 기지 서바이벌</title>
+<style>
+  html,body{margin:0;padding:0;background:#07090d;overflow:hidden;height:100%;font-family:'Malgun Gothic','Segoe UI',sans-serif;user-select:none;-webkit-user-select:none}
+  html,body{touch-action:none;overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  #game{display:block;cursor:crosshair;touch-action:none}
+  #safe-probe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  .panel{position:absolute;background:rgba(10,14,20,.94);border:1px solid #33465a;border-radius:12px;color:#dbe6f0;padding:16px;box-shadow:0 10px 40px rgba(0,0,0,.7);z-index:10}
+  .panel h3{margin:0 0 10px 0;font-size:16px;color:#ffd97a;letter-spacing:1px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 8px;border-radius:8px;margin-bottom:4px;background:rgba(255,255,255,.03)}
+  .row .nm{font-size:13px;font-weight:bold}
+  .row .cs{font-size:11px;color:#9fb3c8}
+  .row .ds{font-size:11px;color:#6f8496}
+  .btn{background:#2d4a63;border:1px solid #4a7195;color:#eaf3fb;border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer;white-space:nowrap}
+  .btn:hover{background:#3a6081}
+  .btn:disabled{background:#1c2530;border-color:#2a3542;color:#5a6b7c;cursor:not-allowed}
+  .btn.sel{background:#b8862d;border-color:#e8b653}
+  #craftMenu{left:50%;top:50%;transform:translate(-50%,-50%);display:none;width:480px;max-height:72vh;overflow:auto}
+  #buildMenu{left:50%;bottom:14px;transform:translateX(-50%);display:none;width:760px}
+  #buildMenu .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  #buildMenu .cell{background:rgba(255,255,255,.04);border:1px solid #2a3a4c;border-radius:8px;padding:8px;cursor:pointer;text-align:center}
+  #buildMenu .cell:hover{border-color:#5a86ad}
+  #buildMenu .cell.sel{border-color:#e8b653;background:rgba(232,182,83,.12)}
+  #buildMenu .cell.no{opacity:.45}
+  #buildMenu .cell .nm{font-size:12px;font-weight:bold;margin-bottom:3px}
+  #buildMenu .cell .cs{font-size:10px;color:#9fb3c8}
+  #buildMenu .hint{font-size:11px;color:#7d93a8;margin-top:8px;text-align:center}
+  #overlay{left:50%;top:50%;transform:translate(-50%,-50%);display:none;width:420px;text-align:center;padding:28px}
+  #overlay h2{margin:0 0 8px 0;font-size:30px}
+  #overlay p{color:#9fb3c8;font-size:14px;line-height:1.7}
+  #help{right:14px;top:64px;display:none;width:320px;font-size:12px;line-height:1.9}
+  #help b{color:#ffd97a}
+  .kbd{background:#222d3a;border:1px solid #45596e;border-radius:4px;padding:0 6px;font-size:11px;font-family:monospace}
+  #menu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:20;
+    background:radial-gradient(ellipse at center,#131c28 0%,#07090d 75%)}
+  #menu .mbox{text-align:center;width:400px}
+  #menu h1{font-size:52px;margin:0;color:#ffd97a;letter-spacing:6px;text-shadow:0 0 24px rgba(255,180,60,.35)}
+  #menu .sub{color:#8fa5ba;font-size:13px;margin:6px 0 26px 0}
+  #menu .mbtn{display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:13px;font-size:15px;font-weight:bold;
+    background:#1c2836;border:1px solid #3d5670;color:#eaf3fb;border-radius:9px;cursor:pointer}
+  #menu .mbtn:hover:not(:disabled){background:#2b3f55;border-color:#6a94bd}
+  #menu .mbtn:disabled{opacity:.35;cursor:not-allowed}
+  #menu .mbtn.warn{border-color:#7a4040;color:#ffb0a0}
+  #menu .mbtn.warn:hover:not(:disabled){background:#4a2530;border-color:#b05050}
+  #menu .minfo{font-size:12px;color:#9fb3c8;margin:4px 0 10px 0;min-height:16px}
+  #menu .fstat{font-size:11px;color:#6f8496;margin-top:12px;line-height:1.6}
+  #menu .fstat b{color:#7ae8a0}
+  /* ---- 작은 화면: 메뉴가 잘리지 않게 (내용이 넘치면 위부터 보이고 스크롤) ---- */
+  #menu{overflow-y:auto;box-sizing:border-box;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  #menu .mbox{margin:auto;max-width:calc(100vw - 32px)}
+  #menu h1{font-size:clamp(30px,10vw,52px)}
+  @media (max-height:520px){
+    #menu .mbox{padding:10px 0}
+    #menu h1{font-size:34px;letter-spacing:4px}
+    #menu .sub{margin:4px 0 10px 0}
+    #menu .mbtn{padding:9px;margin:6px 0}
+  }
+  /* ---- 터치(휴대폰/태블릿) 전용: body.touch ---- */
+  .panel,#menu{touch-action:pan-y}
+  .btn,.mbtn,.cell{touch-action:manipulation}
+  body.touch #game{cursor:default}
+  body.touch .btn{min-height:44px;padding:8px 14px;font-size:13px}
+  body.touch #menu .mbtn{min-height:44px}
+  body.touch .row .cs,body.touch .row .ds,body.touch .kbd,body.touch #menu .fstat,
+  body.touch #buildMenu .cell .cs,body.touch #buildMenu .hint{font-size:12px}
+  body.touch .panel{box-sizing:border-box;max-height:calc(100% - 20px);overflow-y:auto}
+  body.touch #craftMenu,body.touch #help,body.touch #overlay{left:calc(12px + env(safe-area-inset-left));right:calc(12px + env(safe-area-inset-right));
+    width:auto;margin:0 auto;top:50%;transform:translateY(-50%);padding:12px 14px}
+  body.touch #craftMenu{max-width:480px}
+  body.touch #help{max-width:360px;font-size:13px;line-height:1.75}
+  body.touch #overlay{max-width:420px;padding:18px 16px}
+  body.touch #overlay .btn{margin-top:6px}
+  body.touch #buildMenu{transform:none;width:auto;padding:8px 10px}
+  body.touch #buildMenu .grid{gap:5px}
+  body.touch #buildMenu .cell{padding:5px 4px;min-height:44px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}
+  body.touch #buildMenu .cell .nm{margin-bottom:2px}
+  /* 머리(닫기)와 아래 줄(설명·수리/업그레이드/철거)은 항상 보이게: 건물 칸만 스크롤 */
+  body.touch #buildMenu .tb-head{position:sticky;top:-8px;z-index:1;background:#0b0f15;margin:-8px -10px 6px;padding:8px 10px 0}
+  body.touch #buildMenu .tb-act{position:sticky;bottom:-8px;z-index:1;background:#0b0f15;margin:6px -10px -8px;padding:4px 10px 8px}
+  @media (orientation:portrait){
+    body.touch #buildMenu{left:calc(8px + env(safe-area-inset-left));right:calc(8px + env(safe-area-inset-right));bottom:calc(8px + env(safe-area-inset-bottom));top:auto}
+  }
+  @media (orientation:landscape){
+    body.touch #help{max-width:600px;line-height:1.6}
+    body.touch #buildMenu{left:auto;right:calc(8px + env(safe-area-inset-right));top:var(--hudb,104px);bottom:calc(8px + env(safe-area-inset-bottom));width:236px}
+    body.touch #buildMenu .grid{grid-template-columns:repeat(2,1fr)}
+  }
+  .tb-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .tb-head h3{margin:0 !important;flex:1}
+  .tb-x{min-width:44px;min-height:44px;font-size:17px !important;padding:0 10px !important}
+  .tb-act{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:44px;font-size:12px;color:#9fb3c8;line-height:1.35}
+  .tb-act .btn{flex:1;padding:6px 4px}
+  .tb-act .tb-bn{flex-basis:100%;color:#ffd97a;font-weight:bold}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="safe-probe"></div>
+<div id="buildMenu" class="panel"></div>
+<div id="craftMenu" class="panel"></div>
+<div id="help" class="panel">
+  <h3>조작법 (H로 닫기)</h3>
+  <b>이동</b> <span class="kbd">W A S D</span><br>
+  <b>조준/사격</b> 마우스 / <span class="kbd">클릭(꾹)</span><br>
+  <b>무기 교체</b> <span class="kbd">1</span> 권총 <span class="kbd">2</span> 샷건 <span class="kbd">3</span> SMG<br>
+  <b>채집</b> 자원 근처에서 <span class="kbd">E</span> 꾹 누르기<br>
+  <b>건설 모드</b> <span class="kbd">B</span> — 배치는 클릭, 취소는 우클릭<br>
+  <b>수리/업그레이드/철거</b> 건설 모드에서 건물에 커서 올리고 <span class="kbd">R</span>/<span class="kbd">T</span>/<span class="kbd">X</span><br>
+  <b>제작 메뉴</b> <span class="kbd">C</span><br>
+  <b>구급상자 사용</b> <span class="kbd">Q</span> (+60 HP)<br>
+  <b>식량 섭취</b> <span class="kbd">F</span> (식량3 → +15 HP)<br>
+  <b>일시정지</b> <span class="kbd">P</span><br>
+  <hr style="border-color:#243242">
+  낮에 파밍하고, 해질녘에 복귀해 건설하고, 밤 웨이브를 막아내세요.<br>
+  <b>코어</b>가 파괴되거나 <b>플레이어</b>가 죽으면 패배합니다.
+</div>
+<div id="overlay" class="panel"></div>
+<div id="menu">
+  <div class="mbox">
+    <h1>NIGHT SIEGE</h1>
+    <div class="sub">낮에 파밍 · 해질녘에 건설 · 밤 웨이브에서 생존하라</div>
+    <div class="minfo" id="saveInfo"></div>
+    <button class="mbtn" id="btnContinue">이어하기</button>
+    <button class="mbtn" id="btnNew">새 게임</button>
+    <button class="mbtn warn" id="btnDelete">세이브 파일 삭제</button>
+    <button class="mbtn" id="btnFolder">저장 폴더 연결 (세이브 파일 자동 생성)</button>
+    <div class="fstat" id="folderStat"></div>
+  </div>
+</div>
+<script>
+"use strict";
+//////////////////// 상수 ////////////////////
+const TILE=32;
+const GW=120, GH=120;               // 타일 단위 월드 크기
+const W=GW*TILE, H=GH*TILE;         // 픽셀 단위 (3840x3840)
+const CX=W/2, CY=H/2;               // 월드 중심(코어 위치)
+const BASE_R=430;                   // 기지(건설 가능) 반경
+const DAY_LEN=150, DUSK_LEN=45;     // 초
+const VICTORY_WAVE=10;
+
+const RES_DEF={
+  wood:{name:'목재',color:'#b58a53'},
+  stone:{name:'석재',color:'#a7b2bd'},
+  scrap:{name:'고철',color:'#8fa8c9'},
+  food:{name:'식량',color:'#8fd06a'},
+  gunpowder:{name:'화약',color:'#e0d05a'},
+  herb:{name:'약초',color:'#5ad0a0'},
+  parts:{name:'부품',color:'#e08fd0'},
+};
+
+const ZKIND={
+  walker:{r:12,hp:42,dmg:9,spd:50,bDmg:1,color:'#7da05a',dark:'#4c6b34',name:'좀비'},
+  runner:{r:10,hp:26,dmg:7,spd:118,bDmg:.6,color:'#cbd455',dark:'#8a9130',name:'러너'},
+  tank:{r:21,hp:340,dmg:26,spd:32,bDmg:3.2,color:'#5a7d72',dark:'#38524a',name:'탱커'},
+  spitter:{r:12,hp:60,dmg:12,spd:44,bDmg:1,color:'#a05ad0',dark:'#6d3596',ranged:true,name:'스피터'},
+  boomer:{r:15,hp:55,dmg:0,spd:62,bDmg:1,color:'#d0763a',dark:'#94491c',explode:true,name:'부머'},
+};
+
+const WEAPONS={
+  pistol:{name:'권총',dmg:16,rof:.32,spd:620,spread:.04,pellets:1,infinite:true,color:'#cfd8e0'},
+  shotgun:{name:'샷건',dmg:11,rof:.85,spd:560,spread:.30,pellets:6,color:'#e8a653'},
+  smg:{name:'SMG',dmg:10,rof:.095,spd:640,spread:.09,pellets:1,color:'#7ad0e8'},
+};
+
+const BUILD_DEF={
+  wallWood:{name:'목재 방벽',cost:{wood:4},hp:220,color:'#9a7443',desc:'저렴한 방벽'},
+  wallStone:{name:'석재 방벽',cost:{stone:6},hp:640,color:'#8b97a3',desc:'튼튼한 방벽'},
+  door:{name:'문',cost:{wood:8},hp:340,color:'#c8a05a',desc:'플레이어만 통과 가능'},
+  turret1:{name:'자동 포탑',cost:{scrap:10,stone:8},hp:220,color:'#6aa0c8',desc:'자동 사격 (사거리 230)',turret:{dmg:14,rof:.55,range:230,bspd:700}},
+  turret2:{name:'중포탑 II',cost:{scrap:18,parts:6},hp:330,color:'#e8b653',desc:'강력한 포탑 (제작소 II 필요)',need:'workshop2',turret:{dmg:34,rof:.38,range:290,bspd:820}},
+  mine:{name:'광산',cost:{wood:12,stone:24},hp:190,color:'#7d8ea0',desc:'석재+고철 자동 생산',prod:true},
+  farm:{name:'농장',cost:{wood:16},hp:150,color:'#6fae4e',desc:'식량 자동 생산',prod:true},
+  workshop:{name:'제작소',cost:{wood:22,stone:12,scrap:6},hp:230,color:'#c87d5a',desc:'고급 제작 해금',prod:true},
+  core:{name:'코어',cost:{},hp:1200,color:'#5ae0c8',desc:'파괴되면 패배'},
+};
+// 업그레이드 비용 (T1 → T2)
+const UPGRADE_COST={mine:{stone:30,scrap:10},farm:{wood:25,food:10},workshop:{scrap:24,parts:8}};
+
+const NODE_DEF={
+  tree:{name:'나무',res:'wood',amount:[4,7],color:'#4e7d3a',r:14,respawn:[55,85]},
+  rock:{name:'바위',res:'stone',amount:[4,7],color:'#8a939c',r:13,respawn:[55,85]},
+  bush:{name:'덤불',res:'food',amount:[3,5],color:'#6fae4e',r:11,respawn:[50,80],bonus:{herb:.55}},
+  crate:{name:'보급 상자',res:'scrap',amount:[3,6],color:'#b09045',r:12,respawn:[70,100],bonus:{gunpowder:.85,parts:.28}},
+};
+
+const RECIPES=[
+  {id:'sgAmmo',name:'샷건 탄약 ×12',cost:{gunpowder:2,scrap:1},desc:'샷건 보유 시',
+   ok:()=>G.weapons.shotgun, give:()=>{G.ammo.shotgun+=12;}},
+  {id:'smgAmmo',name:'SMG 탄약 ×60',cost:{gunpowder:3,scrap:2},desc:'SMG 보유 시',
+   ok:()=>G.weapons.smg, give:()=>{G.ammo.smg+=60;}},
+  {id:'medkit',name:'구급상자 ×1',cost:{herb:2,food:2},desc:'Q키로 사용 (+60 HP)',
+   ok:()=>true, give:()=>{G.medkits++;}},
+  {id:'mkShotgun',name:'샷건 제작',cost:{scrap:10,parts:3},desc:'제작소 필요',
+   ok:()=>!G.weapons.shotgun&&hasBuilding('workshop',1), give:()=>{G.weapons.shotgun=true;G.ammo.shotgun+=16;}},
+  {id:'mkSmg',name:'SMG 제작',cost:{scrap:14,parts:5},desc:'제작소 II 필요',
+   ok:()=>!G.weapons.smg&&hasBuilding('workshop',2), give:()=>{G.weapons.smg=true;G.ammo.smg+=90;}},
+];
+
+//////////////////// 유틸 ////////////////////
+const rand=(a,b)=>a+Math.random()*(b-a);
+const randi=(a,b)=>Math.floor(rand(a,b+1));
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const dist2=(ax,ay,bx,by)=>{const dx=ax-bx,dy=ay-by;return dx*dx+dy*dy;};
+const choice=a=>a[Math.floor(Math.random()*a.length)];
+const key=(tx,ty)=>tx+','+ty;
+
+//////////////////// 캔버스 ////////////////////
+const cv=document.getElementById('game'), cx2d=cv.getContext('2d');
+let VW=innerWidth, VH=innerHeight;
+// DPR: 터치 기기만 선명하게 (최대 2배). VZ: 월드 확대율 — 휴대폰은 화면이 작으니 조금 멀리서 본다 (PC는 둘 다 1 그대로)
+let DPR=1, VZ=1, FONT_WT='bold 12px sans-serif', FONT_WH='bold 11px sans-serif', FONT_WII='bold 9px sans-serif';
+function resize(){
+  VW=innerWidth;VH=innerHeight;
+  DPR=T.on?Math.min(devicePixelRatio||1,2):1;
+  VZ=T.on?clamp(Math.min(VW,VH)/540,0.6,1):1;
+  cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);
+  cv.style.width=VW+'px';cv.style.height=VH+'px';
+  lightCv.width=VW;lightCv.height=VH;
+  // 월드 글자는 확대율과 상관없이 화면에서 12px 이상
+  const wf=n=>'bold '+Math.round(T.on?Math.max(12,n)/VZ:n)+'px sans-serif';
+  FONT_WT=wf(12);FONT_WH=wf(11);FONT_WII=wf(9);
+  touchLayout();
+}
+const lightCv=document.createElement('canvas'), lct=lightCv.getContext('2d');
+addEventListener('resize',resize);
+addEventListener('orientationchange',()=>setTimeout(resize,250));
+
+// 바닥 패턴 (미리 렌더)
+const groundCv=document.createElement('canvas');
+(function(){
+  groundCv.width=256;groundCv.height=256;
+  const g=groundCv.getContext('2d');
+  g.fillStyle='#2a3325';g.fillRect(0,0,256,256);
+  for(let i=0;i<240;i++){
+    g.fillStyle=Math.random()<.5?'rgba(60,76,50,.5)':'rgba(34,42,30,.55)';
+    const s=rand(2,7);g.fillRect(rand(0,256),rand(0,256),s,s);
+  }
+  for(let i=0;i<26;i++){
+    g.fillStyle='rgba(88,102,66,.28)';
+    g.beginPath();g.arc(rand(0,256),rand(0,256),rand(3,9),0,7);g.fill();
+  }
+})();
+let groundPat=null;
+
+//////////////////// 입력 ////////////////////
+const keys={};
+const mouse={x:0,y:0,down:false,rdown:false};
+// 한글 IME에서도 동작하도록 e.code 기준으로 키 판별
+function normKey(e){
+  const c=e.code||'';
+  if(c.startsWith('Key'))return c.slice(3).toLowerCase();
+  if(c.startsWith('Digit'))return c.slice(5);
+  if(c.startsWith('Arrow'))return c.toLowerCase();
+  if(c==='Escape')return 'escape';
+  return (e.key||'').toLowerCase();
+}
+addEventListener('keydown',e=>{
+  const k=normKey(e);
+  if(keys[k])return;
+  keys[k]=true;
+  onKeyPress(k,e);
+});
+addEventListener('keyup',e=>{keys[normKey(e)]=false;});
+cv.addEventListener('mousemove',e=>{
+  if(T.on){ // 터치 모드에서 진짜 마우스가 움직이면 PC 조작으로 돌아간다
+    if(touchRecent()||!(e.movementX||e.movementY))return;
+    setTouchMode(false);
+  }
+  mouse.x=e.clientX;mouse.y=e.clientY;
+});
+cv.addEventListener('mousedown',e=>{
+  if(touchRecent())return; // 탭이 만든 가짜 마우스 이벤트 무시
+  if(e.button===0)mouse.down=true;
+  if(e.button===2){mouse.rdown=true;if(G&&G.buildMode)exitBuild();}
+});
+addEventListener('mouseup',e=>{if(e.button===0)mouse.down=false;if(e.button===2)mouse.rdown=false;});
+addEventListener('contextmenu',e=>e.preventDefault());
+
+//////////////////// 터치 조작 (휴대폰/태블릿) ////////////////////
+// 왼쪽: 이동 스틱(누른 자리에 생기는 조이스틱) · 오른쪽: 조준 스틱(멀리 밀면 사격)
+// 오른쪽 아래 버튼: 채집(꾹)/무기/제작/구급/식량/건설 · 오른쪽 위: 일시정지/조작법 · 좌상단 무기 슬롯도 탭 가능
+// 건설 모드: 화면을 탭해서 배치(드래그하면 연속 배치), 건물을 탭하면 메뉴에 수리/업그레이드/철거 버튼
+const T={
+  on:matchMedia('(pointer: coarse)').matches,
+  last:-1e9,                        // 마지막 터치 시각
+  ids:new Map(),                    // 터치 id → 역할 'move' | 'aim' | 'place' | 'hold' | 'btn' | 'none'
+  move:{id:null,bx:0,by:0,dx:0,dy:0,fixed:false},
+  aim:{id:null,bx:0,by:0,dx:0,dy:0,fixed:false},
+  aimA:-Math.PI/2, aimD:160, aimHold:0, firing:false,
+  press:{pause:0,help:0,harvest:0,weapon:0,craft:0,med:0,food:0,build:0}, // 눌림 표시 남은 시간
+  L:{B:1,R:50,port:false,s:{l:0,t:0,r:0,b:0},hp:{x:0,y:0,w:0},slots:{x:0,y:0,w:64,h:40,gap:6},
+    res:{x:0,y:0,cols:4,cw:74,rh:19},mm:{x:0,y:0,size:100},phase:{y:0,lo:0,hi:0},ann:{y:0},
+    pause:{x:0,y:0,r:22},help:{x:0,y:0,r:22},mv:{x:0,y:0},am:{x:0,y:0},bst:{x:0,y:0},
+    btns:[{id:'harvest',t:'채집'},{id:'weapon',t:'무기'},{id:'craft',t:'제작'},{id:'med',t:'구급'},{id:'food',t:'식량'},{id:'build',t:'건설'}]},
+};
+const AA={a:0,d:0};                 // 조준 보정 결과 (매 프레임 새 객체를 만들지 않도록 재사용)
+const touchRecent=()=>performance.now()-T.last<1500;
+const K=(pc,touch)=>T.on?touch:pc;  // 안내 문구: PC 키 ↔ 터치 버튼
+const angDiff=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
+
+function touchLayout(){
+  const L=T.L,s=L.s;
+  try{const cs=getComputedStyle(document.getElementById('safe-probe'));
+    s.t=parseFloat(cs.paddingTop)||0;s.r=parseFloat(cs.paddingRight)||0;s.b=parseFloat(cs.paddingBottom)||0;s.l=parseFloat(cs.paddingLeft)||0;}catch(e){}
+  const B=clamp(Math.min(VW,VH)/390,0.9,1.3),port=VH>VW,x0=s.l+10,y0=s.t+8;
+  L.B=B;L.port=port;L.R=50*B;L.font='bold '+Math.round(14*B)+'px sans-serif';
+  // 오른쪽 위: 일시정지 · 조작법
+  L.help.r=L.pause.r=22*B;
+  L.help.x=VW-s.r-10-22*B;L.help.y=y0+22*B;
+  L.pause.x=L.help.x-54*B;L.pause.y=L.help.y;
+  // 자원 (버튼 아래, 가로 화면 4칸 · 세로 화면 2칸)
+  const R=L.res;R.cols=port?2:4;R.x=VW-s.r-10-R.cols*R.cw;R.y=L.help.y+L.help.r+8;
+  const resB=R.y+Math.ceil(7/R.cols)*R.rh;
+  // 미니맵 (자원 아래)
+  L.mm.size=Math.round(clamp(Math.min(VW,VH)*0.26,84,140));
+  L.mm.x=VW-s.r-10-L.mm.size;L.mm.y=resB+8;
+  // 왼쪽 위: HP/코어 바 · 무기 슬롯 (세로 화면은 페이즈 줄 아래)
+  const top=port?L.help.y+L.help.r+8:y0;
+  L.hp.x=x0;L.hp.y=top;L.hp.w=Math.min(220,port?R.x-x0-14:VW*0.28);
+  L.slots.x=x0;L.slots.y=top+44;
+  L.slots.w=port?Math.floor(clamp((R.x-8-x0-2*L.slots.gap)/3,50,64)):64; // 좁은 세로 화면: 자원 칸과 겹치지 않게
+  // 페이즈 문구: 위 가운데 (버튼과 겹치지 않는 범위)
+  L.phase.y=y0+2;L.phase.lo=port?x0:x0+L.hp.w+12;L.phase.hi=L.pause.x-L.pause.r-8;
+  L.ann.y=Math.max(L.slots.y+L.slots.h,port?L.mm.y+L.mm.size:resB)+12;
+  // 오른쪽 아래 버튼 (2줄 × 3칸)
+  const c1=VW-s.r-44*B,c2=c1-68*B,c3=c2-64*B,r1=VH-s.b-44*B,r2=r1-68*B,P=[[c1,r1,32],[c2,r1,26],[c3,r1,26],[c1,r2,26],[c2,r2,26],[c3,r2,26]];
+  L.btns.forEach((b,i)=>{b.x=P[i][0];b.y=P[i][1];b.r=P[i][2]*B;});
+  // 스틱이 쉬는 자리 (손가락을 대면 그 자리로 옮겨 간다)
+  L.mv.x=s.l+96*B;L.mv.y=VH-s.b-100*B;
+  if(port){L.am.x=VW-s.r-100*B;L.am.y=r2-26*B-24*B-L.R;}
+  else{L.am.x=c3-26*B-24*B-L.R;L.am.y=VH-s.b-100*B;}
+  document.documentElement.style.setProperty('--hudb',Math.round(L.mm.y)+'px');
+  placeBuildStick();
+}
+// 건설 모드 이동 스틱: 고정 위치 (세로 화면은 건설 메뉴 위)
+function placeBuildStick(){
+  const L=T.L;L.bst.x=L.mv.x;L.bst.y=L.mv.y;
+  if(L.port&&T.on&&buildMenuEl.style.display==='block'){
+    const r=buildMenuEl.getBoundingClientRect();
+    L.bst.y=Math.min(L.mv.y,r.top-16-L.R);
+  }
+}
+function setTouchMode(on){
+  T.on=on;
+  document.body.classList.toggle('touch',on);
+  touchReset();resize();
+  helpEl.innerHTML=on?HELP_TOUCH:HELP_PC;
+  lastBuildHtml=lastCraftHtml='';
+  if(G&&G.buildMode)renderBuildMenu();
+  if(G&&G.craftOpen)renderCraft();
+}
+function touchReset(){
+  T.ids.clear();
+  for(const s of [T.move,T.aim]){s.id=null;s.dx=s.dy=0;}
+  T.firing=false;
+  if(T.on){mouse.down=false;keys.e=false;}
+}
+function stickStart(s,role,id,x,y,fixed){s.id=id;s.bx=x;s.by=y;s.dx=s.dy=0;s.fixed=!!fixed;T.ids.set(id,role);}
+function stickMove(s,x,y){
+  const R=T.L.R;let dx=x-s.bx,dy=y-s.by;const d=Math.hypot(dx,dy);
+  if(d>R){dx*=R/d;dy*=R/d;if(!s.fixed){s.bx=x-dx;s.by=y-dy;}} // 테두리 밖으로 밀면 받침이 손가락을 따라온다
+  s.dx=dx;s.dy=dy;
+}
+const tHit=(b,x,y,k)=>Math.hypot(x-b.x,y-b.y)<=b.r*(k||1.15);
+function tapBtn(id){
+  T.press[id]=.15;
+  if(id==='weapon'){ // 보유한 다음 무기로
+    const order=['pistol','shotgun','smg'];let i=order.indexOf(G.weapon);
+    for(let n=0;n<3;n++){i=(i+1)%3;if(G.weapons[order[i]]){onKeyPress(String(i+1));break;}}
+  }
+  else if(id==='craft')onKeyPress('c');
+  else if(id==='med')onKeyPress('q');
+  else if(id==='food')onKeyPress('f');
+  else if(id==='build')onKeyPress('b');
+}
+function touchStart(id,x,y){
+  if(!G||inMenu||G.over){T.ids.set(id,'none');return;} // 메뉴·게임오버 화면은 DOM 버튼이 처리
+  const L=T.L;
+  if(tHit(L.pause,x,y,1.3)){T.ids.set(id,'btn');T.press.pause=.15;onKeyPress('p');if(G.paused)touchReset();return;}
+  if(tHit(L.help,x,y,1.3)){T.ids.set(id,'btn');T.press.help=.15;onKeyPress('h');return;}
+  if(G.paused){T.ids.set(id,'none');if(overlayEl.style.display!=='block')onKeyPress('p');return;} // 아무 데나 탭 → 계속
+  for(let i=0;i<3;i++){ // 무기 슬롯
+    const sx=L.slots.x+i*(L.slots.w+L.slots.gap);
+    if(x>=sx-3&&x<=sx+L.slots.w+3&&y>=L.slots.y-4&&y<=L.slots.y+L.slots.h+6){T.ids.set(id,'btn');onKeyPress(String(i+1));return;}
+  }
+  if(G.buildMode){
+    if(T.move.id===null&&Math.hypot(x-L.bst.x,y-L.bst.y)<L.R*1.4){stickStart(T.move,'move',id,L.bst.x,L.bst.y,true);stickMove(T.move,x,y);return;}
+    // 탭한 자리가 건설 커서: 배치(드래그 → 연속 배치), 이미 건물이 있으면 그 건물을 선택
+    T.ids.set(id,'place');
+    mouse.x=x;mouse.y=y;mouse.down=true;lastPlaced='';
+    if(G.buildSel)tryPlaceBuild();
+    const mt=mouseTile();G.hoverB=G.grid.get(key(mt.tx,mt.ty))||null;
+    renderBuildMenu();
+    return;
+  }
+  for(const b of L.btns){
+    if(!tHit(b,x,y))continue;
+    if(b.id==='harvest'){T.ids.set(id,'hold');keys.e=true;T.press.harvest=.15;}
+    else{T.ids.set(id,'btn');tapBtn(b.id);}
+    return;
+  }
+  if(x<VW*.5){if(T.move.id===null)stickStart(T.move,'move',id,x,y);else T.ids.set(id,'none');}
+  else if(T.aim.id===null)stickStart(T.aim,'aim',id,x,y);
+  else T.ids.set(id,'none');
+}
+function touchMove(id,x,y){
+  const role=T.ids.get(id);
+  if(role==='move'&&T.move.id===id)stickMove(T.move,x,y);
+  else if(role==='aim'&&T.aim.id===id)stickMove(T.aim,x,y);
+  else if(role==='place'&&G&&G.buildMode){mouse.x=x;mouse.y=y;}
+}
+function touchEnd(id){
+  const role=T.ids.get(id);T.ids.delete(id);
+  for(const s of [T.move,T.aim])if(s.id===id){s.id=null;s.dx=s.dy=0;}
+  if(role==='hold')keys.e=false;
+  if(role==='place'){mouse.down=false;if(G&&G.buildMode)renderBuildMenu();}
+}
+cv.addEventListener('touchstart',e=>{
+  e.preventDefault();T.last=performance.now();
+  if(!T.on)setTouchMode(true);
+  for(const t of e.changedTouches)touchStart(t.identifier,t.clientX,t.clientY);
+},{passive:false});
+cv.addEventListener('touchmove',e=>{
+  e.preventDefault();T.last=performance.now();
+  for(const t of e.changedTouches)touchMove(t.identifier,t.clientX,t.clientY);
+},{passive:false});
+function touchEndEv(e){T.last=performance.now();for(const t of e.changedTouches)touchEnd(t.identifier);}
+cv.addEventListener('touchend',touchEndEv);
+cv.addEventListener('touchcancel',touchEndEv);
+// 메뉴(DOM)를 먼저 탭해도 터치 모드로
+addEventListener('touchstart',()=>{T.last=performance.now();if(!T.on)setTouchMode(true);},{passive:true,capture:true});
+
+// 조준 보정: 스틱 방향 근처(±10° 정도)의 좀비가 있으면 그쪽을 겨눈다
+function aimAssist(raw){
+  const p=G.player;let best=null,bs=1e9;
+  for(const z of G.zombies){
+    const dx=z.x-p.x,dy=z.y-p.y,d=Math.hypot(dx,dy);
+    if(d<1||d>560)continue;
+    const za=Math.atan2(dy,dx),ad=Math.abs(angDiff(raw,za));
+    if(ad>0.17+Math.atan2(z.r,d))continue;
+    const sc=ad*420+d*.3;
+    if(sc<bs){bs=sc;best=z;AA.a=za;AA.d=d;}
+  }
+  return best!==null;
+}
+// 가상 마우스(조준점)를 조준선 위에 둔다 → 기존 마우스 조준/사격 코드가 그대로 동작
+function touchSyncMouse(){
+  const p=G.player;
+  mouse.x=((p.x-G.cam.x)+Math.cos(T.aimA)*T.aimD)*VZ;
+  mouse.y=((p.y-G.cam.y)+Math.sin(T.aimA)*T.aimD)*VZ;
+}
+function touchUpdate(dt){
+  if(!T.on||G.buildMode){T.firing=false;return;}
+  const a=T.aim,m=T.move,B=T.L.B,ad=Math.hypot(a.dx,a.dy);
+  if(a.id!==null&&ad>6*B){
+    const raw=Math.atan2(a.dy,a.dx);
+    if(aimAssist(raw)){T.aimA=AA.a;T.aimD=clamp(AA.d,60,420);}
+    else{T.aimA=raw;T.aimD=120+180*Math.min(1,ad/T.L.R);}
+    T.aimHold=.8;
+  }else if(a.id===null){ // 조준하지 않을 땐 잠시 뒤 걷는 방향을 바라본다
+    T.aimHold-=dt;
+    if(m.id!==null&&T.aimHold<=0&&Math.hypot(m.dx,m.dy)>10*B)T.aimA+=angDiff(T.aimA,Math.atan2(m.dy,m.dx))*Math.min(1,dt*8);
+  }
+  T.firing=a.id!==null&&ad>T.L.R*.3;
+  mouse.down=T.firing;
+  touchSyncMouse();
+}
+
+//////////////////// 게임 상태 ////////////////////
+let G=null;
+let inMenu=true;
+
+function initGame(save){
+  touchReset();
+  G={
+    over:false,won:false,paused:false,
+    time:0, phase:'day', phaseT:DAY_LEN, phaseAge:0, day:1, wave:0,
+    waveTotal:0, waveSpawned:0, waveAlive:0, spawnTimer:0, nightOn:false,
+    res:{wood:30,stone:20,scrap:10,food:6,gunpowder:10,herb:3,parts:0},
+    weapons:{pistol:true,shotgun:false,smg:false},
+    ammo:{shotgun:0,smg:0},
+    weapon:'pistol', medkits:1, eatCd:0,
+    player:{x:CX,y:CY+TILE*3.2,r:11,hp:100,maxHp:100,spd:175,fireCd:0,aim:0,hurtT:0},
+    cam:{x:0,y:0},
+    grid:new Map(), buildings:[], zombies:[], bullets:[], spits:[], drops:[], nodes:[], parts:[], texts:[],
+    buildMode:false, buildSel:null, hoverB:null,
+    announce:null, shake:0, killCount:0,
+    ambTimer:0,
+  };
+  if(save){
+    G.day=save.day;G.phase=save.phase;G.phaseT=save.phaseT;G.wave=save.wave||0;
+    G.won=!!save.won;G.killCount=save.kills||0;
+    G.res=Object.assign(G.res,save.res);
+    G.weapons=Object.assign(G.weapons,save.weapons);
+    G.ammo=Object.assign(G.ammo,save.ammo);
+    G.medkits=save.medkits||0;
+    if(save.weapon&&G.weapons[save.weapon])G.weapon=save.weapon;
+    G.player.hp=clamp(save.php||100,1,G.player.maxHp);
+    G.player.x=clamp(save.px||CX,TILE,W-TILE);
+    G.player.y=clamp(save.py||CY,TILE,H-TILE);
+    for(const b of save.buildings){
+      if(G.grid.has(key(b.tx,b.ty)))continue;
+      const nb=placeBuilding(b.type,b.tx,b.ty);
+      nb.tier=b.tier||1;nb.maxHp=b.maxHp||nb.maxHp;nb.hp=clamp(b.hp,1,nb.maxHp);
+    }
+    G.nodes=save.nodes.map(n=>({type:n.type,x:n.x,y:n.y,amount:n.amount,max:n.max||n.amount,
+      alive:!!n.alive,respT:n.respT||0,hT:0,wob:rand(0,7)}));
+    if(G.phase==='night'){G.phase='dusk';G.phaseT=8;} // 밤 저장분은 밤 직전부터 재개
+    announce(`${G.day}일차 — 이어서 계속한다. (${G.phase==='dusk'?'해질녘':'낮'})`,4);
+  }else{
+    genBase();
+    genNodes();
+    announce(K('1일차 — 낮이다. 파밍을 시작하자! (H: 조작법)','1일차 — 낮이다. 파밍을 시작하자! (? 버튼: 조작법)'), 4);
+  }
+  updateCam(0);
+  document.getElementById('overlay').style.display='none';
+}
+
+function addRes(r,n,x,y){
+  G.res[r]=(G.res[r]||0)+n;
+  if(x!==undefined)fText('+'+n+' '+RES_DEF[r].name,x,y,RES_DEF[r].color);
+}
+function canPay(cost){for(const k in cost)if((G.res[k]||0)<cost[k])return false;return true;}
+function pay(cost){for(const k in cost)G.res[k]-=cost[k];}
+function costStr(cost){return Object.keys(cost).map(k=>RES_DEF[k].name+' '+cost[k]).join(', ');}
+function fText(t,x,y,c){G.texts.push({t,x,y,c:c||'#fff',life:1.15});}
+function announce(t,dur){G.announce={t,life:dur||3,max:dur||3};}
+function hasBuilding(type,tier){
+  return G.buildings.some(b=>b.type===type&&b.hp>0&&(b.tier||1)>=(tier||1));
+}
+
+//////////////////// 월드 생성 ////////////////////
+function placeBuilding(type,tx,ty,free){
+  const def=BUILD_DEF[type];
+  const w=type==='core'?2:1, h=w;
+  const b={type,tx,ty,w,h,hp:def.hp,maxHp:def.hp,tier:1,cd:0,prodT:rand(1,4),angle:0,flash:0};
+  for(let ix=0;ix<w;ix++)for(let iy=0;iy<h;iy++)G.grid.set(key(tx+ix,ty+iy),b);
+  G.buildings.push(b);
+  if(type==='core')G.core=b;
+  return b;
+}
+function removeBuilding(b){
+  for(let ix=0;ix<b.w;ix++)for(let iy=0;iy<b.h;iy++)G.grid.delete(key(b.tx+ix,b.ty+iy));
+  const i=G.buildings.indexOf(b);
+  if(i>=0)G.buildings.splice(i,1);
+}
+function bCenter(b){return{x:(b.tx+b.w/2)*TILE,y:(b.ty+b.h/2)*TILE};}
+
+function genBase(){
+  const ctx=GW/2-1, cty=GH/2-1;      // 코어 좌상단 타일
+  placeBuilding('core',ctx,cty);
+  // 초기 방벽: 코어(2x2, (ctx,cty)~(ctx+1,cty+1)) 기준 반지름 5타일 사각 링, 남쪽에 문
+  const r=5;
+  const x0=ctx-r, y0=cty-r, x1=ctx+1+r, y1=cty+1+r;
+  const doorTx=ctx; // 남쪽 문 (코어 바로 아래 열)
+  for(let tx=x0;tx<=x1;tx++)for(let ty=y0;ty<=y1;ty++){
+    if(tx!==x0&&tx!==x1&&ty!==y0&&ty!==y1)continue;
+    if(ty===y1&&(tx===doorTx||tx===doorTx+1)){placeBuilding('door',tx,ty);continue;}
+    placeBuilding('wallStone',tx,ty);
+  }
+  // 초기 포탑 2기 (링 안쪽 대각)
+  placeBuilding('turret1',ctx-3,cty-3);
+  placeBuilding('turret1',ctx+4,cty+4);
+}
+
+function genNodes(){
+  // 지역별 클러스터: 숲(북서) 바위(북동) 폐허(남쪽) 덤불(동/서)
+  const clusters=[
+    {type:'tree',cx:W*.22,cy:H*.22,r:W*.16,n:34},
+    {type:'tree',cx:W*.40,cy:H*.12,r:W*.10,n:16},
+    {type:'rock',cx:W*.78,cy:H*.22,r:W*.15,n:30},
+    {type:'rock',cx:W*.62,cy:H*.10,r:W*.09,n:12},
+    {type:'crate',cx:W*.30,cy:H*.82,r:W*.14,n:20},
+    {type:'crate',cx:W*.72,cy:H*.80,r:W*.13,n:20},
+    {type:'bush',cx:W*.10,cy:H*.55,r:W*.10,n:14},
+    {type:'bush',cx:W*.90,cy:H*.55,r:W*.10,n:14},
+    {type:'bush',cx:W*.50,cy:H*.68,r:W*.08,n:8},
+    {type:'tree',cx:W*.14,cy:H*.80,r:W*.08,n:10},
+    {type:'rock',cx:W*.88,cy:H*.85,r:W*.07,n:8},
+  ];
+  for(const c of clusters){
+    for(let i=0;i<c.n;i++){
+      let x,y,tries=0;
+      do{
+        const a=rand(0,Math.PI*2), d=Math.sqrt(Math.random())*c.r;
+        x=c.cx+Math.cos(a)*d; y=c.cy+Math.sin(a)*d; tries++;
+      }while(tries<20&&(x<TILE*2||y<TILE*2||x>W-TILE*2||y>H-TILE*2||dist2(x,y,CX,CY)<(BASE_R+120)**2));
+      if(tries>=20)continue;
+      const def=NODE_DEF[c.type];
+      G.nodes.push({type:c.type,x,y,amount:randi(def.amount[0],def.amount[1]),max:def.amount[1],alive:true,respT:0,hT:0,wob:rand(0,7)});
+    }
+  }
+}
+
+//////////////////// 충돌 ////////////////////
+function solidAtPx(px,py,isPlayer){
+  if(px<0||py<0||px>=W||py>=H)return {border:true};
+  const b=G.grid.get(key(Math.floor(px/TILE),Math.floor(py/TILE)));
+  if(!b)return null;
+  if(isPlayer&&b.type==='door')return null;
+  return b;
+}
+// 축 분리 이동. 막혀서 못 간 경우 해당 건물 반환(좀비 공격용)
+function moveCircle(e,dx,dy,isPlayer){
+  let hitB=null;
+  if(dx!==0){
+    const nx=clamp(e.x+dx,e.r+1,W-e.r-1);
+    const edge=nx+(dx>0?e.r:-e.r);
+    let ok=true;
+    for(const oy of [-e.r*0.7,0,e.r*0.7]){
+      const b=solidAtPx(edge,e.y+oy,isPlayer);
+      if(b){ok=false;if(!b.border)hitB=b;break;}
+    }
+    if(ok)e.x=nx;
+  }
+  if(dy!==0){
+    const ny=clamp(e.y+dy,e.r+1,H-e.r-1);
+    const edge=ny+(dy>0?e.r:-e.r);
+    let ok=true;
+    for(const ox of [-e.r*0.7,0,e.r*0.7]){
+      const b=solidAtPx(e.x+ox,edge,isPlayer);
+      if(b){ok=false;if(!b.border)hitB=b;break;}
+    }
+    if(ok)e.y=ny;
+  }
+  return hitB;
+}
+
+//////////////////// 플레이어 ////////////////////
+function updatePlayer(dt){
+  const p=G.player;
+  p.hurtT=Math.max(0,p.hurtT-dt);
+  p.fireCd=Math.max(0,p.fireCd-dt);
+  G.eatCd=Math.max(0,G.eatCd-dt);
+  let dx=0,dy=0;
+  if(keys['w']||keys['arrowup'])dy--;
+  if(keys['s']||keys['arrowdown'])dy++;
+  if(keys['a']||keys['arrowleft'])dx--;
+  if(keys['d']||keys['arrowright'])dx++;
+  if(T.on&&T.move.id!==null){ // 터치 이동 스틱: 아무 방향으로나 (속도는 키보드와 같음)
+    const d=Math.hypot(T.move.dx,T.move.dy);
+    if(d>8*T.L.B){dx=T.move.dx/d;dy=T.move.dy/d;}
+  }
+  if(dx||dy){
+    const l=Math.hypot(dx,dy);
+    moveCircle(p,dx/l*p.spd*dt,dy/l*p.spd*dt,true);
+    p.moving=true;
+  }else p.moving=false;
+  p.aim=Math.atan2(mouse.y/VZ-(p.y-G.cam.y),mouse.x/VZ-(p.x-G.cam.x));
+  if(mouse.down&&!G.buildMode&&p.fireCd<=0)fireWeapon();
+  G.harvNode=null;
+  if(keys['e']&&!G.buildMode)harvest(dt);
+}
+
+function fireWeapon(){
+  const wd=WEAPONS[G.weapon],p=G.player;
+  if(!wd.infinite){
+    if((G.ammo[G.weapon]||0)<=0){fText(K('탄약 없음! (C: 제작)','탄약 없음! (제작 버튼)'),p.x,p.y-26,'#ff8a8a');p.fireCd=.4;return;}
+    G.ammo[G.weapon]--;
+  }
+  p.fireCd=wd.rof;
+  for(let i=0;i<wd.pellets;i++){
+    const a=p.aim+rand(-wd.spread,wd.spread);
+    G.bullets.push({x:p.x+Math.cos(a)*15,y:p.y+Math.sin(a)*15,
+      vx:Math.cos(a)*wd.spd,vy:Math.sin(a)*wd.spd,dmg:wd.dmg,life:.9,color:wd.color});
+  }
+  spark(p.x+Math.cos(p.aim)*18,p.y+Math.sin(p.aim)*18,'#ffd97a',2);
+  G.shake=Math.min(6,G.shake+(G.weapon==='shotgun'?2.5:.7));
+}
+
+function harvest(dt){
+  const p=G.player;
+  let best=null,bd=1e18;
+  for(const n of G.nodes){
+    if(!n.alive)continue;
+    const rr=NODE_DEF[n.type].r+42;
+    const d=dist2(n.x,n.y,p.x,p.y);
+    if(d<rr*rr&&d<bd){bd=d;best=n;}
+  }
+  if(!best)return;
+  G.harvNode=best;
+  best.hT+=dt;
+  if(best.hT>=0.42){
+    best.hT=0;
+    const def=NODE_DEF[best.type];
+    addRes(def.res,1,best.x,best.y-18);
+    if(def.bonus)for(const k in def.bonus)
+      if(Math.random()<def.bonus[k])addRes(k,1,best.x+10,best.y-34);
+    best.amount--;
+    spark(best.x,best.y,def.color,3);
+    if(best.amount<=0){best.alive=false;best.respT=rand(def.respawn[0],def.respawn[1]);}
+  }
+}
+
+function damagePlayer(d){
+  if(G.over)return;
+  const p=G.player;
+  p.hp-=d;p.hurtT=.25;G.shake=Math.min(8,G.shake+2);
+  if(p.hp<=0){p.hp=0;gameOver('당신은 좀비 떼에 쓰러졌습니다...');}
+}
+
+//////////////////// 좀비 ////////////////////
+function phaseMult(){
+  if(G.phase==='day')return{spd:.5,dmg:.45};
+  if(G.phase==='dusk')return{spd:.78,dmg:.75};
+  return{spd:1,dmg:1};
+}
+function spawnZombie(kind,x,y,isWave){
+  const k=ZKIND[kind];
+  let hpM;
+  if(isWave)hpM=1+0.17*(G.wave-1);
+  else hpM=G.phase==='day'?.55:(G.phase==='dusk'?.8:1);
+  const z={kind,x,y,r:k.r,hp:k.hp*hpM,maxHp:k.hp*hpM,
+    dmgM:isWave?1+0.09*(G.wave-1):1,spdM:isWave?1+0.025*(G.wave-1):1,
+    wave:!!isWave,atkCd:rand(0,.5),spitCd:rand(1,2.5),wt:0,wx:x,wy:y,wob:rand(0,7),hurtF:0};
+  G.zombies.push(z);
+  if(isWave){G.waveAlive++;}
+  return z;
+}
+function updateZombies(dt){
+  const p=G.player,pm=phaseMult();
+  const core=G.core;
+  for(let i=G.zombies.length-1;i>=0;i--){
+    const z=G.zombies[i],k=ZKIND[z.kind];
+    z.atkCd-=dt;z.hurtF-=dt;
+    const pd=dist2(z.x,z.y,p.x,p.y);
+    const sight=G.phase==='day'?230:(G.phase==='dusk'?420:540);
+    let tx,ty,chasing=false;
+    if(pd<sight*sight){tx=p.x;ty=p.y;chasing=true;}
+    else if((z.wave||G.phase==='night')&&core){const c=bCenter(core);tx=c.x;ty=c.y;}
+    else{
+      z.wt-=dt;
+      if(z.wt<=0){z.wx=clamp(z.x+rand(-180,180),TILE,W-TILE);z.wy=clamp(z.y+rand(-180,180),TILE,H-TILE);z.wt=rand(2.5,6);}
+      tx=z.wx;ty=z.wy;
+    }
+    const dd=Math.hypot(tx-z.x,ty-z.y)||1;
+    z.face=Math.atan2(ty-z.y,tx-z.x);
+    const spd=k.spd*pm.spd*z.spdM;
+    // 스피터: 사거리 내에서 정지 사격
+    if(k.ranged&&chasing&&pd<200*200){
+      z.spitCd-=dt;
+      if(z.spitCd<=0){
+        z.spitCd=2.4;
+        const a=Math.atan2(p.y-z.y,p.x-z.x);
+        G.spits.push({x:z.x,y:z.y,vx:Math.cos(a)*300,vy:Math.sin(a)*300,life:1.4,dmg:k.dmg*pm.dmg*z.dmgM});
+      }
+    }else{
+      const hit=moveCircle(z,(tx-z.x)/dd*spd*dt,(ty-z.y)/dd*spd*dt,false);
+      if(hit&&z.atkCd<=0){
+        if(k.explode){boomerBlow(z);continue;}
+        z.atkCd=.85;
+        damageBuilding(hit,k.dmg*pm.dmg*z.dmgM*k.bDmg);
+      }
+    }
+    // 플레이어 접촉
+    if(pd<(z.r+p.r+3)**2&&z.atkCd<=0){
+      if(k.explode){boomerBlow(z);continue;}
+      z.atkCd=.9;
+      damagePlayer(k.dmg*pm.dmg*z.dmgM);
+    }
+  }
+  // 좀비끼리 겹침 방지 (간단 분리)
+  const zs=G.zombies;
+  for(let a=0;a<zs.length;a++){
+    const za=zs[a];
+    for(let b=a+1;b<zs.length;b++){
+      const zb=zs[b],rr=za.r+zb.r;
+      const dx=zb.x-za.x,dy=zb.y-za.y;
+      if(dx>rr||dx<-rr||dy>rr||dy<-rr)continue;
+      const d2=dx*dx+dy*dy;
+      if(d2>0.01&&d2<rr*rr){
+        const d=Math.sqrt(d2),ov=(rr-d)*.35,ux=dx/d,uy=dy/d;
+        za.x-=ux*ov;za.y-=uy*ov;zb.x+=ux*ov;zb.y+=uy*ov;
+      }
+    }
+  }
+}
+function boomerBlow(z){
+  const i=G.zombies.indexOf(z);
+  if(i>=0){G.zombies.splice(i,1);if(z.wave)G.waveAlive--;G.killCount++;}
+  explode(z.x,z.y,84,34*phaseMult().dmg*z.dmgM,130*z.dmgM,45);
+}
+function damageZombie(z,d){
+  z.hp-=d;z.hurtF=.09;
+  if(z.hp<=0)killZombie(z);
+}
+function killZombie(z){
+  const i=G.zombies.indexOf(z);
+  if(i<0)return;
+  G.zombies.splice(i,1);
+  G.killCount++;
+  if(z.wave)G.waveAlive--;
+  if(ZKIND[z.kind].explode){explode(z.x,z.y,84,30,110,45);return;}
+  blood(z.x,z.y);
+  const table=[['scrap',.15],['gunpowder',.11],['food',.08],['herb',.05],['parts',.04]];
+  for(const[r,pr]of table)
+    if(Math.random()<pr){G.drops.push({r,x:z.x+rand(-10,10),y:z.y+rand(-10,10),life:45});break;}
+}
+
+//////////////////// 폭발/파티클 ////////////////////
+function explode(x,y,r,pDmg,bDmg,zDmg){
+  for(let i=0;i<24;i++){
+    const a=rand(0,7),s=rand(40,260);
+    G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(.25,.6),color:choice(['#ffb04a','#ff7a3a','#ffe08a']),r:rand(2,5)});
+  }
+  G.shake=Math.min(11,G.shake+6);
+  if(dist2(x,y,G.player.x,G.player.y)<r*r)damagePlayer(pDmg);
+  for(const b of G.buildings.slice()){
+    const c=bCenter(b);
+    if(dist2(x,y,c.x,c.y)<(r+TILE*.5)**2)damageBuilding(b,bDmg);
+  }
+  for(const z of G.zombies.slice()){
+    if(dist2(x,y,z.x,z.y)<(r+z.r)**2)damageZombie(z,zDmg);
+  }
+}
+function blood(x,y){
+  for(let i=0;i<7;i++){
+    const a=rand(0,7),s=rand(20,110);
+    G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(.2,.5),color:'#a52f2f',r:rand(1.5,3.5)});
+  }
+}
+function spark(x,y,color,n){
+  for(let i=0;i<n;i++){
+    const a=rand(0,7),s=rand(30,140);
+    G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(.15,.35),color,r:rand(1,2.5)});
+  }
+}
+
+//////////////////// 탄환/투사체/드랍 ////////////////////
+function updateBullets(dt){
+  for(let i=G.bullets.length-1;i>=0;i--){
+    const b=G.bullets[i];
+    b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+    let dead=b.life<=0||b.x<0||b.y<0||b.x>=W||b.y>=H;
+    if(!dead)for(const z of G.zombies){
+      const rr=z.r+3;
+      if(dist2(b.x,b.y,z.x,z.y)<rr*rr){damageZombie(z,b.dmg);spark(b.x,b.y,'#ffb0b0',2);dead=true;break;}
+    }
+    if(dead)G.bullets.splice(i,1);
+  }
+}
+function updateSpits(dt){
+  const p=G.player;
+  for(let i=G.spits.length-1;i>=0;i--){
+    const s=G.spits[i];
+    s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;
+    let dead=s.life<=0;
+    if(!dead&&dist2(s.x,s.y,p.x,p.y)<(p.r+5)**2){damagePlayer(s.dmg);dead=true;}
+    if(!dead){
+      const b=solidAtPx(s.x,s.y,false);
+      if(b){if(!b.border)damageBuilding(b,s.dmg*.8);dead=true;}
+    }
+    if(dead){spark(s.x,s.y,'#b06ad0',3);G.spits.splice(i,1);}
+  }
+}
+function updateDrops(dt){
+  const p=G.player;
+  for(let i=G.drops.length-1;i>=0;i--){
+    const d=G.drops[i];
+    d.life-=dt;
+    if(d.life<=0){G.drops.splice(i,1);continue;}
+    const dd=dist2(d.x,d.y,p.x,p.y);
+    if(dd<70*70){ // 자석
+      const l=Math.sqrt(dd)||1;
+      d.x+=(p.x-d.x)/l*220*dt;d.y+=(p.y-d.y)/l*220*dt;
+    }
+    if(dd<18*18){addRes(d.r,1,p.x,p.y-22);G.drops.splice(i,1);}
+  }
+}
+function updateNodes(dt){
+  for(const n of G.nodes){
+    if(!n.alive){
+      n.respT-=dt;
+      if(n.respT<=0){
+        const def=NODE_DEF[n.type];
+        n.alive=true;n.amount=randi(def.amount[0],def.amount[1]);n.hT=0;
+      }
+    }
+  }
+}
+function updateParticles(dt){
+  for(let i=G.parts.length-1;i>=0;i--){
+    const p=G.parts[i];
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.9;p.vy*=.9;p.life-=dt;
+    if(p.life<=0)G.parts.splice(i,1);
+  }
+  for(let i=G.texts.length-1;i>=0;i--){
+    const t=G.texts[i];
+    t.y-=34*dt;t.life-=dt;
+    if(t.life<=0)G.texts.splice(i,1);
+  }
+}
+
+//////////////////// 건물 동작 ////////////////////
+function damageBuilding(b,d){
+  if(b.hp<=0)return;
+  b.hp-=d;b.flash=.12;
+  if(b.hp<=0){
+    b.hp=0;
+    removeBuilding(b);
+    const c=bCenter(b);
+    for(let i=0;i<12;i++){
+      const a=rand(0,7),s=rand(30,160);
+      G.parts.push({x:c.x,y:c.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(.3,.6),color:BUILD_DEF[b.type].color,r:rand(2,4)});
+    }
+    if(b.type==='core')gameOver('코어가 파괴되었습니다...');
+    else fText(BUILD_DEF[b.type].name+' 파괴됨!',c.x,c.y,'#ff8a8a');
+  }
+}
+function updateBuildings(dt){
+  for(const b of G.buildings){
+    b.flash=Math.max(0,b.flash-dt);
+    const def=BUILD_DEF[b.type];
+    if(def.turret){
+      b.cd-=dt;
+      const c=bCenter(b);
+      let best=null,bd=def.turret.range*def.turret.range;
+      for(const z of G.zombies){
+        const d=dist2(c.x,c.y,z.x,z.y);
+        if(d<bd){bd=d;best=z;}
+      }
+      if(best){
+        b.angle=Math.atan2(best.y-c.y,best.x-c.x);
+        if(b.cd<=0){
+          b.cd=def.turret.rof;
+          G.bullets.push({x:c.x+Math.cos(b.angle)*17,y:c.y+Math.sin(b.angle)*17,
+            vx:Math.cos(b.angle)*def.turret.bspd,vy:Math.sin(b.angle)*def.turret.bspd,
+            dmg:def.turret.dmg,life:.75,color:b.type==='turret2'?'#ffd97a':'#9fd0ff'});
+        }
+      }
+    }
+    if(b.type==='mine'||b.type==='farm'){
+      b.prodT-=dt;
+      if(b.prodT<=0){
+        b.prodT=b.tier>=2?5:7.5;
+        const c=bCenter(b);
+        if(b.type==='mine'){addRes('stone',b.tier>=2?4:2,c.x,c.y-14);addRes('scrap',b.tier>=2?2:1,c.x+8,c.y-32);}
+        else addRes('food',b.tier>=2?4:2,c.x,c.y-14);
+      }
+    }
+  }
+}
+
+//////////////////// 낮/밤 사이클 & 웨이브 ////////////////////
+function updatePhase(dt){
+  if(G.phase==='night'){
+    if(G.waveSpawned<G.waveTotal){
+      G.spawnTimer-=dt;
+      if(G.spawnTimer<=0){
+        G.spawnTimer=2.7;
+        const batch=Math.min(randi(3,5+Math.floor(G.wave/2)),G.waveTotal-G.waveSpawned);
+        spawnWaveBatch(batch);
+      }
+    }else if(G.waveAlive<=0){
+      startDay();
+    }
+  }else{
+    G.phaseT-=dt;
+    if(G.phaseT<=0){
+      if(G.phase==='day'){
+        G.phase='dusk';G.phaseT=DUSK_LEN;G.phaseAge=0;
+        announce('해질녘 — 좀비들이 강해진다. 기지로 복귀해 방어를 준비하라!',4.5);
+      }else startNight();
+    }
+    // 주간 배회 좀비 유지
+    G.ambTimer-=dt;
+    if(G.ambTimer<=0){
+      G.ambTimer=2.5;
+      let amb=0;for(const z of G.zombies)if(!z.wave)amb++;
+      if(amb<10+G.day*2)spawnAmbient();
+    }
+  }
+}
+function spawnAmbient(){
+  for(let t=0;t<12;t++){
+    const x=rand(TILE*2,W-TILE*2),y=rand(TILE*2,H-TILE*2);
+    if(dist2(x,y,CX,CY)<(BASE_R+260)**2)continue;
+    if(dist2(x,y,G.player.x,G.player.y)<420*420)continue;
+    spawnZombie('walker',x,y,false);
+    return;
+  }
+}
+function startNight(){
+  G.phase='night';G.phaseAge=0;
+  G.wave=G.day;
+  G.waveTotal=10+G.wave*6;
+  G.waveSpawned=0;G.waveAlive=0;G.spawnTimer=1.2;
+  announce(`${G.wave}번째 밤 — 웨이브 시작! 좀비 ${G.waveTotal}마리가 몰려온다!`,4.5);
+  saveGame(); // 밤 직전 상태로 자동 저장
+}
+function waveKindRoll(){
+  const w=G.wave,pool=[['walker',1]];
+  if(w>=2)pool.push(['runner',.22]);
+  if(w>=3)pool.push(['boomer',.13]);
+  if(w>=4)pool.push(['spitter',.14]);
+  if(w>=5)pool.push(['tank',.06+.012*w]);
+  const tot=pool.reduce((s,p)=>s+p[1],0);
+  let r=Math.random()*tot;
+  for(const p of pool){r-=p[1];if(r<=0)return p[0];}
+  return 'walker';
+}
+function spawnWaveBatch(n){
+  const side=randi(0,3);
+  let bx,by;
+  if(side===0){bx=rand(W*.1,W*.9);by=TILE*2;}
+  else if(side===1){bx=rand(W*.1,W*.9);by=H-TILE*2;}
+  else if(side===2){bx=TILE*2;by=rand(H*.1,H*.9);}
+  else{bx=W-TILE*2;by=rand(H*.1,H*.9);}
+  for(let i=0;i<n;i++){
+    spawnZombie(waveKindRoll(),clamp(bx+rand(-100,100),TILE,W-TILE),clamp(by+rand(-100,100),TILE,H-TILE),true);
+    G.waveSpawned++;
+  }
+}
+function startDay(){
+  G.day++;G.phase='day';G.phaseT=DAY_LEN;G.phaseAge=0;
+  const bonus=1+Math.floor(G.wave/3);
+  addRes('parts',bonus);
+  if(G.wave>=VICTORY_WAVE&&!G.won){G.won=true;showVictory();}
+  announce(`${G.day}일차 아침 — ${G.wave}번째 밤을 버텨냈다! (생존 보상: 부품 +${bonus})`,4.5);
+  saveGame(); // 아침마다 자동 저장
+}
+
+//////////////////// 건설 시스템 ////////////////////
+const BUILD_LIST=['wallWood','wallStone','door','turret1','turret2','mine','farm','workshop'];
+const buildMenuEl=document.getElementById('buildMenu');
+const craftMenuEl=document.getElementById('craftMenu');
+
+function buildAvailable(id){
+  const def=BUILD_DEF[id];
+  if(def.need==='workshop2'&&!hasBuilding('workshop',2))return false;
+  return true;
+}
+function enterBuild(){
+  G.buildMode=true;G.buildSel=null;
+  closeCraft();
+  if(T.on){ // 터치: 조준 손가락은 놓은 것으로, 건설 커서는 첫 탭 전까지 화면 밖
+    T.aim.id=null;T.aim.dx=T.aim.dy=0;T.firing=false;
+    mouse.down=false;mouse.x=mouse.y=-9999;
+  }
+  renderBuildMenu();
+  buildMenuEl.style.display='block';
+  placeBuildStick();
+}
+function exitBuild(){
+  G.buildMode=false;G.buildSel=null;G.hoverB=null;
+  buildMenuEl.style.display='none';
+  if(T.on)mouse.down=false;
+}
+let lastBuildHtml='';
+function renderBuildMenu(){
+  let html;
+  if(T.on)html=buildMenuTouchHtml();
+  else{
+  html='<h3>건설 모드 <span style="font-size:11px;color:#7d93a8">— 기지 반경 내에만 배치 가능</span></h3><div class="grid">';
+  for(const id of BUILD_LIST){
+    const def=BUILD_DEF[id];
+    const avail=buildAvailable(id),pay=canPay(def.cost);
+    const cls='cell'+(G.buildSel===id?' sel':'')+((!avail||!pay)?' no':'');
+    html+=`<div class="${cls}" data-b="${id}">
+      <div class="nm">${def.name}</div>
+      <div class="cs">${costStr(def.cost)||'-'}</div>
+      <div class="cs" style="color:#6f8496">${def.desc||''} · HP ${def.hp}</div>
+      ${!avail?'<div class="cs" style="color:#ff8a8a">제작소 II 필요</div>':''}
+    </div>`;
+  }
+  html+='</div><div class="hint">클릭: 배치 · 우클릭/B: 종료 · 기존 건물에 커서 → <b>R</b> 수리 / <b>T</b> 업그레이드 / <b>X</b> 철거(50% 환급)</div>';
+  }
+  // 내용이 그대로면 DOM을 다시 만들지 않는다 (주기적 갱신이 클릭/탭 도중의 버튼을 바꿔치기해 입력이 사라지는 문제 방지)
+  if(html===lastBuildHtml)return;
+  lastBuildHtml=html;
+  buildMenuEl.innerHTML=html;
+  buildMenuEl.querySelectorAll('.cell').forEach(el=>{
+    el.onclick=()=>{
+      const id=el.dataset.b;
+      if(!buildAvailable(id))return;
+      G.buildSel=(G.buildSel===id)?null:id;
+      renderBuildMenu();
+    };
+  });
+  // 터치: 닫기 · 선택한 건물 수리/업그레이드/철거
+  buildMenuEl.querySelectorAll('[data-x]').forEach(el=>{el.onclick=()=>exitBuild();});
+  buildMenuEl.querySelectorAll('[data-a]').forEach(el=>{
+    el.onclick=()=>{
+      if(!G||G.over||G.paused||!G.buildMode||!G.hoverB)return;
+      const a=el.dataset.a;
+      if(a==='r')repairB(G.hoverB);else if(a==='t')upgradeB(G.hoverB);else demolishB(G.hoverB);
+      renderBuildMenu();
+    };
+  });
+  placeBuildStick();
+}
+// 터치용 건설 메뉴: 건물 칸(이름·비용) + 선택 설명 + 탭한 건물의 수리/업그레이드/철거 버튼
+function buildMenuTouchHtml(){
+  const sel=G.buildSel?BUILD_DEF[G.buildSel]:null;
+  let html='<div class="tb-head"><h3>건설 <span style="font-size:12px;color:#7d93a8">— 기지 반경 안에만</span></h3><button class="btn tb-x" data-x="1">✕</button></div><div class="grid">';
+  for(const id of BUILD_LIST){
+    const def=BUILD_DEF[id];
+    const avail=buildAvailable(id),pay=canPay(def.cost);
+    const cls='cell'+(G.buildSel===id?' sel':'')+((!avail||!pay)?' no':'');
+    html+=`<div class="${cls}" data-b="${id}"><div class="nm">${def.name}</div><div class="cs">${!avail?'<span style="color:#ff8a8a">제작소 II 필요</span>':(costStr(def.cost)||'-')}</div></div>`;
+  }
+  html+='</div><div class="tb-act">';
+  const b=G.hoverB;
+  if(b&&b.hp>0){
+    const uc=UPGRADE_COST[b.type];
+    html+=`<span class="tb-bn">${BUILD_DEF[b.type].name}${b.tier>=2?' II':''} · HP ${Math.ceil(b.hp)}/${b.maxHp}${uc&&b.tier<2?' · 업그레이드: '+costStr(uc):''}</span>`+
+      '<button class="btn" data-a="r">수리</button><button class="btn" data-a="t">업그레이드</button><button class="btn" data-a="x">철거</button>';
+  }else if(sel)html+=`<span><b style="color:#ffd97a">${sel.name}</b> — ${sel.desc} · HP ${sel.hp}<br>기지 안을 탭해서 배치 (드래그: 연속 배치)</span>`;
+  else html+='<span>건물을 고르고 기지 안을 탭해서 배치<br>이미 지은 건물을 탭하면 수리 · 업그레이드 · 철거(50% 환급)</span>';
+  return html+'</div>';
+}
+function mouseTile(){
+  const wx=mouse.x/VZ+G.cam.x,wy=mouse.y/VZ+G.cam.y;
+  return{tx:Math.floor(wx/TILE),ty:Math.floor(wy/TILE),wx,wy};
+}
+function canPlaceAt(id,tx,ty){
+  if(tx<1||ty<1||tx>=GW-1||ty>=GH-1)return false;
+  if(G.grid.has(key(tx,ty)))return false;
+  const cxp=(tx+.5)*TILE,cyp=(ty+.5)*TILE;
+  if(dist2(cxp,cyp,CX,CY)>BASE_R*BASE_R)return false;
+  // 플레이어/좀비와 겹침 방지
+  const p=G.player;
+  if(Math.abs(p.x-cxp)<TILE/2+p.r&&Math.abs(p.y-cyp)<TILE/2+p.r)return false;
+  for(const z of G.zombies)
+    if(Math.abs(z.x-cxp)<TILE/2+z.r&&Math.abs(z.y-cyp)<TILE/2+z.r)return false;
+  return true;
+}
+let lastPlaced='';
+function tryPlaceBuild(){
+  const id=G.buildSel;
+  if(!id)return;
+  const{tx,ty}=mouseTile();
+  if(lastPlaced===key(tx,ty))return;
+  const def=BUILD_DEF[id];
+  if(!buildAvailable(id))return;
+  if(!canPlaceAt(id,tx,ty))return;
+  if(!canPay(def.cost)){fText('자원 부족!',(tx+.5)*TILE,(ty)*TILE,'#ff8a8a');lastPlaced=key(tx,ty);return;}
+  pay(def.cost);
+  placeBuilding(id,tx,ty);
+  lastPlaced=key(tx,ty);
+  spark((tx+.5)*TILE,(ty+.5)*TILE,'#9fd0ff',5);
+  renderBuildMenu();
+}
+function repairB(b){
+  if(b.hp>=b.maxHp){fText('수리 불필요',mouseTile().wx,mouseTile().wy-14,'#9fb3c8');return;}
+  let cost={};
+  if(b.type==='core')cost={stone:10,scrap:5};
+  else{
+    const base=BUILD_DEF[b.type].cost;
+    for(const k in base)cost[k]=Math.max(1,Math.ceil(base[k]*.4));
+  }
+  if(!canPay(cost)){fText('수리 자원 부족: '+costStr(cost),bCenter(b).x,bCenter(b).y-16,'#ff8a8a');return;}
+  pay(cost);
+  b.hp=b.maxHp;
+  const c=bCenter(b);
+  fText('수리 완료! (-'+costStr(cost)+')',c.x,c.y-16,'#7ae8a0');
+}
+function upgradeB(b){
+  const uc=UPGRADE_COST[b.type];
+  const c=bCenter(b);
+  if(!uc){fText('업그레이드 불가',c.x,c.y-16,'#9fb3c8');return;}
+  if(b.tier>=2){fText('이미 최고 티어',c.x,c.y-16,'#9fb3c8');return;}
+  if(!canPay(uc)){fText('업그레이드 자원 부족: '+costStr(uc),c.x,c.y-16,'#ff8a8a');return;}
+  pay(uc);
+  b.tier=2;b.maxHp=Math.round(b.maxHp*1.6);b.hp=b.maxHp;
+  fText(BUILD_DEF[b.type].name+' → II 티어!',c.x,c.y-16,'#ffd97a');
+  spark(c.x,c.y,'#ffd97a',8);
+}
+function demolishB(b){
+  const c=bCenter(b);
+  if(b.type==='core'){fText('코어는 철거할 수 없다',c.x,c.y-16,'#ff8a8a');return;}
+  for(const k in BUILD_DEF[b.type].cost)
+    addRes(k,Math.floor(BUILD_DEF[b.type].cost[k]*.5));
+  removeBuilding(b);
+  G.hoverB=null;
+  fText('철거 (50% 환급)',c.x,c.y-16,'#9fb3c8');
+  renderBuildMenu();
+}
+
+//////////////////// 제작 시스템 ////////////////////
+function toggleCraft(){
+  G.craftOpen=!G.craftOpen;
+  if(G.craftOpen){exitBuild();renderCraft();craftMenuEl.style.display='block';}
+  else craftMenuEl.style.display='none';
+}
+function closeCraft(){G.craftOpen=false;craftMenuEl.style.display='none';}
+let lastCraftHtml='';
+function renderCraft(){
+  let html=T.on?'<div class="tb-head"><h3>제작</h3><button class="btn tb-x" data-x="1">✕</button></div>':'<h3>제작 (C로 닫기)</h3>';
+  const ws=hasBuilding('workshop',1),ws2=hasBuilding('workshop',2);
+  html+=`<div style="font-size:${T.on?12:11}px;color:#7d93a8;margin-bottom:8px">제작소:${ws?(ws2?'II 티어':'I 티어'):'없음'} — 화약·약초·부품은 기지 밖 파밍/전투로만 수급 가능</div>`;
+  for(const r of RECIPES){
+    const ok=r.ok(),pay=canPay(r.cost);
+    let stat='';
+    if(r.id==='mkShotgun'&&G.weapons.shotgun)stat='보유중';
+    if(r.id==='mkSmg'&&G.weapons.smg)stat='보유중';
+    html+=`<div class="row">
+      <div><div class="nm">${r.name}</div><div class="cs">${costStr(r.cost)}</div><div class="ds">${T.on?r.desc.replace('Q키로','구급 버튼으로'):r.desc}</div></div>
+      <button class="btn" data-r="${r.id}" ${(!ok||!pay||stat)?'disabled':''}>${stat||'제작'}</button>
+    </div>`;
+  }
+  html+=`<div style="font-size:${T.on?12:11}px;color:#7d93a8;margin-top:6px">보유 — 구급상자 ${G.medkits} · 샷건탄 ${G.ammo.shotgun} · SMG탄 ${G.ammo.smg}</div>`;
+  if(html===lastCraftHtml)return; // 그대로면 다시 만들지 않는다 (탭 도중 버튼 교체 방지)
+  lastCraftHtml=html;
+  craftMenuEl.innerHTML=html;
+  craftMenuEl.querySelectorAll('[data-x]').forEach(el=>{el.onclick=()=>closeCraft();});
+  craftMenuEl.querySelectorAll('button[data-r]').forEach(el=>{
+    el.onclick=()=>{
+      const r=RECIPES.find(x=>x.id===el.dataset.r);
+      if(!r||!r.ok()||!canPay(r.cost))return;
+      pay(r.cost);r.give();
+      fText(r.name+' 완료!',G.player.x,G.player.y-28,'#7ae8a0');
+      renderCraft();
+    };
+  });
+}
+
+//////////////////// 키 입력 ////////////////////
+function onKeyPress(k,e){
+  if(!G||inMenu)return;
+  if(k==='h'){
+    const h=document.getElementById('help');
+    h.style.display=(h.style.display==='block')?'none':'block';
+    return;
+  }
+  if(G.over){if(k==='r')continueFromSave();return;}
+  if(k==='p'){G.paused=!G.paused;return;}
+  if(G.paused)return;
+  if(k==='1')G.weapon='pistol';
+  if(k==='2'){if(G.weapons.shotgun)G.weapon='shotgun';else fText(K('샷건 미보유 (C: 제작)','샷건 미보유 (제작 버튼)'),G.player.x,G.player.y-26,'#9fb3c8');}
+  if(k==='3'){if(G.weapons.smg)G.weapon='smg';else fText(K('SMG 미보유 (C: 제작)','SMG 미보유 (제작 버튼)'),G.player.x,G.player.y-26,'#9fb3c8');}
+  if(k==='q'){
+    if(G.medkits>0&&G.player.hp<G.player.maxHp){
+      G.medkits--;G.player.hp=Math.min(G.player.maxHp,G.player.hp+60);
+      fText('+60 HP (구급상자)',G.player.x,G.player.y-26,'#7ae8a0');
+    }else if(G.medkits<=0)fText(K('구급상자 없음 (C: 제작)','구급상자 없음 (제작 버튼)'),G.player.x,G.player.y-26,'#9fb3c8');
+  }
+  if(k==='f'){
+    if(G.eatCd<=0&&(G.res.food||0)>=3&&G.player.hp<G.player.maxHp){
+      G.res.food-=3;G.eatCd=4;
+      G.player.hp=Math.min(G.player.maxHp,G.player.hp+15);
+      fText('+15 HP (식량)',G.player.x,G.player.y-26,'#8fd06a');
+    }
+  }
+  if(k==='b'){G.buildMode?exitBuild():enterBuild();}
+  if(k==='c')toggleCraft();
+  if(k==='escape'){exitBuild();closeCraft();}
+  if(G.buildMode&&G.hoverB){
+    if(k==='r')repairB(G.hoverB);
+    if(k==='t')upgradeB(G.hoverB);
+    if(k==='x')demolishB(G.hoverB);
+  }
+}
+
+//////////////////// 게임오버/승리 ////////////////////
+const overlayEl=document.getElementById('overlay');
+function gameOver(msg){
+  if(G.over)return;
+  G.over=true;
+  exitBuild();closeCraft();
+  overlayEl.innerHTML=`<h2 style="color:#ff6a6a">패배</h2>
+    <p>${msg}</p>
+    <p>생존: <b>${G.day}일</b> · 버텨낸 밤: <b>${Math.max(0,G.day-1)}회</b> · 처치: <b>${G.killCount}</b></p>
+    <button class="btn" style="font-size:15px;padding:10px 22px" onclick="continueFromSave()">마지막 저장에서 계속${K(' (R)','')}</button>
+    <button class="btn" style="font-size:15px;padding:10px 22px;margin-left:8px" onclick="showMenu()">메인 메뉴</button>`;
+  overlayEl.style.display='block';
+}
+function showVictory(){
+  G.paused=true;
+  overlayEl.innerHTML=`<h2 style="color:#ffd97a">승리!</h2>
+    <p>${VICTORY_WAVE}번의 밤에서 모두 살아남았습니다!<br>처치: <b>${G.killCount}</b></p>
+    <p style="font-size:12px;color:#7d93a8">이후는 무한 모드 — 얼마나 더 버틸 수 있을까?</p>
+    <button class="btn" style="font-size:15px;padding:10px 26px" onclick="overlayEl.style.display='none';G.paused=false;">계속하기</button>`;
+  overlayEl.style.display='block';
+}
+
+// 건설 배치 클릭 (꾹 눌러 연속 배치 지원은 update에서)
+cv.addEventListener('mousedown',e=>{
+  if(touchRecent())return;
+  if(e.button===0&&G&&!G.over&&!G.paused&&G.buildMode&&G.buildSel){lastPlaced='';tryPlaceBuild();}
+});
+
+//////////////////// 카메라 ////////////////////
+function updateCam(dt){
+  const p=G.player,vw=VW/VZ,vh=VH/VZ; // 화면에 보이는 월드 크기
+  G.cam.x=clamp(p.x-vw/2,0,Math.max(0,W-vw));
+  G.cam.y=clamp(p.y-vh/2,0,Math.max(0,H-vh));
+  G.shake=Math.max(0,G.shake-(dt||0)*14);
+}
+
+//////////////////// 렌더링 ////////////////////
+const ctx=cx2d;
+function circle(x,y,r,fill,stroke,lw){
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw||2;ctx.stroke();}
+}
+function bar(x,y,w,h,frac,color,label){
+  ctx.fillStyle='rgba(8,12,16,.78)';ctx.fillRect(x-2,y-2,w+4,h+4);
+  ctx.fillStyle='#242f3a';ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=color;ctx.fillRect(x,y,w*clamp(frac,0,1),h);
+  if(label){
+    ctx.fillStyle='#fff';ctx.font=T.on?'bold 12px sans-serif':'bold 11px sans-serif';
+    ctx.textAlign='left';ctx.textBaseline='middle';
+    ctx.fillText(label,x+6,y+h/2+1);
+  }
+}
+function drawNode(n,camx,camy){
+  const def=NODE_DEF[n.type];
+  const wob=Math.sin(G.time*2+n.wob)*1.2;
+  if(n.type==='tree'){
+    ctx.fillStyle='#5c4326';ctx.fillRect(n.x-3,n.y-2,6,12);
+    circle(n.x+wob*.5,n.y-6,14,'#3e6b2e','#2c4c20',2);
+    circle(n.x-6+wob*.5,n.y-12,8,'#4e7d3a');
+    circle(n.x+7+wob*.5,n.y-10,7,'#4e7d3a');
+  }else if(n.type==='rock'){
+    circle(n.x,n.y,13,'#7d868f','#5a626a',2);
+    circle(n.x-4,n.y-4,4,'#9aa3ac');
+  }else if(n.type==='bush'){
+    circle(n.x,n.y,11,'#4f8236','#3a6126',2);
+    circle(n.x-4,n.y-3,2,'#d05a5a');circle(n.x+3,n.y+2,2,'#d05a5a');circle(n.x+1,n.y-5,2,'#5ad0a0');
+  }else{
+    ctx.fillStyle='#8f7439';ctx.fillRect(n.x-11,n.y-9,22,18);
+    ctx.strokeStyle='#5f4c22';ctx.lineWidth=2;ctx.strokeRect(n.x-11,n.y-9,22,18);
+    ctx.strokeRect(n.x-3,n.y-9,6,18);
+  }
+  // 채집 진행 링 + 잔량
+  if(G.harvNode===n){
+    ctx.strokeStyle='#ffd97a';ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(n.x,n.y,def.r+8,-Math.PI/2,-Math.PI/2+Math.PI*2*(n.hT/0.42));ctx.stroke();
+    ctx.fillStyle='#ffd97a';ctx.font=FONT_WH;ctx.textAlign='center';
+    ctx.fillText(def.name+' '+n.amount,n.x,n.y-def.r-14);
+  }
+}
+function drawBuilding(b){
+  const x=b.tx*TILE,y=b.ty*TILE,w=b.w*TILE,h=b.h*TILE;
+  const def=BUILD_DEF[b.type];
+  const cxp=x+w/2,cyp=y+h/2;
+  if(b.type==='wallWood'||b.type==='wallStone'){
+    ctx.fillStyle=def.color;ctx.fillRect(x+1,y+1,w-2,h-2);
+    ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=2;ctx.strokeRect(x+2,y+2,w-4,h-4);
+    ctx.fillStyle='rgba(255,255,255,.12)';ctx.fillRect(x+1,y+1,w-2,4);
+    if(b.hp<b.maxHp*.5){
+      ctx.strokeStyle='rgba(0,0,0,.5)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(x+5,y+6);ctx.lineTo(x+w-8,y+h-5);ctx.moveTo(x+w-6,y+8);ctx.lineTo(x+10,y+h-7);ctx.stroke();
+    }
+  }else if(b.type==='door'){
+    ctx.fillStyle=def.color;ctx.fillRect(x+1,y+1,w-2,h-2);
+    ctx.strokeStyle='rgba(0,0,0,.45)';ctx.lineWidth=2;ctx.strokeRect(x+2,y+2,w-4,h-4);
+    ctx.fillStyle='rgba(0,0,0,.35)';
+    ctx.fillRect(x+6,y+h/2-1,w-12,2);
+    ctx.beginPath();ctx.moveTo(cxp,y+7);ctx.lineTo(cxp-5,y+13);ctx.lineTo(cxp+5,y+13);ctx.fill();
+    ctx.beginPath();ctx.moveTo(cxp,y+h-7);ctx.lineTo(cxp-5,y+h-13);ctx.lineTo(cxp+5,y+h-13);ctx.fill();
+  }else if(def.turret){
+    ctx.fillStyle='#3a4652';ctx.fillRect(x+3,y+3,w-6,h-6);
+    circle(cxp,cyp,10,b.type==='turret2'?'#6b5a30':'#44586b','#22303c',2);
+    ctx.save();ctx.translate(cxp,cyp);ctx.rotate(b.angle);
+    ctx.fillStyle=b.type==='turret2'?'#e8b653':'#8fb8d8';
+    ctx.fillRect(0,-3,16,6);
+    if(b.type==='turret2')ctx.fillRect(0,-5,11,10);
+    ctx.restore();
+    circle(cxp,cyp,4,'#dce8f2');
+  }else if(b.type==='core'){
+    const pulse=.5+.5*Math.sin(G.time*3);
+    ctx.fillStyle='#1d3b3a';ctx.fillRect(x+2,y+2,w-4,h-4);
+    ctx.strokeStyle='#2f5a56';ctx.lineWidth=3;ctx.strokeRect(x+3,y+3,w-6,h-6);
+    circle(cxp,cyp,16+pulse*3,'rgba(90,224,200,.25)');
+    circle(cxp,cyp,12,'#5ae0c8','#bdf5ea',2);
+    circle(cxp,cyp,5,'#eafffb');
+  }else{
+    ctx.fillStyle='#33404d';ctx.fillRect(x+2,y+2,w-4,h-4);
+    ctx.strokeStyle=def.color;ctx.lineWidth=2;ctx.strokeRect(x+3,y+3,w-6,h-6);
+    ctx.font='16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(b.type==='mine'?'⛏️':(b.type==='farm'?'🌾':'🔨'),cxp,cyp+1);
+    if(b.tier>=2){
+      ctx.fillStyle='#ffd97a';ctx.font=FONT_WII;
+      ctx.fillText('II',x+w-7,y+8);
+    }
+  }
+  if(b.flash>0){ctx.fillStyle='rgba(255,255,255,'+(b.flash*4)+')';ctx.fillRect(x,y,w,h);}
+  if(b.hp<b.maxHp){
+    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(x+2,y-7,w-4,4);
+    ctx.fillStyle=b.hp<b.maxHp*.3?'#e05a5a':'#7ae8a0';
+    ctx.fillRect(x+2,y-7,(w-4)*(b.hp/b.maxHp),4);
+  }
+}
+function drawZombie(z){
+  const k=ZKIND[z.kind];
+  const wob=Math.sin(G.time*8+z.wob)*2;
+  const bodyC=z.hurtF>0?'#ffffff':k.color;
+  // 팔
+  ctx.strokeStyle=k.dark;ctx.lineWidth=4;
+  const fa=z.face||0;
+  ctx.beginPath();
+  ctx.moveTo(z.x,z.y);ctx.lineTo(z.x+Math.cos(fa-.5)*(z.r+6),z.y+Math.sin(fa-.5)*(z.r+6)+wob*.4);
+  ctx.moveTo(z.x,z.y);ctx.lineTo(z.x+Math.cos(fa+.5)*(z.r+6),z.y+Math.sin(fa+.5)*(z.r+6)-wob*.4);
+  ctx.stroke();
+  circle(z.x,z.y+wob*.3,z.r,bodyC,k.dark,2);
+  // 눈
+  const ex=Math.cos(fa),ey=Math.sin(fa);
+  circle(z.x+ex*z.r*.5-ey*z.r*.35,z.y+ey*z.r*.5+ex*z.r*.35,z.r*.16,'#1d1206');
+  circle(z.x+ex*z.r*.5+ey*z.r*.35,z.y+ey*z.r*.5-ex*z.r*.35,z.r*.16,'#1d1206');
+  if(k.explode)circle(z.x,z.y-2,z.r*.4,'#ffe08a');
+  if(z.kind==='tank'){ctx.strokeStyle='#2c403a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(z.x,z.y,z.r-4,0,7);ctx.stroke();}
+  if(z.hp<z.maxHp){
+    ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(z.x-12,z.y-z.r-9,24,3.5);
+    ctx.fillStyle='#e05a5a';ctx.fillRect(z.x-12,z.y-z.r-9,24*(z.hp/z.maxHp),3.5);
+  }
+}
+function drawPlayer(){
+  const p=G.player;
+  circle(p.x,p.y,p.r+2,'rgba(0,0,0,.25)');
+  circle(p.x,p.y,p.r,p.hurtT>0?'#ffb0a0':'#e8eef4','#5a86ad',2.5);
+  // 총
+  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.aim);
+  ctx.fillStyle='#2c3540';
+  const wd=WEAPONS[G.weapon];
+  if(G.weapon==='shotgun'){ctx.fillRect(2,-3,19,6);}
+  else if(G.weapon==='smg'){ctx.fillRect(2,-2.5,16,5);ctx.fillRect(8,2,4,5);}
+  else ctx.fillRect(3,-2,13,4);
+  ctx.restore();
+  circle(p.x+Math.cos(p.aim)*4,p.y+Math.sin(p.aim)*4,3.5,'#8fb0c8');
+}
+
+function drawWorld(camx,camy){
+  if(!groundPat)groundPat=ctx.createPattern(groundCv,'repeat');
+  const vw=VW/VZ,vh=VH/VZ; // 화면에 보이는 월드 크기
+  ctx.fillStyle=groundPat;
+  ctx.fillRect(camx-8,camy-8,vw+16,vh+16);
+  // 기지 구역 표시
+  ctx.strokeStyle='rgba(120,200,255,.3)';ctx.lineWidth=2;ctx.setLineDash([14,10]);
+  ctx.beginPath();ctx.arc(CX,CY,BASE_R,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(90,150,200,.045)';
+  ctx.beginPath();ctx.arc(CX,CY,BASE_R,0,Math.PI*2);ctx.fill();
+  // 월드 경계
+  ctx.strokeStyle='rgba(200,60,60,.5)';ctx.lineWidth=6;
+  ctx.strokeRect(3,3,W-6,H-6);
+
+  const vis=(x,y,m)=>x>camx-m&&x<camx+vw+m&&y>camy-m&&y<camy+vh+m;
+  let hintNode=null,hintD=70*70;
+  for(const n of G.nodes){
+    if(!n.alive||!vis(n.x,n.y,50))continue;
+    drawNode(n,camx,camy);
+    const d=dist2(n.x,n.y,G.player.x,G.player.y);
+    if(d<hintD){hintD=d;hintNode=n;}
+  }
+  G.hintNode=hintNode; // 터치: 근처에 자원이 있으면 채집 버튼이 빛난다
+  if(hintNode&&G.harvNode!==hintNode&&!G.buildMode){
+    if(!T.on){
+    ctx.fillStyle='rgba(10,14,20,.85)';
+    ctx.fillRect(hintNode.x-30,hintNode.y-NODE_DEF[hintNode.type].r-26,60,16);
+    ctx.fillStyle='#ffd97a';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('E 꾹: 채집',hintNode.x,hintNode.y-NODE_DEF[hintNode.type].r-18);
+    }else{ // 터치: 화면에서 12px 글자
+      const k=1/VZ,bw=88*k,bh=18*k,by=hintNode.y-NODE_DEF[hintNode.type].r-8*k-bh;
+      ctx.fillStyle='rgba(10,14,20,.85)';ctx.fillRect(hintNode.x-bw/2,by,bw,bh);
+      ctx.fillStyle='#ffd97a';ctx.font=FONT_WT;ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('채집 버튼 꾹',hintNode.x,by+bh/2+k);
+    }
+  }
+  for(const d of G.drops){
+    if(!vis(d.x,d.y,20))continue;
+    const bob=Math.sin(G.time*5+d.x)*2;
+    circle(d.x,d.y+bob,5,RES_DEF[d.r].color,'rgba(0,0,0,.4)',1.5);
+  }
+  for(const b of G.buildings){
+    if(!vis((b.tx+.5)*TILE,(b.ty+.5)*TILE,TILE*2))continue;
+    drawBuilding(b);
+  }
+  for(const z of G.zombies){
+    if(!vis(z.x,z.y,40))continue;
+    drawZombie(z);
+  }
+  drawPlayer();
+  for(const b of G.bullets){
+    ctx.strokeStyle=b.color;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(b.x-b.vx*.018,b.y-b.vy*.018);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+  for(const s of G.spits){
+    circle(s.x,s.y,4.5,'#b06ad0','#7d3aa0',1.5);
+  }
+  for(const p of G.parts){
+    ctx.globalAlpha=clamp(p.life*2.5,0,1);
+    circle(p.x,p.y,p.r,p.color);
+    ctx.globalAlpha=1;
+  }
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  for(const t of G.texts){
+    ctx.globalAlpha=clamp(t.life,0,1);
+    ctx.font=FONT_WT;
+    ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillText(t.t,t.x+1,t.y+1);
+    ctx.fillStyle=t.c;ctx.fillText(t.t,t.x,t.y);
+    ctx.globalAlpha=1;
+  }
+  // 건설 고스트/호버
+  if(G.buildMode){
+    const{tx,ty}=mouseTile();
+    if(G.buildSel){
+      const ok=canPlaceAt(G.buildSel,tx,ty)&&canPay(BUILD_DEF[G.buildSel].cost);
+      ctx.fillStyle=ok?'rgba(110,230,140,.4)':'rgba(230,90,90,.4)';
+      ctx.fillRect(tx*TILE,ty*TILE,TILE,TILE);
+      ctx.strokeStyle=ok?'#6ee68c':'#e65a5a';ctx.lineWidth=2;
+      ctx.strokeRect(tx*TILE,ty*TILE,TILE,TILE);
+      const tdef=BUILD_DEF[G.buildSel];
+      if(tdef.turret){
+        ctx.strokeStyle='rgba(140,200,255,.35)';ctx.setLineDash([8,8]);
+        ctx.beginPath();ctx.arc((tx+.5)*TILE,(ty+.5)*TILE,tdef.turret.range,0,7);ctx.stroke();ctx.setLineDash([]);
+      }
+    }else if(G.hoverB){
+      const b=G.hoverB;
+      ctx.strokeStyle='#ffd97a';ctx.lineWidth=2;
+      ctx.strokeRect(b.tx*TILE-2,b.ty*TILE-2,b.w*TILE+4,b.h*TILE+4);
+    }
+    // 포탑 사거리 항상 표시
+    for(const b of G.buildings){
+      const def=BUILD_DEF[b.type];
+      if(!def.turret)continue;
+      const c=bCenter(b);
+      if(!vis(c.x,c.y,def.turret.range+50))continue;
+      ctx.strokeStyle='rgba(140,200,255,.14)';
+      ctx.beginPath();ctx.arc(c.x,c.y,def.turret.range,0,7);ctx.stroke();
+    }
+  }
+}
+
+function drawLighting(camx,camy){
+  if(G.phase==='day')return;
+  const age=clamp(G.phaseAge/5,0,1);
+  if(G.phase==='dusk'){
+    ctx.fillStyle=`rgba(255,110,40,${0.05+0.08*age})`;
+    ctx.fillRect(0,0,VW,VH);
+    ctx.fillStyle=`rgba(30,18,55,${0.20*age})`;
+    ctx.fillRect(0,0,VW,VH);
+    return;
+  }
+  // 밤
+  lct.globalCompositeOperation='source-over';
+  lct.clearRect(0,0,VW,VH);
+  lct.fillStyle=`rgba(5,7,20,${0.62+0.18*age})`;
+  lct.fillRect(0,0,VW,VH);
+  lct.globalCompositeOperation='destination-out';
+  const holes=[[G.player.x,G.player.y,240,1]];
+  for(const b of G.buildings){
+    const c=bCenter(b);
+    if(b.type==='core')holes.push([c.x,c.y,210,.95]);
+    else if(BUILD_DEF[b.type].turret)holes.push([c.x,c.y,140,.8]);
+    else if(BUILD_DEF[b.type].prod)holes.push([c.x,c.y,100,.7]);
+  }
+  for(const[hx,hy,wr,hi]of holes){
+    const sx=(hx-camx)*VZ,sy=(hy-camy)*VZ,hr=wr*VZ; // 월드 → 화면 좌표
+    if(sx<-hr||sy<-hr||sx>VW+hr||sy>VH+hr)continue;
+    const g=lct.createRadialGradient(sx,sy,hr*.15,sx,sy,hr);
+    g.addColorStop(0,`rgba(0,0,0,${hi})`);
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    lct.fillStyle=g;
+    lct.beginPath();lct.arc(sx,sy,hr,0,7);lct.fill();
+  }
+  ctx.drawImage(lightCv,0,0,VW,VH);
+  ctx.fillStyle='rgba(45,60,130,.07)';
+  ctx.fillRect(0,0,VW,VH);
+}
+
+function fmtTime(s){
+  s=Math.max(0,Math.ceil(s));
+  return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+}
+function drawHUD(){
+  const p=G.player,L=T.on?T.L:null; // L: 터치 화면 배치 (PC는 원래 자리 그대로)
+  // HP / 코어
+  const hx=L?L.hp.x:14,hy=L?L.hp.y:14,hw=L?L.hp.w:220;
+  bar(hx,hy,hw,17,p.hp/p.maxHp,p.hp<30?'#ff4a4a':'#e05a5a','HP '+Math.ceil(p.hp)+' / '+p.maxHp);
+  if(G.core&&G.core.hp>0)bar(hx,hy+23,hw,13,G.core.hp/G.core.maxHp,'#5ae0c8','코어 '+Math.ceil(G.core.hp));
+  if(!L){
+  ctx.fillStyle='#c8d6e2';ctx.font='12px sans-serif';ctx.textAlign='left';ctx.textBaseline='top';
+  ctx.fillText(`구급상자 ×${G.medkits} (Q) · 식량 섭취 (F) · 조작법 (H)`,14,58);
+  // 자원 (우상단)
+  let y=14;
+  ctx.textAlign='right';
+  for(const k in RES_DEF){
+    circle(VW-146,y+7,5,RES_DEF[k].color);
+    ctx.fillStyle='#dbe6f0';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+    ctx.fillText(RES_DEF[k].name,VW-136,y+1);
+    ctx.textAlign='right';
+    ctx.fillText(String(G.res[k]||0),VW-14,y+1);
+    y+=21;
+  }
+  }else{ // 터치: 자원은 촘촘한 격자 (구급상자 수는 구급 버튼에 표시)
+    const R=L.res,rows=Math.ceil(7/R.cols);
+    ctx.fillStyle='rgba(6,10,14,.6)';ctx.fillRect(R.x-4,R.y-3,R.cols*R.cw+8,rows*R.rh+6);
+    ctx.font='bold 12px sans-serif';ctx.textBaseline='top';
+    let i=0;
+    for(const k in RES_DEF){
+      const x=R.x+(i%R.cols)*R.cw,y=R.y+Math.floor(i/R.cols)*R.rh;i++;
+      circle(x+6,y+8,4.5,RES_DEF[k].color);
+      ctx.fillStyle='#dbe6f0';ctx.textAlign='left';ctx.fillText(RES_DEF[k].name,x+14,y+2);
+      ctx.textAlign='right';ctx.fillText(String(G.res[k]||0),x+R.cw-6,y+2);
+    }
+  }
+  // 시간/페이즈 (상단 중앙)
+  let phTxt,phCol;
+  if(G.phase==='day'){phTxt=`☀️ ${G.day}일차 낮 — ${fmtTime(G.phaseT)}`;phCol='#ffd97a';}
+  else if(G.phase==='dusk'){phTxt=`🌆 해질녘 — 밤까지 ${fmtTime(G.phaseT)}`;phCol='#ff9a5a';}
+  else{
+    const remain=G.waveAlive+(G.waveTotal-G.waveSpawned);
+    phTxt=`🌙 ${G.wave}번째 밤 — 남은 좀비 ${remain}`;phCol='#8fb0ff';
+  }
+  if(!L){
+  ctx.font='bold 17px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillText(phTxt,VW/2+1,15);
+  ctx.fillStyle=phCol;ctx.fillText(phTxt,VW/2,14);
+  if(G.phase==='night'){
+    const done=1-(G.waveAlive+(G.waveTotal-G.waveSpawned))/G.waveTotal;
+    bar(VW/2-110,40,220,7,done,'#8fb0ff');
+  }
+  }else{ // 터치: 버튼·HP바와 겹치지 않는 범위에서 가운데
+    const P=L.phase;
+    ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+    const tw=ctx.measureText(phTxt).width,cxp=clamp(VW/2,P.lo+tw/2,Math.max(P.lo+tw/2,P.hi-tw/2));
+    ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillText(phTxt,cxp+1,P.y+1);
+    ctx.fillStyle=phCol;ctx.fillText(phTxt,cxp,P.y);
+    if(G.phase==='night'){
+      const done=1-(G.waveAlive+(G.waveTotal-G.waveSpawned))/G.waveTotal;
+      const bw=Math.min(220,P.hi-P.lo),bx=clamp(VW/2-bw/2,P.lo,Math.max(P.lo,P.hi-bw));
+      bar(bx,P.y+24,bw,7,done,'#8fb0ff');
+    }
+  }
+  // 무기 (좌하단 · 터치는 좌상단, 탭하면 교체)
+  const slots=[['1','pistol'],['2','shotgun'],['3','smg']];
+  const sw=L?L.slots.w:86,sh=L?L.slots.h:50,sy=L?L.slots.y:VH-64;
+  let x=L?L.slots.x:14;
+  for(const[num,id]of slots){
+    const own=G.weapons[id],sel=G.weapon===id;
+    ctx.fillStyle=sel?'rgba(232,182,83,.25)':'rgba(10,14,20,.75)';
+    ctx.fillRect(x,sy,sw,sh);
+    ctx.strokeStyle=sel?'#e8b653':(own?'#44586b':'#2a3542');ctx.lineWidth=2;
+    ctx.strokeRect(x,sy,sw,sh);
+    ctx.fillStyle=own?'#dbe6f0':'#55636f';ctx.font='bold 12px sans-serif';ctx.textAlign='left';ctx.textBaseline='top';
+    ctx.fillText(num+'. '+WEAPONS[id].name,x+(L?5:7),sy+(L?5:6));
+    ctx.font=L?'12px sans-serif':'11px sans-serif';
+    ctx.fillText(own?(WEAPONS[id].infinite?'∞':'탄약 '+(G.ammo[id]||0)):'미보유',x+(L?5:7),sy+(L?22:24));
+    x+=sw+(L?L.slots.gap:6);
+  }
+  // 미니맵 (우하단 · 터치는 자원 아래, 가로 화면 건설 모드에선 건설 메뉴 자리라 숨김)
+  if(!(L&&G.buildMode&&!L.port)){
+  const MM=L?L.mm.size:170,mx=L?L.mm.x:VW-MM-14,my=L?L.mm.y:VH-MM-14,s=MM/W;
+  ctx.fillStyle='rgba(6,10,14,.85)';ctx.fillRect(mx-3,my-3,MM+6,MM+6);
+  ctx.strokeStyle='#33465a';ctx.lineWidth=2;ctx.strokeRect(mx-3,my-3,MM+6,MM+6);
+  for(const n of G.nodes){
+    if(!n.alive)continue;
+    ctx.fillStyle=NODE_DEF[n.type].color;
+    ctx.fillRect(mx+n.x*s-1,my+n.y*s-1,2.2,2.2);
+  }
+  ctx.strokeStyle='rgba(120,200,255,.5)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(mx+CX*s,my+CY*s,BASE_R*s,0,7);ctx.stroke();
+  for(const b of G.buildings){
+    ctx.fillStyle=b.type==='core'?'#5ae0c8':'#8899aa';
+    ctx.fillRect(mx+b.tx*TILE*s-.8,my+b.ty*TILE*s-.8,1.8,1.8);
+  }
+  for(const z of G.zombies){
+    ctx.fillStyle=z.wave?'#ff5a5a':'#c07a5a';
+    ctx.fillRect(mx+z.x*s-1,my+z.y*s-1,2.4,2.4);
+  }
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(mx+p.x*s-1.6,my+p.y*s-1.6,3.6,3.6);
+  }
+  // 공지
+  if(G.announce){
+    const a=G.announce;
+    ctx.globalAlpha=clamp(a.life/a.max*2,0,1);
+    if(!L){
+    ctx.font='bold 21px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillText(a.t,VW/2+1,73);
+    ctx.fillStyle='#ffe8b0';ctx.fillText(a.t,VW/2,72);
+    }else{ // 터치: 상단 HUD 아래, 화면보다 길면 두 줄로
+      ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+      let l1=a.t,l2=null;
+      if(ctx.measureText(a.t).width>VW-24-L.s.l-L.s.r){
+        let cut=-1;
+        for(let i=0;i<a.t.length;i++)if(a.t[i]===' '&&(cut<0||Math.abs(i-a.t.length/2)<Math.abs(cut-a.t.length/2)))cut=i;
+        if(cut>0){l1=a.t.slice(0,cut);l2=a.t.slice(cut+1);}
+      }
+      ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillText(l1,VW/2+1,L.ann.y+1);if(l2)ctx.fillText(l2,VW/2+1,L.ann.y+21);
+      ctx.fillStyle='#ffe8b0';ctx.fillText(l1,VW/2,L.ann.y);if(l2)ctx.fillText(l2,VW/2,L.ann.y+20);
+    }
+    ctx.globalAlpha=1;
+  }
+  // 피격 비네트
+  if(p.hurtT>0||p.hp<30){
+    const a=Math.max(p.hurtT*1.5,p.hp<30?.25+.1*Math.sin(G.time*6):0);
+    const g=ctx.createRadialGradient(VW/2,VH/2,VH*.35,VW/2,VH/2,VH*.75);
+    g.addColorStop(0,'rgba(200,30,30,0)');
+    g.addColorStop(1,`rgba(200,30,30,${clamp(a,0,.5)})`);
+    ctx.fillStyle=g;ctx.fillRect(0,0,VW,VH);
+  }
+  // 일시정지
+  if(G.paused&&!G.over&&overlayEl.style.display!=='block'){
+    ctx.fillStyle='rgba(5,8,12,.6)';ctx.fillRect(0,0,VW,VH);
+    ctx.fillStyle='#dbe6f0';ctx.font=L?'bold 22px sans-serif':'bold 30px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(L?'일시정지 — 화면을 탭하면 계속':'일시정지 (P)',VW/2,VH/2);
+  }
+  // 저장 알림
+  if(G.saveToastT>0){
+    const ty=L?VH-L.s.b-10:VH-14;
+    ctx.globalAlpha=clamp(G.saveToastT,0,1);
+    ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+    ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText('💾 자동 저장됨',VW/2+1,ty+1);
+    ctx.fillStyle='#9fe8b8';ctx.fillText('💾 자동 저장됨',VW/2,ty);
+    ctx.globalAlpha=1;
+  }
+  // 조준점 (터치는 조준 중일 때만)
+  if(!G.buildMode&&!G.over&&(!L||T.aim.id!==null)){
+    ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(mouse.x,mouse.y,7,0,7);ctx.stroke();
+    circle(mouse.x,mouse.y,1.5,'#fff');
+  }
+  if(L)drawTouch();
+}
+
+// 터치 컨트롤 그리기 (스틱 · 버튼)
+function tButton(b,label,sub,on,dim,glow){
+  const B=T.L.B;
+  ctx.globalAlpha=dim?.45:1;
+  ctx.fillStyle=on?'rgba(255,255,255,.32)':'rgba(10,14,20,.55)';
+  ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
+  ctx.lineWidth=glow?3:2;
+  ctx.strokeStyle=on?'#fff':(glow?'rgba(255,217,122,'+(.55+.45*Math.sin(G.time*8)).toFixed(2)+')':'rgba(255,255,255,.4)');
+  ctx.stroke();
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  if(label){
+    ctx.fillStyle='#fff';ctx.font=T.L.font;
+    ctx.fillText(label,b.x,sub?b.y-6*B:b.y+1);
+  }
+  if(sub){ctx.fillStyle='#c8d6e2';ctx.font='bold 12px sans-serif';ctx.fillText(sub,b.x,b.y+10*B);}
+  ctx.globalAlpha=1;
+}
+function tStick(s,rx,ry,label,fire){
+  const R=T.L.R,on=s.id!==null,bx=on?s.bx:rx,by=on?s.by:ry;
+  ctx.globalAlpha=on?1:.55;
+  ctx.fillStyle='rgba(10,14,20,.28)';ctx.beginPath();ctx.arc(bx,by,R,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=on?'rgba(255,255,255,.55)':'rgba(255,255,255,.25)';ctx.lineWidth=2;ctx.stroke();
+  if(on&&fire!==undefined){ // 안쪽 고리: 이보다 멀리 밀면 사격
+    ctx.strokeStyle=fire?'rgba(255,120,80,.7)':'rgba(255,255,255,.25)';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.arc(bx,by,R*.3,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+  }
+  const kx=bx+(on?s.dx:0),ky=by+(on?s.dy:0);
+  ctx.fillStyle=on?(fire?'rgba(255,120,80,.85)':'rgba(255,255,255,.55)'):'rgba(255,255,255,.16)';
+  ctx.beginPath();ctx.arc(kx,ky,R*.42,0,Math.PI*2);ctx.fill();
+  if(!on){ctx.fillStyle='rgba(255,255,255,.85)';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,bx,by);}
+  ctx.globalAlpha=1;
+}
+function drawTouch(){
+  const L=T.L,B=L.B;
+  if(G.over)return; // 패배 화면은 DOM 버튼만
+  // 일시정지 / 조작법
+  tButton(L.pause,null,null,T.press.pause>0,false,false);
+  ctx.fillStyle='#fff';
+  if(G.paused){ctx.beginPath();ctx.moveTo(L.pause.x-5*B,L.pause.y-8*B);ctx.lineTo(L.pause.x+8*B,L.pause.y);ctx.lineTo(L.pause.x-5*B,L.pause.y+8*B);ctx.fill();}
+  else{ctx.fillRect(L.pause.x-6*B,L.pause.y-8*B,4*B,16*B);ctx.fillRect(L.pause.x+2*B,L.pause.y-8*B,4*B,16*B);}
+  tButton(L.help,'?',null,T.press.help>0,false,false);
+  if(G.paused)return;
+  if(G.buildMode){tStick(T.move,L.bst.x,L.bst.y,'이동');return;}
+  tStick(T.move,L.mv.x,L.mv.y,'이동');
+  tStick(T.aim,L.am.x,L.am.y,'조준·사격',T.firing);
+  for(const b of L.btns){
+    let sub=null,dim=false,glow=false,on=T.press[b.id]>0;
+    if(b.id==='harvest'){on=on||!!keys.e;glow=!!G.hintNode;sub='꾹';}
+    else if(b.id==='weapon')sub=WEAPONS[G.weapon].name;
+    else if(b.id==='med'){sub='×'+G.medkits;dim=G.medkits<=0;}
+    else if(b.id==='food'){sub=String(G.res.food||0);dim=(G.res.food||0)<3||G.eatCd>0;}
+    else if(b.id==='craft')on=on||!!G.craftOpen;
+    tButton(b,b.t,sub,on,dim,glow);
+  }
+}
+
+function render(){
+  if(!G)return;
+  const shx=(Math.random()-.5)*G.shake,shy=(Math.random()-.5)*G.shake;
+  const camx=G.cam.x+shx,camy=G.cam.y+shy;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle='#07090d';ctx.fillRect(0,0,VW,VH);
+  ctx.save();
+  const k=VZ*DPR; // 월드: 확대율 × 픽셀 비율, 카메라는 기기 픽셀 단위로 반올림
+  ctx.setTransform(k,0,0,k,-Math.round(camx*k),-Math.round(camy*k));
+  drawWorld(camx,camy);
+  ctx.restore();
+  drawLighting(camx,camy);
+  drawHUD();
+}
+
+//////////////////// 메인 루프 ////////////////////
+let last=0;
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt=Math.min(.05,(t-last)/1000||0);
+  last=t;
+  if(T.on)for(const k in T.press)if(T.press[k]>0)T.press[k]-=dt; // 터치 버튼 눌림 표시
+  if(G&&!G.over&&!G.paused&&!inMenu){
+    G.time+=dt;G.phaseAge=(G.phaseAge||0)+dt;
+    touchUpdate(dt);
+    updatePhase(dt);
+    updatePlayer(dt);
+    updateZombies(dt);
+    updateBullets(dt);
+    updateSpits(dt);
+    updateBuildings(dt);
+    updateDrops(dt);
+    updateNodes(dt);
+    updateParticles(dt);
+    updateCam(dt);
+    if(T.on&&!G.buildMode)touchSyncMouse(); // 카메라가 움직인 뒤 조준점 다시 맞춤
+    if(G.buildMode){
+      const{tx,ty}=mouseTile();
+      G.hoverB=G.grid.get(key(tx,ty))||null;
+      if(mouse.down&&G.buildSel)tryPlaceBuild();
+      G.menuT=(G.menuT||0)-dt;
+      if(G.menuT<=0){G.menuT=.6;renderBuildMenu();}
+    }
+    if(G.craftOpen){
+      G.craftT=(G.craftT||0)-dt;
+      if(G.craftT<=0){G.craftT=.7;renderCraft();}
+    }
+    if(G.announce){G.announce.life-=dt;if(G.announce.life<=0)G.announce=null;}
+    // 주기적 자동 저장 (낮/해질녘, 30초마다)
+    G.autoT=(G.autoT===undefined?30:G.autoT)-dt;
+    if(G.autoT<=0){G.autoT=30;if(G.phase!=='night')saveGame();}
+    if(G.saveToastT>0)G.saveToastT-=dt;
+  }
+  if(!inMenu)render();
+}
+
+//////////////////// 저장 시스템 ////////////////////
+const SAVE_KEY='nightsiege_save_v1';
+const SAVE_FILE='nightsiege-save.json';
+
+function buildSave(){
+  // 밤 도중 저장 시 → 해질녘 8초 전 상태로 스냅샷 (밤은 처음부터 재도전)
+  const night=G.phase==='night';
+  return {
+    v:1, ts:Date.now(),
+    day:G.day, phase:night?'dusk':G.phase, phaseT:night?8:G.phaseT,
+    wave:G.wave, won:G.won, kills:G.killCount,
+    res:G.res, weapons:G.weapons, ammo:G.ammo, medkits:G.medkits, weapon:G.weapon,
+    php:G.player.hp, px:G.player.x, py:G.player.y,
+    buildings:(()=>{const seen=new Set(),arr=[];
+      for(const b of G.buildings){if(seen.has(b))continue;seen.add(b);
+        arr.push({type:b.type,tx:b.tx,ty:b.ty,hp:Math.ceil(b.hp),maxHp:b.maxHp,tier:b.tier});}
+      return arr;})(),
+    nodes:G.nodes.map(n=>({type:n.type,x:Math.round(n.x),y:Math.round(n.y),
+      amount:n.amount,max:n.max,alive:n.alive,respT:Math.ceil(n.respT||0)})),
+  };
+}
+function saveGame(){
+  if(!G||G.over||inMenu)return;
+  try{
+    const data=buildSave();
+    const json=JSON.stringify(data);
+    try{localStorage.setItem(SAVE_KEY,json);}catch(e){}
+    folderWrite(json);
+    G.saveToastT=2.2;
+  }catch(e){console.warn('save fail',e);}
+}
+function loadLocalSave(){
+  try{
+    const d=JSON.parse(localStorage.getItem(SAVE_KEY));
+    return (d&&d.v===1)?d:null;
+  }catch(e){return null;}
+}
+async function getBestSave(){
+  const ls=loadLocalSave();
+  const fs=await folderRead();
+  if(ls&&fs)return (fs.ts||0)>(ls.ts||0)?fs:ls;
+  return ls||fs||null;
+}
+async function deleteSave(){
+  try{localStorage.removeItem(SAVE_KEY);}catch(e){}
+  await folderDelete();
+}
+
+// ---- 게임 폴더 세이브 파일 (File System Access API, 크롬/엣지) ----
+let dirHandle=null, folderState='none'; // none | prompt | granted | unsupported
+function idbOpen(){return new Promise((res,rej)=>{
+  const r=indexedDB.open('nightsiege',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('kv');
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
+});}
+async function idbSet(k,v){const db=await idbOpen();return new Promise((res,rej)=>{
+  const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);
+  tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});}
+async function idbGet(k){const db=await idbOpen();return new Promise((res,rej)=>{
+  const rq=db.transaction('kv','readonly').objectStore('kv').get(k);
+  rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);});}
+
+async function initFolder(){
+  if(!window.showDirectoryPicker){folderState='unsupported';return;}
+  try{dirHandle=await idbGet('dir')||null;}catch(e){dirHandle=null;}
+  if(!dirHandle){folderState='none';return;}
+  try{
+    const p=await dirHandle.queryPermission({mode:'readwrite'});
+    folderState=p==='granted'?'granted':'prompt';
+  }catch(e){folderState='none';}
+}
+async function connectFolder(){
+  try{
+    dirHandle=await showDirectoryPicker({mode:'readwrite'});
+    await idbSet('dir',dirHandle);
+    folderState='granted';
+  }catch(e){/* 사용자가 취소 */}
+  refreshMenu();
+}
+async function regrantFolder(){
+  if(!dirHandle)return;
+  try{
+    const p=await dirHandle.requestPermission({mode:'readwrite'});
+    folderState=p==='granted'?'granted':'prompt';
+  }catch(e){}
+  refreshMenu();
+}
+async function folderWrite(json){
+  if(folderState!=='granted'||!dirHandle)return;
+  try{
+    const f=await dirHandle.getFileHandle(SAVE_FILE,{create:true});
+    const w=await f.createWritable();
+    await w.write(json);await w.close();
+  }catch(e){console.warn('folder write fail',e);}
+}
+async function folderRead(){
+  if(folderState!=='granted'||!dirHandle)return null;
+  try{
+    const f=await dirHandle.getFileHandle(SAVE_FILE);
+    const d=JSON.parse(await (await f.getFile()).text());
+    return (d&&d.v===1)?d:null;
+  }catch(e){return null;}
+}
+async function folderDelete(){
+  if(folderState!=='granted'||!dirHandle)return;
+  try{await dirHandle.removeEntry(SAVE_FILE);}catch(e){}
+}
+
+//////////////////// 메인 메뉴 ////////////////////
+const menuEl=document.getElementById('menu');
+const btnContinue=document.getElementById('btnContinue');
+const btnNew=document.getElementById('btnNew');
+const btnDelete=document.getElementById('btnDelete');
+const btnFolder=document.getElementById('btnFolder');
+let menuSave=null, confirmDel=0, confirmNew=0;
+// 조작법 패널: PC(키보드/마우스) / 터치용 두 가지
+const helpEl=document.getElementById('help');
+const HELP_PC=helpEl.innerHTML;
+const HELP_TOUCH=`<div class="tb-head"><h3>조작법</h3><button class="btn tb-x">✕</button></div>
+  <b>이동</b> 화면 왼쪽을 누른 채 드래그<br>
+  <b>조준/사격</b> 화면 오른쪽을 누른 채 드래그 (멀리 밀면 발사)<br>
+  <b>무기 교체</b> <span class="kbd">무기</span> 버튼 또는 좌상단 무기 칸 탭<br>
+  <b>채집</b> 자원 근처에서 <span class="kbd">채집</span> 꾹 누르기<br>
+  <b>건설 모드</b> <span class="kbd">건설</span> — 건물을 고르고 기지 안을 탭 (드래그: 연속 배치)<br>
+  <b>수리/업그레이드/철거</b> 건설 모드에서 건물을 탭 → 메뉴 버튼<br>
+  <b>제작 메뉴</b> <span class="kbd">제작</span><br>
+  <b>구급상자 사용</b> <span class="kbd">구급</span> (+60 HP)<br>
+  <b>식량 섭취</b> <span class="kbd">식량</span> (식량3 → +15 HP)<br>
+  <b>일시정지</b> 오른쪽 위 일시정지 버튼 · 조작법은 <span class="kbd">?</span><br>
+  <hr style="border-color:#243242">
+  낮에 파밍하고, 해질녘에 복귀해 건설하고, 밤 웨이브를 막아내세요.<br>
+  <b>코어</b>가 파괴되거나 <b>플레이어</b>가 죽으면 패배합니다.`;
+helpEl.addEventListener('click',()=>{if(T.on)helpEl.style.display='none';}); // 터치: 패널을 탭하면 닫힘
+
+function timeAgo(ts){
+  const m=Math.floor((Date.now()-ts)/60000);
+  if(m<1)return'방금 전';
+  if(m<60)return m+'분 전';
+  const h=Math.floor(m/60);
+  return h<24?h+'시간 전':Math.floor(h/24)+'일 전';
+}
+async function refreshMenu(){
+  if(!inMenu)return;
+  menuSave=await getBestSave();
+  confirmDel=0;confirmNew=0;
+  const info=document.getElementById('saveInfo');
+  if(menuSave){
+    info.textContent=`세이브: ${menuSave.day}일차 · 처치 ${menuSave.kills||0} · ${timeAgo(menuSave.ts||Date.now())} 저장`;
+    btnContinue.disabled=false;btnDelete.disabled=false;
+    btnNew.textContent='새 게임';
+  }else{
+    info.textContent='저장된 게임 없음';
+    btnContinue.disabled=true;btnDelete.disabled=true;
+    btnNew.textContent='새 게임 시작';
+  }
+  btnDelete.textContent='세이브 파일 삭제';
+  const fs=document.getElementById('folderStat');
+  if(folderState==='unsupported'){
+    btnFolder.style.display='none';
+    fs.innerHTML='이 브라우저는 폴더 저장 미지원 — 브라우저 내부 자동 저장만 사용됩니다.';
+  }else if(folderState==='granted'){
+    btnFolder.textContent='저장 폴더 변경';
+    fs.innerHTML=`<b>✔ 폴더 연결됨</b> — 게임 폴더에 <b>${SAVE_FILE}</b> 자동 생성/갱신 중<br>(브라우저 내부 저장과 이중 백업)`;
+  }else if(folderState==='prompt'){
+    btnFolder.textContent='저장 폴더 재연결 (클릭 1회)';
+    fs.innerHTML='이전에 연결한 폴더가 있습니다 — 버튼을 눌러 권한을 다시 허용하세요.';
+  }else{
+    btnFolder.textContent='저장 폴더 연결 (세이브 파일 자동 생성)';
+    fs.innerHTML='게임 파일이 있는 폴더를 선택하면 그 안에 세이브 파일이 자동 생성됩니다.<br>연결하지 않아도 브라우저 내부에 자동 저장됩니다.';
+  }
+}
+function showMenu(){
+  inMenu=true;
+  exitBuildSafe();
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('help').style.display='none';
+  menuEl.style.display='flex';
+  refreshMenu();
+}
+function exitBuildSafe(){if(G){exitBuild();closeCraft();}}
+function startPlay(save){
+  inMenu=false;
+  menuEl.style.display='none';
+  initGame(save);
+  if(!save)document.getElementById('help').style.display='block';
+}
+btnContinue.onclick=()=>{if(menuSave)startPlay(menuSave);};
+btnNew.onclick=()=>{
+  if(menuSave&&confirmNew===0){
+    confirmNew=1;btnNew.textContent='기존 세이브를 덮어씁니다 — 다시 '+K('클릭','탭');
+    return;
+  }
+  startPlay(null);
+};
+btnDelete.onclick=async()=>{
+  if(confirmDel===0){
+    confirmDel=1;btnDelete.textContent='정말 삭제할까요? — 다시 '+K('클릭','탭');
+    return;
+  }
+  await deleteSave();
+  refreshMenu();
+};
+btnFolder.onclick=()=>{
+  if(folderState==='prompt')regrantFolder();
+  else connectFolder();
+};
+async function continueFromSave(){
+  const s=await getBestSave();
+  inMenu=false;menuEl.style.display='none';
+  initGame(s||null);
+}
+
+// 종료/탭 전환 시 자동 저장
+addEventListener('beforeunload',()=>saveGame());
+addEventListener('pagehide',()=>saveGame());
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveGame();});
+
+//////////////////// 시작 ////////////////////
+setTouchMode(T.on); // 터치 기기면 터치 화면 배치로 (resize 포함)
+initFolder().then(refreshMenu);
+showMenu();
+requestAnimationFrame(loop);
+
+
+
+</script>
+</body>
+</html>

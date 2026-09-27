@@ -1,0 +1,2735 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <title>SDF Physics Lab</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #080a0f;
+      color: #edf2ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: #080a0f;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      cursor: grab;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    #overlayCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      pointer-events: none;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 7px;
+      color: #f8fafc;
+      background: rgba(255, 255, 255, 0.07);
+      cursor: pointer;
+      transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+    }
+
+    /* 터치 기기에서는 탭한 버튼에 hover 색이 남지 않도록 실제 hover가 있는 기기에서만 적용 */
+    @media (hover: hover) {
+      button:hover {
+        border-color: rgba(94, 234, 212, 0.58);
+        background: rgba(94, 234, 212, 0.13);
+      }
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.active {
+      border-color: rgba(94, 234, 212, 0.9);
+      background: rgba(94, 234, 212, 0.19);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .panel {
+      position: fixed;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      background: rgba(9, 13, 22, 0.80);
+      box-shadow: 0 18px 54px rgba(0, 0, 0, 0.36);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      user-select: none;
+      overscroll-behavior: contain;
+      touch-action: manipulation;
+    }
+
+    .left-panel {
+      top: 16px;
+      left: 16px;
+      width: min(370px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 15px 16px 16px;
+    }
+
+    .right-panel {
+      top: 16px;
+      right: 16px;
+      width: min(330px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 15px 16px 16px;
+    }
+
+    .status {
+      left: 50%;
+      bottom: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      min-height: 38px;
+      padding: 8px 12px;
+      transform: translateX(-50%);
+      color: #dbeafe;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      letter-spacing: 0;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 17px;
+      font-weight: 780;
+    }
+
+    h2 {
+      margin-top: 17px;
+      margin-bottom: 8px;
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 760;
+      text-transform: uppercase;
+    }
+
+    p {
+      margin: 0;
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.52;
+    }
+
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .tool-grid button,
+    .action-row button {
+      min-height: 38px;
+      padding: 7px 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .material-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
+      gap: 7px;
+    }
+
+    .material-row button {
+      min-height: 34px;
+      padding: 6px 4px;
+      font-size: 11px;
+      font-weight: 720;
+    }
+
+    .swatch {
+      display: block;
+      width: 16px;
+      height: 16px;
+      margin: 0 auto 4px;
+      border-radius: 999px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+    }
+
+    .object-list {
+      display: grid;
+      gap: 6px;
+      max-height: 160px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .object-row {
+      display: grid;
+      grid-template-columns: 14px 1fr auto;
+      gap: 7px;
+      align-items: center;
+      width: 100%;
+      min-height: 32px;
+      padding: 6px 7px;
+      text-align: left;
+    }
+
+    .object-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    .object-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 680;
+    }
+
+    .object-speed {
+      color: #aab7cc;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .control {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr) 54px;
+      gap: 9px;
+      align-items: center;
+      margin-top: 9px;
+    }
+
+    .control label {
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 680;
+      white-space: nowrap;
+    }
+
+    output,
+    .readout {
+      color: #c2cce0;
+      font-size: 12px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #5eead4;
+    }
+
+    .select-row {
+      display: grid;
+      grid-template-columns: 86px 1fr;
+      gap: 9px;
+      align-items: center;
+      margin-top: 9px;
+    }
+
+    .select-row label {
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 680;
+    }
+
+    select {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 7px;
+      padding: 7px 8px;
+      color: #f8fafc;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .empty {
+      display: grid;
+      min-height: 104px;
+      place-items: center;
+      color: #aab7cc;
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .inspector-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 3px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 999px;
+      color: #b7c3d8;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .error {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 24px;
+      color: #fff;
+      background: #130f18;
+      text-align: center;
+      font: 650 16px/1.5 system-ui, sans-serif;
+      z-index: 20;
+    }
+
+    /* ---- 모바일 대응: 하단 독, 시트형 패널, 터치 안내 ---- */
+    .dock,
+    .sheet-close,
+    .touch-help {
+      display: none;
+    }
+
+    .touch-hint {
+      position: fixed;
+      left: 50%;
+      top: calc(16px + env(safe-area-inset-top));
+      z-index: 8;
+      width: max-content;
+      max-width: min(420px, calc(100vw - 32px));
+      padding: 9px 14px;
+      border: 1px solid rgba(94, 234, 212, 0.38);
+      border-radius: 8px;
+      color: #e2f7f3;
+      background: rgba(9, 13, 22, 0.88);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      font-size: 12px;
+      line-height: 1.55;
+      text-align: center;
+      word-break: keep-all;
+      transform: translateX(-50%);
+      transition: opacity 400ms ease;
+      touch-action: manipulation;
+    }
+
+    .touch-hint.fade {
+      opacity: 0;
+    }
+
+    /* 손가락용: 누르는 곳은 최소 44px, 글자는 최소 12px */
+    @media (pointer: coarse) {
+      body {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .tool-grid button,
+      .action-row button,
+      .material-row button,
+      .object-row,
+      select {
+        min-height: 44px;
+      }
+
+      input[type="range"] {
+        height: 44px;
+        margin: 0;
+      }
+
+      .control {
+        margin-top: 4px;
+      }
+
+      .material-row button,
+      .object-speed,
+      .pill {
+        font-size: 12px;
+      }
+
+      .touch-help {
+        display: block;
+        margin-top: 6px;
+        color: #9fb1c8;
+        word-break: keep-all;
+      }
+    }
+
+    /* 좁은 화면(휴대폰 세로·가로): 자주 쓰는 버튼은 하단 독에 두고, 패널은 필요할 때만 여는 시트로 바꾼다 */
+    @media (max-width: 840px), (max-height: 540px) {
+      :root {
+        --dock-h: 108px;
+      }
+
+      .dock {
+        left: calc(8px + env(safe-area-inset-left));
+        right: calc(8px + env(safe-area-inset-right));
+        bottom: calc(8px + env(safe-area-inset-bottom));
+        z-index: 6;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 6px;
+      }
+
+      .dock-row {
+        display: flex;
+        gap: 6px;
+      }
+
+      .dock button {
+        flex: 1 1 0;
+        min-width: 0;
+        height: 44px;
+        padding: 0 4px;
+        overflow: hidden;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .dock .sheet-toggle {
+        border-color: rgba(94, 234, 212, 0.34);
+      }
+
+      .dock .sheet-toggle.active {
+        border-color: rgba(94, 234, 212, 0.9);
+      }
+
+      .left-panel,
+      .right-panel {
+        display: none;
+        z-index: 7;
+        padding: 12px 14px 14px;
+      }
+
+      body[data-sheet="tools"] .left-panel,
+      body[data-sheet="inspector"] .right-panel {
+        display: block;
+      }
+
+      .sheet-close {
+        display: grid;
+        place-items: center;
+        float: right;
+        width: 44px;
+        height: 44px;
+        margin: -4px -4px 4px 8px;
+        padding: 0;
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .inspector-title {
+        min-height: 40px;
+      }
+
+      .spawn-heading,
+      .left-panel .tool-grid,
+      .world-actions {
+        display: none;
+      }
+
+      .object-list {
+        max-height: none;
+        overflow: visible;
+      }
+
+      .status {
+        top: calc(8px + env(safe-area-inset-top));
+        bottom: auto;
+        z-index: 5;
+        min-height: 32px;
+        max-width: calc(100vw - 16px);
+        padding: 6px 12px;
+        overflow: hidden;
+      }
+
+      .touch-hint {
+        top: calc(50px + env(safe-area-inset-top));
+      }
+
+      @media (orientation: portrait) {
+        .left-panel,
+        .right-panel {
+          top: auto;
+          left: calc(8px + env(safe-area-inset-left));
+          right: calc(8px + env(safe-area-inset-right));
+          bottom: calc(var(--dock-h) + 16px + env(safe-area-inset-bottom));
+          width: auto;
+          max-height: min(56vh, calc(100% - var(--dock-h) - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+        }
+      }
+
+      @media (orientation: landscape) {
+        .left-panel,
+        .right-panel {
+          top: calc(8px + env(safe-area-inset-top));
+          bottom: calc(var(--dock-h) + 16px + env(safe-area-inset-bottom));
+          max-height: none;
+        }
+
+        .left-panel {
+          left: calc(8px + env(safe-area-inset-left));
+          right: auto;
+          width: min(360px, calc(50vw - 16px));
+        }
+
+        .right-panel {
+          left: auto;
+          right: calc(8px + env(safe-area-inset-right));
+          width: min(330px, calc(50vw - 16px));
+        }
+
+        body[data-sheet="tools"] .status {
+          left: auto;
+          right: calc(8px + env(safe-area-inset-right));
+          transform: none;
+        }
+
+        body[data-sheet="inspector"] .status {
+          left: calc(8px + env(safe-area-inset-left));
+          transform: none;
+        }
+      }
+
+      @media (min-width: 680px) {
+        :root {
+          --dock-h: 58px;
+        }
+
+        .dock {
+          flex-direction: row;
+        }
+
+        .dock-row {
+          flex: 6 1 0;
+        }
+
+        .dock-row + .dock-row {
+          flex: 5 1 0;
+        }
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="glCanvas" aria-label="SDF physics lab canvas"></canvas>
+  <canvas id="overlayCanvas" aria-hidden="true"></canvas>
+
+  <section class="panel left-panel" id="toolsPanel" aria-label="world tools">
+    <button class="sheet-close" type="button" aria-label="닫기">✕</button>
+    <h1>SDF Physics Lab</h1>
+    <p class="touch-help">물체를 끌면 이동 · 빈 곳을 끌면 시점 회전 · 물체를 잡은 채 두 손가락을 벌리거나 오므리면 앞뒤로 이동</p>
+
+    <h2 class="spawn-heading">생성</h2>
+    <div class="tool-grid">
+      <button id="addSphere" type="button">구</button>
+      <button id="addBox" type="button">박스</button>
+      <button id="addTorus" type="button">토러스</button>
+      <button id="addBomb" type="button">폭탄</button>
+      <button id="addLiquid" type="button">액체</button>
+      <button id="pulseWorld" type="button">충격파</button>
+    </div>
+
+    <h2>재질</h2>
+    <div class="material-row" id="materialButtons"></div>
+
+    <h2>세계</h2>
+    <div class="control">
+      <label for="gravity">중력</label>
+      <input id="gravity" type="range" min="-18" max="3" step="0.1" value="-9.8">
+      <output id="gravityValue" for="gravity">-9.8</output>
+    </div>
+    <div class="control">
+      <label for="timeScale">시간</label>
+      <input id="timeScale" type="range" min="0.1" max="1.8" step="0.05" value="1">
+      <output id="timeScaleValue" for="timeScale">1.00</output>
+    </div>
+    <div class="control">
+      <label for="blend">SDF blend</label>
+      <input id="blend" type="range" min="0" max="0.42" step="0.01" value="0.04">
+      <output id="blendValue" for="blend">0.04</output>
+    </div>
+    <div class="control">
+      <label for="steps">max steps</label>
+      <input id="steps" type="range" min="48" max="180" step="1" value="112">
+      <output id="stepsValue" for="steps">112</output>
+    </div>
+    <div class="control">
+      <label for="epsilon">epsilon</label>
+      <input id="epsilon" type="range" min="0.0008" max="0.014" step="0.0004" value="0.0028">
+      <output id="epsilonValue" for="epsilon">0.0028</output>
+    </div>
+
+    <div class="action-row world-actions">
+      <button id="togglePause" type="button">일시정지</button>
+      <button id="dropStack" type="button">쌓기</button>
+      <button id="resetWorld" type="button">초기화</button>
+    </div>
+
+    <h2>오브젝트</h2>
+    <div class="object-list" id="objectList"></div>
+  </section>
+
+  <section class="panel right-panel" id="inspectorPanel" aria-label="selected object inspector">
+    <button class="sheet-close" type="button" aria-label="닫기">✕</button>
+    <div class="inspector-title">
+      <h1 id="selectedTitle">선택 없음</h1>
+      <span class="pill" id="objectCount">0 / 24</span>
+    </div>
+
+    <div id="emptyInspector" class="empty">선택 없음</div>
+
+    <div id="inspector" hidden>
+      <div class="select-row">
+        <label for="shapeSelect">형태</label>
+        <select id="shapeSelect">
+          <option value="sphere">구</option>
+          <option value="box">박스</option>
+          <option value="torus">토러스</option>
+        </select>
+      </div>
+      <div class="select-row">
+        <label for="materialSelect">재질</label>
+        <select id="materialSelect"></select>
+      </div>
+
+      <h2>물리값</h2>
+      <div class="control">
+        <label for="size">크기</label>
+        <input id="size" type="range" min="0.22" max="0.92" step="0.01" value="0.5">
+        <output id="sizeValue" for="size">0.50</output>
+      </div>
+      <div class="control">
+        <label for="mass">질량</label>
+        <input id="mass" type="range" min="0.2" max="6" step="0.1" value="1">
+        <output id="massValue" for="mass">1.0</output>
+      </div>
+      <div class="control">
+        <label for="bounce">탄성</label>
+        <input id="bounce" type="range" min="0" max="1" step="0.01" value="0.5">
+        <output id="bounceValue" for="bounce">0.50</output>
+      </div>
+      <div class="control">
+        <label for="friction">마찰</label>
+        <input id="friction" type="range" min="0" max="1" step="0.01" value="0.4">
+        <output id="frictionValue" for="friction">0.40</output>
+      </div>
+
+      <h2>동작</h2>
+      <div class="action-row">
+        <button id="kickObject" type="button">밀기</button>
+        <button id="cloneObject" type="button">복제</button>
+        <button id="deleteObject" type="button">삭제</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="panel status" aria-live="polite">
+    <span id="playState">실행 중</span>
+    <span id="collisionReadout">충돌 0</span>
+    <span id="energyReadout">에너지 0.0</span>
+  </div>
+
+  <!-- 좁은 화면 전용 하단 독: 버튼은 위 패널의 같은 버튼을 대신 누른다 -->
+  <nav class="panel dock" id="dock" aria-label="quick tools">
+    <div class="dock-row">
+      <button type="button" data-proxy="addSphere">구</button>
+      <button type="button" data-proxy="addBox">박스</button>
+      <button type="button" data-proxy="addTorus">토러스</button>
+      <button type="button" data-proxy="addBomb">폭탄</button>
+      <button type="button" data-proxy="addLiquid">액체</button>
+      <button type="button" data-proxy="pulseWorld">충격파</button>
+    </div>
+    <div class="dock-row">
+      <button type="button" data-proxy="togglePause" id="dockPause">일시정지</button>
+      <button type="button" data-proxy="dropStack">쌓기</button>
+      <button type="button" data-proxy="resetWorld">초기화</button>
+      <button type="button" class="sheet-toggle" data-sheet="tools" aria-controls="toolsPanel" aria-expanded="false">도구</button>
+      <button type="button" class="sheet-toggle" data-sheet="inspector" aria-controls="inspectorPanel" aria-expanded="false">속성</button>
+    </div>
+  </nav>
+
+  <div class="touch-hint" id="touchHint" hidden>물체를 끌면 이동 · 빈 곳을 끌면 시점 회전<br>물체를 잡은 채 두 손가락을 벌리거나 오므리면 앞뒤로</div>
+
+  <div id="error" class="error"></div>
+
+  <script>
+    const MAX_OBJECTS = 24;
+    const canvas = document.getElementById("glCanvas");
+    const overlay = document.getElementById("overlayCanvas");
+    const overlayCtx = overlay.getContext("2d");
+    const errorBox = document.getElementById("error");
+    const gl = canvas.getContext("webgl2", {
+      antialias: false,
+      depth: false,
+      stencil: false,
+      preserveDrawingBuffer: false
+    });
+
+    if (!gl) {
+      errorBox.textContent = "이 브라우저는 WebGL2를 지원하지 않습니다.";
+      errorBox.style.display = "grid";
+      throw new Error("WebGL2 is not supported.");
+    }
+
+    const vertexSource = `#version 300 es
+      in vec2 aPosition;
+      out vec2 vUv;
+
+      void main() {
+        vUv = aPosition * 0.5 + 0.5;
+        gl_Position = vec4(aPosition, 0.0, 1.0);
+      }
+    `;
+
+    const fragmentSource = `#version 300 es
+      precision highp float;
+
+      #define MAX_OBJECTS 24
+
+      in vec2 vUv;
+      out vec4 outColor;
+
+      uniform vec2 uResolution;
+      uniform vec2 uViewCenter;
+      uniform float uViewScale;
+      uniform float uTime;
+      uniform vec2 uCamera;
+      uniform int uObjectCount;
+      uniform int uObjectType[MAX_OBJECTS];
+      uniform vec4 uObjectPos[MAX_OBJECTS];
+      uniform vec4 uObjectShape[MAX_OBJECTS];
+      uniform vec4 uObjectColor[MAX_OBJECTS];
+      uniform int uSelectedIndex;
+      uniform float uBlend;
+      uniform int uMaxSteps;
+      uniform float uEpsilon;
+
+      const float FAR_CLIP = 52.0;
+      const int LOOP_LIMIT = 220;
+
+      float sdSphere(vec3 p, float radius) {
+        return length(p) - radius;
+      }
+
+      float sdBox(vec3 p, vec3 halfSize) {
+        vec3 q = abs(p) - halfSize;
+        return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+      }
+
+      float sdTorus(vec3 p, vec2 torus) {
+        vec2 q = vec2(length(p.xy) - torus.x, p.z);
+        return length(q) - torus.y;
+      }
+
+      float smoothUnion(float a, float b, float k) {
+        if (k <= 0.0001) {
+          return min(a, b);
+        }
+        float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+        return mix(b, a, h) - k * h * (1.0 - h);
+      }
+
+      float objectDistance(int i, vec3 p) {
+        vec3 local = p - uObjectPos[i].xyz;
+        int type = uObjectType[i];
+        vec4 shape = uObjectShape[i];
+
+        if (type == 0) {
+          return sdSphere(local, shape.x);
+        }
+        if (type == 1) {
+          return sdBox(local, shape.xyz);
+        }
+        return sdTorus(local, shape.xy);
+      }
+
+      // sdfScene: 현재 물리 시뮬레이션에 있는 모든 오브젝트와 바닥을 하나의 거리장으로 합친다.
+      // 각 점에서 가장 가까운 표면까지의 거리와 어떤 물체에 닿았는지를 함께 반환한다.
+      vec2 sdfScene(vec3 p) {
+        vec2 result = vec2(10000.0, -1.0);
+
+        for (int i = 0; i < MAX_OBJECTS; i++) {
+          if (i >= uObjectCount) {
+            break;
+          }
+
+          float d = objectDistance(i, p);
+          float id = float(i + 1);
+
+          if (result.y > 0.0 && uBlend > 0.0001) {
+            float merged = smoothUnion(result.x, d, uBlend);
+            if (d < result.x) {
+              result.y = id;
+            }
+            result.x = merged;
+          } else if (d < result.x) {
+            result = vec2(d, id);
+          }
+        }
+
+        float floorDist = p.y;
+        if (floorDist < result.x) {
+          result = vec2(floorDist, 100.0);
+        }
+
+        return result;
+      }
+
+      // raymarch: 카메라에서 출발한 광선을 SDF 값만큼 전진시키며 표면과 만나는 지점을 찾는다.
+      // 이 방식은 빈 공간을 크게 건너뛰기 때문에 메시 없이도 수학적 도형을 렌더링할 수 있다.
+      vec2 raymarch(vec3 ro, vec3 rd) {
+        float traveled = 0.0;
+        float id = -1.0;
+
+        for (int i = 0; i < LOOP_LIMIT; i++) {
+          if (i >= uMaxSteps) {
+            break;
+          }
+
+          vec2 scene = sdfScene(ro + rd * traveled);
+          if (scene.x < uEpsilon) {
+            id = scene.y;
+            break;
+          }
+
+          traveled += scene.x;
+          if (traveled > FAR_CLIP) {
+            break;
+          }
+        }
+
+        if (traveled > FAR_CLIP) {
+          id = -1.0;
+        }
+
+        return vec2(traveled, id);
+      }
+
+      // estimateNormal: 표면 근처의 SDF 값을 여러 방향으로 조금씩 비교해 법선을 추정한다.
+      // 메시의 vertex normal이 없기 때문에 조명 계산에 필요한 표면 방향을 여기서 직접 만든다.
+      vec3 estimateNormal(vec3 p) {
+        float e = max(uEpsilon * 1.8, 0.0012);
+        vec2 h = vec2(e, 0.0);
+        return normalize(vec3(
+          sdfScene(p + h.xyy).x - sdfScene(p - h.xyy).x,
+          sdfScene(p + h.yxy).x - sdfScene(p - h.yxy).x,
+          sdfScene(p + h.yyx).x - sdfScene(p - h.yyx).x
+        ));
+      }
+
+      vec3 objectColor(float id) {
+        if (id > 90.0) {
+          return vec3(0.30, 0.35, 0.42);
+        }
+
+        int index = int(id) - 1;
+        for (int i = 0; i < MAX_OBJECTS; i++) {
+          if (i == index) {
+            return uObjectColor[i].rgb;
+          }
+        }
+        return vec3(0.8);
+      }
+
+      float softShadow(vec3 ro, vec3 rd, float minT, float maxT) {
+        float shadow = 1.0;
+        float t = minT;
+
+        for (int i = 0; i < 42; i++) {
+          float h = sdfScene(ro + rd * t).x;
+          shadow = min(shadow, 9.0 * h / t);
+          t += clamp(h, 0.02, 0.24);
+
+          if (shadow < 0.03 || t > maxT) {
+            break;
+          }
+        }
+
+        return clamp(shadow, 0.0, 1.0);
+      }
+
+      float ambientOcclusion(vec3 p, vec3 n) {
+        float occ = 0.0;
+        float weight = 1.0;
+
+        for (int i = 1; i <= 4; i++) {
+          float h = 0.055 * float(i);
+          float d = sdfScene(p + n * h).x;
+          occ += (h - d) * weight;
+          weight *= 0.55;
+        }
+
+        return clamp(1.0 - occ * 1.75, 0.0, 1.0);
+      }
+
+      vec3 floorGrid(vec3 p, vec3 base) {
+        vec2 cell = abs(fract(p.xz * 0.5) - 0.5);
+        float line = 1.0 - smoothstep(0.012, 0.018, min(cell.x, cell.y));
+        vec2 majorCell = abs(fract(p.xz * 0.1) - 0.5);
+        float major = 1.0 - smoothstep(0.008, 0.014, min(majorCell.x, majorCell.y));
+        vec3 gridColor = mix(vec3(0.42, 0.51, 0.62), vec3(0.58, 0.68, 0.78), major);
+        return mix(base, gridColor, max(line * 0.42, major * 0.60));
+      }
+
+      // lighting: 충돌 지점의 색, 법선, 그림자, 주변광, 안개를 조합해 최종 픽셀 색을 만든다.
+      // 물리 엔진이 움직인 오브젝트 상태를 시각적으로 읽기 좋게 보여주는 단계다.
+      vec3 lighting(vec3 p, vec3 n, vec3 rd, float id, float traveled) {
+        vec3 base = objectColor(id);
+        if (id > 90.0) {
+          base = floorGrid(p, base);
+        }
+
+        vec3 lightDir = normalize(vec3(-0.58, 0.82, 0.35));
+        vec3 fillDir = normalize(vec3(0.62, 0.35, -0.70));
+        float diffuse = max(dot(n, lightDir), 0.0);
+        float fill = max(dot(n, fillDir), 0.0);
+        float shadow = softShadow(p + n * max(uEpsilon * 4.0, 0.006), lightDir, 0.05, 8.0);
+        float ao = ambientOcclusion(p, n);
+
+        vec3 halfVector = normalize(lightDir - rd);
+        float specular = pow(max(dot(n, halfVector), 0.0), 48.0);
+        float rim = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);
+
+        vec3 color = base * (0.16 + 0.92 * diffuse * shadow + 0.24 * fill) * ao;
+        color += vec3(1.0, 0.96, 0.86) * specular * shadow * 0.38;
+        color += vec3(0.34, 0.68, 1.0) * rim * 0.18;
+
+        float selected = step(0.5, 0.5 - abs(id - float(uSelectedIndex + 1)));
+        color += vec3(1.0, 0.82, 0.32) * selected * (0.16 + rim * 0.70);
+
+        float fog = 1.0 - exp(-0.012 * traveled * traveled);
+        vec3 sky = mix(vec3(0.045, 0.055, 0.074), vec3(0.17, 0.21, 0.28), clamp(rd.y * 0.5 + 0.5, 0.0, 1.0));
+        return mix(color, sky, fog);
+      }
+
+      mat3 cameraBasis(float yaw, float pitch) {
+        vec3 target = vec3(0.0, 1.1, 0.0);
+        float radius = 9.0;
+        vec3 ro = target + vec3(
+          radius * cos(pitch) * sin(yaw),
+          radius * sin(pitch),
+          radius * cos(pitch) * cos(yaw)
+        );
+
+        vec3 forward = normalize(target - ro);
+        vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+        vec3 up = cross(right, forward);
+        return mat3(right, up, forward);
+      }
+
+      vec3 background(vec3 rd) {
+        float t = clamp(rd.y * 0.5 + 0.5, 0.0, 1.0);
+        vec3 color = mix(vec3(0.038, 0.045, 0.062), vec3(0.18, 0.22, 0.30), t);
+        float glow = pow(max(dot(rd, normalize(vec3(-0.46, 0.73, 0.36))), 0.0), 8.0);
+        return color + glow * vec3(0.13, 0.17, 0.23);
+      }
+
+      void main() {
+        vec2 frag = gl_FragCoord.xy;
+        // uViewScale: 가로 화면에서는 화면 높이(기존과 같음), 세로 화면에서는 가로 시야가 너무 좁아지지 않게 줄인 값
+        // uViewCenter: 카메라 중심이 놓이는 픽셀 (기본은 화면 가운데, 모바일에서 시트가 열리면 가려지지 않은 쪽으로 이동)
+        vec2 uv = (frag * 2.0 - 2.0 * uViewCenter) / uViewScale;
+        uv *= 1.0 + 0.045 * dot(uv, uv);
+
+        vec3 target = vec3(0.0, 1.1, 0.0);
+        float radius = 9.0;
+        vec3 ro = target + vec3(
+          radius * cos(uCamera.y) * sin(uCamera.x),
+          radius * sin(uCamera.y),
+          radius * cos(uCamera.y) * cos(uCamera.x)
+        );
+
+        mat3 basis = cameraBasis(uCamera.x, uCamera.y);
+        vec3 rd = normalize(basis * vec3(uv, 1.75));
+        vec2 hit = raymarch(ro, rd);
+        vec3 color = background(rd);
+
+        if (hit.y > 0.0) {
+          vec3 p = ro + rd * hit.x;
+          vec3 n = estimateNormal(p);
+          color = lighting(p, n, rd, hit.y, hit.x);
+        }
+
+        color = pow(color, vec3(0.4545));
+        color += (fract(sin(dot(frag + uTime, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.012;
+        outColor = vec4(color, 1.0);
+      }
+    `;
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.style.display = "grid";
+    }
+
+    function compileShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const log = gl.getShaderInfoLog(shader);
+        gl.deleteShader(shader);
+        throw new Error(log || "Shader compilation failed.");
+      }
+
+      return shader;
+    }
+
+    function createProgram(vertex, fragment) {
+      const program = gl.createProgram();
+      gl.attachShader(program, vertex);
+      gl.attachShader(program, fragment);
+      gl.linkProgram(program);
+
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        const log = gl.getProgramInfoLog(program);
+        gl.deleteProgram(program);
+        throw new Error(log || "Program link failed.");
+      }
+
+      return program;
+    }
+
+    let program;
+    try {
+      const vertexShader = compileShader(gl.VERTEX_SHADER, vertexSource);
+      const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
+      program = createProgram(vertexShader, fragmentShader);
+      gl.deleteShader(vertexShader);
+      gl.deleteShader(fragmentShader);
+    } catch (error) {
+      showError(`셰이더 오류: ${error.message}`);
+      throw error;
+    }
+
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+
+    const quad = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,
+       3, -1,
+      -1,  3
+    ]), gl.STATIC_DRAW);
+
+    const positionLocation = gl.getAttribLocation(program, "aPosition");
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    const uniforms = {
+      resolution: gl.getUniformLocation(program, "uResolution"),
+      viewCenter: gl.getUniformLocation(program, "uViewCenter"),
+      viewScale: gl.getUniformLocation(program, "uViewScale"),
+      time: gl.getUniformLocation(program, "uTime"),
+      camera: gl.getUniformLocation(program, "uCamera"),
+      objectCount: gl.getUniformLocation(program, "uObjectCount"),
+      objectType: gl.getUniformLocation(program, "uObjectType[0]"),
+      objectPos: gl.getUniformLocation(program, "uObjectPos[0]"),
+      objectShape: gl.getUniformLocation(program, "uObjectShape[0]"),
+      objectColor: gl.getUniformLocation(program, "uObjectColor[0]"),
+      selectedIndex: gl.getUniformLocation(program, "uSelectedIndex"),
+      blend: gl.getUniformLocation(program, "uBlend"),
+      maxSteps: gl.getUniformLocation(program, "uMaxSteps"),
+      epsilon: gl.getUniformLocation(program, "uEpsilon")
+    };
+
+    const ui = {
+      materialButtons: document.getElementById("materialButtons"),
+      objectList: document.getElementById("objectList"),
+      selectedTitle: document.getElementById("selectedTitle"),
+      objectCount: document.getElementById("objectCount"),
+      emptyInspector: document.getElementById("emptyInspector"),
+      inspector: document.getElementById("inspector"),
+      shapeSelect: document.getElementById("shapeSelect"),
+      materialSelect: document.getElementById("materialSelect"),
+      gravity: document.getElementById("gravity"),
+      gravityValue: document.getElementById("gravityValue"),
+      timeScale: document.getElementById("timeScale"),
+      timeScaleValue: document.getElementById("timeScaleValue"),
+      blend: document.getElementById("blend"),
+      blendValue: document.getElementById("blendValue"),
+      steps: document.getElementById("steps"),
+      stepsValue: document.getElementById("stepsValue"),
+      epsilon: document.getElementById("epsilon"),
+      epsilonValue: document.getElementById("epsilonValue"),
+      size: document.getElementById("size"),
+      sizeValue: document.getElementById("sizeValue"),
+      mass: document.getElementById("mass"),
+      massValue: document.getElementById("massValue"),
+      bounce: document.getElementById("bounce"),
+      bounceValue: document.getElementById("bounceValue"),
+      friction: document.getElementById("friction"),
+      frictionValue: document.getElementById("frictionValue"),
+      togglePause: document.getElementById("togglePause"),
+      dockPause: document.getElementById("dockPause"),
+      playState: document.getElementById("playState"),
+      collisionReadout: document.getElementById("collisionReadout"),
+      energyReadout: document.getElementById("energyReadout")
+    };
+
+    const materials = {
+      rubber: { label: "고무", color: [0.95, 0.22, 0.38], mass: 1.0, bounce: 0.86, friction: 0.68 },
+      metal: { label: "금속", color: [0.70, 0.78, 0.86], mass: 3.2, bounce: 0.32, friction: 0.28 },
+      ice: { label: "얼음", color: [0.42, 0.86, 1.00], mass: 0.9, bounce: 0.18, friction: 0.04 },
+      wood: { label: "나무", color: [1.00, 0.62, 0.28], mass: 1.6, bounce: 0.38, friction: 0.62 },
+      foam: { label: "폼", color: [0.56, 0.98, 0.54], mass: 0.45, bounce: 0.66, friction: 0.82 },
+      liquid: { label: "액체", color: [0.23, 0.70, 1.00], mass: 0.22, bounce: 0.22, friction: 0.02 },
+      bomb: { label: "폭탄", color: [1.00, 0.30, 0.12], mass: 2.4, bounce: 0.42, friction: 0.36 }
+    };
+
+    const shapeNames = {
+      sphere: "구",
+      box: "박스",
+      torus: "토러스"
+    };
+
+    const state = {
+      objects: [],
+      effects: [],
+      selectedId: null,
+      nextId: 1,
+      yaw: 0.55,
+      pitch: 0.36,
+      gravity: Number(ui.gravity.value),
+      timeScale: Number(ui.timeScale.value),
+      blend: Number(ui.blend.value),
+      maxSteps: Number(ui.steps.value),
+      epsilon: Number(ui.epsilon.value),
+      activeMaterial: "rubber",
+      paused: false,
+      collisions: 0,
+      frameCollisions: 0,
+      dragMode: null,
+      dragObjectId: null,
+      dragPlaneY: 0,
+      dragDepth: 0,
+      dragOffset: { x: 0, y: 0, z: 0 },
+      lastPointer: { x: 0, y: 0 },
+      uiDirty: true
+    };
+
+    const objectTypeArray = new Int32Array(MAX_OBJECTS);
+    const objectPosArray = new Float32Array(MAX_OBJECTS * 4);
+    const objectShapeArray = new Float32Array(MAX_OBJECTS * 4);
+    const objectColorArray = new Float32Array(MAX_OBJECTS * 4);
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function vec(x = 0, y = 0, z = 0) {
+      return { x, y, z };
+    }
+
+    function length(v) {
+      return Math.hypot(v.x, v.y, v.z);
+    }
+
+    function normalize(v) {
+      const len = length(v) || 1;
+      return { x: v.x / len, y: v.y / len, z: v.z / len };
+    }
+
+    function dot(a, b) {
+      return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    function cross(a, b) {
+      return {
+        x: a.y * b.z - a.z * b.y,
+        y: a.z * b.x - a.x * b.z,
+        z: a.x * b.y - a.y * b.x
+      };
+    }
+
+    function sub(a, b) {
+      return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+    }
+
+    function add(a, b) {
+      return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z };
+    }
+
+    function scale(v, s) {
+      return { x: v.x * s, y: v.y * s, z: v.z * s };
+    }
+
+    function addScaled(target, direction, amount) {
+      target.x += direction.x * amount;
+      target.y += direction.y * amount;
+      target.z += direction.z * amount;
+    }
+
+    function getSelectedObject() {
+      return state.objects.find((object) => object.id === state.selectedId) || null;
+    }
+
+    function objectLabel(object) {
+      if (object.kind === "bomb") {
+        return "폭탄";
+      }
+      if (object.kind === "liquid") {
+        return "액체";
+      }
+      return shapeNames[object.type];
+    }
+
+    function selectedIndex() {
+      return state.objects.findIndex((object) => object.id === state.selectedId);
+    }
+
+    function applyMaterial(object, key, overwritePhysics = true) {
+      const material = materials[key] || materials.rubber;
+      object.material = key;
+      object.color = material.color.slice();
+
+      if (key === "bomb") {
+        object.kind = "bomb";
+        object.type = "sphere";
+        object.fuse = object.fuse > 0 ? object.fuse : 3.2;
+      } else if (key === "liquid") {
+        object.kind = "liquid";
+        object.type = "sphere";
+      } else if (object.kind === "bomb" || object.kind === "liquid") {
+        object.kind = "solid";
+      }
+
+      if (overwritePhysics) {
+        object.mass = material.mass;
+        object.restitution = material.bounce;
+        object.friction = material.friction;
+      }
+
+      object.invMass = 1 / Math.max(object.mass, 0.001);
+      updateShape(object);
+    }
+
+    function updateShape(object) {
+      const size = object.size;
+      if (object.type === "sphere") {
+        object.radius = size;
+        object.half = vec(size, size, size);
+      } else if (object.type === "box") {
+        object.half = vec(size * 1.05, size * 0.72, size * 0.92);
+        object.radius = length(object.half);
+      } else {
+        object.major = size * 0.68;
+        object.minor = Math.max(0.06, size * 0.18);
+        object.radius = object.major + object.minor;
+        object.half = vec(object.radius, object.radius, object.minor);
+      }
+    }
+
+    function supportY(object) {
+      if (object.type === "box") {
+        return object.half.y;
+      }
+      return object.radius;
+    }
+
+    function supportXZ(object) {
+      if (object.type === "box") {
+        return Math.max(object.half.x, object.half.z);
+      }
+      return object.radius;
+    }
+
+    function createObject(type, options = {}) {
+      if (state.objects.length >= MAX_OBJECTS) {
+        return null;
+      }
+
+      const object = {
+        id: state.nextId++,
+        type,
+        kind: options.kind || "solid",
+        material: state.activeMaterial,
+        size: options.size ?? 0.48,
+        mass: 1,
+        invMass: 1,
+        restitution: 0.5,
+        friction: 0.4,
+        color: [1, 1, 1],
+        pos: vec(options.x ?? 0, options.y ?? 4, options.z ?? 0),
+        vel: vec(options.vx ?? 0, options.vy ?? 0, options.vz ?? 0),
+        fuse: options.fuse ?? 0,
+        age: 0,
+        half: vec(),
+        radius: 0.5,
+        major: 0.35,
+        minor: 0.08
+      };
+
+      updateShape(object);
+      applyMaterial(object, options.material || state.activeMaterial, true);
+      object.pos.y = Math.max(object.pos.y, supportY(object) + 0.02);
+      state.objects.push(object);
+      state.selectedId = object.id;
+      state.uiDirty = true;
+      syncInspectorFromObject();
+      return object;
+    }
+
+    function duplicateObject(object) {
+      if (!object) {
+        return;
+      }
+
+      const copy = createObject(object.type, {
+        kind: object.kind,
+        size: object.size,
+        material: object.material,
+        x: clamp(object.pos.x + 0.45, -4.2, 4.2),
+        y: object.pos.y + 0.5,
+        z: clamp(object.pos.z + 0.35, -4.2, 4.2),
+        vx: object.vel.x * 0.25,
+        vy: Math.abs(object.vel.y) * 0.25,
+        vz: object.vel.z * 0.25
+      });
+
+      if (copy) {
+        copy.mass = object.mass;
+        copy.restitution = object.restitution;
+        copy.friction = object.friction;
+        copy.invMass = 1 / Math.max(copy.mass, 0.001);
+        state.uiDirty = true;
+      }
+    }
+
+    function resetWorld() {
+      state.objects = [];
+      state.effects = [];
+      state.selectedId = null;
+      state.nextId = 1;
+      state.collisions = 0;
+
+      state.activeMaterial = "rubber";
+      createObject("sphere", { x: -1.7, y: 3.5, z: -0.25, vx: 2.3, material: "rubber", size: 0.50 });
+      createObject("box", { x: 0.0, y: 2.4, z: 0.22, vx: -0.7, material: "wood", size: 0.52 });
+      createObject("torus", { x: 1.55, y: 4.4, z: -0.32, vx: -1.3, material: "ice", size: 0.54 });
+      createObject("sphere", { x: 0.95, y: 6.0, z: 0.52, vx: -0.9, material: "metal", size: 0.42 });
+      state.activeMaterial = "rubber";
+      state.selectedId = state.objects[0]?.id ?? null;
+      state.uiDirty = true;
+      syncInspectorFromObject();
+      updateMaterialButtons();
+    }
+
+    function dropStack() {
+      const sequence = [
+        ["box", "wood", -0.8, 3.0, 0.0],
+        ["sphere", "rubber", 0.0, 4.0, 0.0],
+        ["torus", "ice", 0.75, 5.2, 0.0],
+        ["sphere", "metal", -0.15, 6.4, 0.0]
+      ];
+
+      for (const [type, material, x, y, z] of sequence) {
+        if (state.objects.length >= MAX_OBJECTS) {
+          break;
+        }
+        createObject(type, { x, y, z, material, size: 0.44 + Math.random() * 0.12 });
+      }
+    }
+
+    function createBomb() {
+      const bomb = createObject("sphere", {
+        kind: "bomb",
+        material: "bomb",
+        size: 0.36,
+        x: -0.35 + Math.random() * 0.7,
+        y: 6.2,
+        z: -0.35 + Math.random() * 0.7,
+        vx: -0.8 + Math.random() * 1.6,
+        vy: 0.4,
+        vz: -0.8 + Math.random() * 1.6,
+        fuse: 3.2
+      });
+
+      if (bomb) {
+        bomb.restitution = 0.48;
+        bomb.friction = 0.34;
+      }
+    }
+
+    function createLiquidSplash(origin = vec(0, 5.8, 0)) {
+      const count = Math.min(9, MAX_OBJECTS - state.objects.length);
+      for (let i = 0; i < count; i++) {
+        const angle = (i / Math.max(1, count)) * Math.PI * 2 + Math.random() * 0.35;
+        const radius = 0.12 + Math.random() * 0.45;
+        const droplet = createObject("sphere", {
+          kind: "liquid",
+          material: "liquid",
+          size: 0.13 + Math.random() * 0.06,
+          x: origin.x + Math.cos(angle) * radius,
+          y: origin.y + Math.random() * 0.45,
+          z: origin.z + Math.sin(angle) * radius,
+          vx: Math.cos(angle) * (1.2 + Math.random() * 1.8),
+          vy: 0.8 + Math.random() * 1.8,
+          vz: Math.sin(angle) * (1.2 + Math.random() * 1.8)
+        });
+
+        if (droplet) {
+          droplet.mass = 0.16;
+          droplet.invMass = 1 / droplet.mass;
+          droplet.restitution = 0.18;
+          droplet.friction = 0.02;
+        }
+      }
+    }
+
+    function addEffect(kind, position, options = {}) {
+      state.effects.push({
+        kind,
+        pos: { ...position },
+        age: 0,
+        life: options.life ?? 0.65,
+        radius: options.radius ?? 0.25,
+        maxRadius: options.maxRadius ?? 3.2,
+        strength: options.strength ?? 1,
+        color: options.color || (kind === "liquid" ? [0.23, 0.70, 1.00] : [1.00, 0.48, 0.16])
+      });
+
+      if (state.effects.length > 28) {
+        state.effects.shift();
+      }
+    }
+
+    function applyRadialImpulse(center, radius, strength) {
+      for (const object of state.objects) {
+        const delta = sub(object.pos, center);
+        const distance = Math.max(0.001, length(delta));
+        if (distance > radius) {
+          continue;
+        }
+
+        const falloff = 1 - distance / radius;
+        const direction = scale(delta, 1 / distance);
+        const impulse = strength * falloff * falloff / Math.max(0.35, object.mass);
+        addScaled(object.vel, direction, impulse);
+        object.vel.y += impulse * 0.45;
+      }
+    }
+
+    function explodeBomb(bomb) {
+      if (!bomb || !state.objects.includes(bomb)) {
+        return;
+      }
+
+      const center = { ...bomb.pos };
+      applyRadialImpulse(center, 4.2, 13.5);
+      addEffect("explosion", center, { life: 0.85, maxRadius: 4.2, strength: 1.25, color: [1.0, 0.42, 0.12] });
+      state.objects = state.objects.filter((object) => object !== bomb);
+      if (state.selectedId === bomb.id) {
+        state.selectedId = state.objects[0]?.id ?? null;
+        syncInspectorFromObject();
+      }
+      state.collisions += 6;
+      state.uiDirty = true;
+    }
+
+    function pulseWorld() {
+      const selected = getSelectedObject();
+      const center = selected ? { ...selected.pos } : vec(0, 1.0, 0);
+      applyRadialImpulse(center, 3.6, 8.0);
+      addEffect("pulse", center, { life: 0.6, maxRadius: 3.6, strength: 0.9, color: [0.36, 0.92, 1.0] });
+    }
+
+    function setObjectType(object, type) {
+      if (!object) {
+        return;
+      }
+
+      object.type = type;
+      updateShape(object);
+      object.pos.y = Math.max(object.pos.y, supportY(object) + 0.02);
+      state.uiDirty = true;
+    }
+
+    // 화면 좌표 → 카메라 uv 기준 길이. 가로 화면·데스크톱은 기존과 같이 높이 기준이고,
+    // 세로 화면(휴대폰)에서는 가로 시야가 너무 좁아지지 않도록 너비 × PORTRAIT_VIEW 로 줄인다.
+    const PORTRAIT_VIEW = 1.5;
+
+    function viewNorm(width, height) {
+      return Math.min(height, width * PORTRAIT_VIEW);
+    }
+
+    // 좁은 화면에서 도구/속성 시트가 열리면, 가려지지 않은 영역의 가운데로 카메라 중심을 옮긴다 (CSS px).
+    // 데스크톱(패널 고정 배치)이나 시트가 닫힌 상태에서는 항상 0이라 기존 화면과 같다.
+    const compactQuery = matchMedia("(max-width: 840px), (max-height: 540px)");
+    const sheetPanels = {
+      tools: document.getElementById("toolsPanel"),
+      inspector: document.getElementById("inspectorPanel")
+    };
+    const statusPanel = document.querySelector(".status");
+    const view = { offsetX: 0, offsetY: 0, targetX: 0, targetY: 0, glScale: 1, overlayScale: 1, measuredAt: -1e9 };
+
+    function updateViewOffset(dt, now) {
+      const sheet = compactQuery.matches ? sheetPanels[document.body.dataset.sheet] : null;
+      if (!sheet) {
+        view.targetX = 0;
+        view.targetY = 0;
+      } else if (now - view.measuredAt > 200) {
+        // 시트 크기는 가끔만 바뀌므로 0.2초마다 한 번만 잰다
+        view.measuredAt = now;
+        view.targetX = 0;
+        view.targetY = 0;
+        const rect = sheet.getBoundingClientRect();
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        if (rect.width > width * 0.6) {
+          // 아래쪽 시트(세로 화면): 상태 표시줄과 시트 사이의 가운데
+          view.targetY = Math.min(0, (statusPanel.getBoundingClientRect().bottom + rect.top) * 0.5 - height * 0.5);
+        } else if (rect.width > 0) {
+          // 옆 시트(가로 화면): 시트 반대쪽 영역의 가운데
+          view.targetX = rect.left < width * 0.5 ? rect.right * 0.5 : (rect.left - width) * 0.5;
+        }
+      }
+
+      const ease = Math.min(1, Math.max(0, dt) * 10);
+      view.offsetX += (view.targetX - view.offsetX) * ease;
+      view.offsetY += (view.targetY - view.offsetY) * ease;
+      if (Math.abs(view.targetX - view.offsetX) < 0.05) {
+        view.offsetX = view.targetX;
+      }
+      if (Math.abs(view.targetY - view.offsetY) < 0.05) {
+        view.offsetY = view.targetY;
+      }
+    }
+
+    // 휴대폰·태블릿(굵은 포인터)은 레이마칭이 무거우므로 프레임 시간에 맞춰 WebGL 해상도를 자동 조절한다.
+    // 데스크톱은 기존과 같이 devicePixelRatio(최대 1.75) 해상도로 그린다.
+    const coarsePointer = matchMedia("(pointer: coarse)").matches;
+    const renderScale = {
+      adaptive: coarsePointer,
+      value: 1,          // CSS 픽셀 대비 WebGL 버퍼 배율
+      min: 0.5,
+      max: 1.5,
+      frames: 0,
+      time: 0,
+      calm: 0,           // 연속으로 여유 있던 측정 구간(약 0.5초) 수
+      wait: 3,           // 해상도를 올려 보기 전에 기다릴 구간 수
+      sinceRaise: 99
+    };
+
+    function tuneRenderScale(frameMs) {
+      if (!renderScale.adaptive || !(frameMs > 0) || frameMs > 250) {
+        return;
+      }
+
+      renderScale.frames++;
+      renderScale.time += frameMs;
+      if (renderScale.time < 500 || renderScale.frames < 8) {
+        return;
+      }
+
+      const average = renderScale.time / renderScale.frames;
+      renderScale.frames = 0;
+      renderScale.time = 0;
+      renderScale.sinceRaise++;
+
+      if (average > 26) {
+        // 느리면 바로 낮춘다. 방금 올린 탓이면 다음 시도까지 두 배로 오래 기다려 해상도가 들쭉날쭉하지 않게 한다.
+        if (renderScale.sinceRaise <= 2) {
+          renderScale.wait = Math.min(64, renderScale.wait * 2);
+        }
+        renderScale.value = Math.max(renderScale.min, renderScale.value * (average > 40 ? 0.7 : 0.85));
+        renderScale.calm = 0;
+        renderScale.sinceRaise = 99;
+      } else if (average < 19) {
+        if (renderScale.sinceRaise === 3) {
+          renderScale.wait = Math.max(3, renderScale.wait / 2);  // 올린 뒤에도 괜찮았으면 다음엔 더 빨리 올려 본다
+        }
+        renderScale.calm++;
+        if (renderScale.calm >= renderScale.wait && renderScale.value < renderScale.max) {
+          renderScale.value = Math.min(renderScale.max, renderScale.value * 1.1);
+          renderScale.calm = 0;
+          renderScale.sinceRaise = 0;
+        }
+      } else {
+        renderScale.calm = 0;
+      }
+    }
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+      const glScale = renderScale.adaptive ? Math.min(dpr, renderScale.value) : dpr;
+      const width = Math.max(1, Math.floor(canvas.clientWidth * glScale));
+      const height = Math.max(1, Math.floor(canvas.clientHeight * glScale));
+
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+
+      // 오버레이(화살표·링)는 WebGL 해상도와 상관없이 선명하게 그린다
+      const overlayWidth = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+      const overlayHeight = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+      if (overlay.width !== overlayWidth || overlay.height !== overlayHeight) {
+        overlay.width = overlayWidth;
+        overlay.height = overlayHeight;
+      }
+      view.glScale = canvas.width / Math.max(1, canvas.clientWidth);
+      view.overlayScale = overlay.width / Math.max(1, canvas.clientWidth);
+
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+
+    function getCamera() {
+      const target = vec(0, 1.1, 0);
+      const radius = 9;
+      const position = vec(
+        target.x + radius * Math.cos(state.pitch) * Math.sin(state.yaw),
+        target.y + radius * Math.sin(state.pitch),
+        target.z + radius * Math.cos(state.pitch) * Math.cos(state.yaw)
+      );
+      const forward = normalize(sub(target, position));
+      const right = normalize(cross(forward, vec(0, 1, 0)));
+      const up = cross(right, forward);
+      return { position, forward, right, up };
+    }
+
+    function projectPoint(point) {
+      const camera = getCamera();
+      const toPoint = sub(point, camera.position);
+      const z = dot(toPoint, camera.forward);
+      if (z <= 0.05) {
+        return null;
+      }
+
+      const x = dot(toPoint, camera.right);
+      const y = dot(toPoint, camera.up);
+      const uvX = x / z * 1.75;
+      const uvY = y / z * 1.75;
+      const norm = viewNorm(overlay.width, overlay.height);
+      return {
+        x: (uvX * norm + overlay.width) * 0.5 + view.offsetX * view.overlayScale,
+        y: (overlay.height - uvY * norm) * 0.5 + view.offsetY * view.overlayScale,
+        z
+      };
+    }
+
+    function updateEffects(dt) {
+      for (const effect of state.effects) {
+        effect.age += dt;
+        const t = clamp(effect.age / effect.life, 0, 1);
+        effect.radius = effect.maxRadius * (0.18 + 0.82 * t);
+      }
+      state.effects = state.effects.filter((effect) => effect.age < effect.life);
+    }
+
+    function drawArrow(from, to, color, alpha) {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 8) {
+        return;
+      }
+
+      const ux = dx / len;
+      const uy = dy / len;
+      overlayCtx.save();
+      overlayCtx.globalAlpha = alpha;
+      overlayCtx.strokeStyle = color;
+      overlayCtx.fillStyle = color;
+      overlayCtx.lineWidth = 2.2;
+      overlayCtx.lineCap = "round";
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(from.x, from.y);
+      overlayCtx.lineTo(to.x, to.y);
+      overlayCtx.stroke();
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(to.x, to.y);
+      overlayCtx.lineTo(to.x - ux * 12 - uy * 5, to.y - uy * 12 + ux * 5);
+      overlayCtx.lineTo(to.x - ux * 12 + uy * 5, to.y - uy * 12 - ux * 5);
+      overlayCtx.closePath();
+      overlayCtx.fill();
+      overlayCtx.restore();
+    }
+
+    function drawOverlay() {
+      overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+      const norm = viewNorm(overlay.width, overlay.height);
+
+      for (const effect of state.effects) {
+        const screen = projectPoint(effect.pos);
+        if (!screen) {
+          continue;
+        }
+
+        const t = clamp(effect.age / effect.life, 0, 1);
+        const screenRadius = effect.radius / screen.z * 1.75 * norm * 0.5;
+        const [r, g, b] = effect.color.map((value) => Math.round(value * 255));
+        overlayCtx.save();
+        overlayCtx.globalAlpha = (1 - t) * 0.78 * effect.strength;
+        overlayCtx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+        overlayCtx.lineWidth = effect.kind === "impact" ? 2 : 4;
+        overlayCtx.beginPath();
+        overlayCtx.arc(screen.x, screen.y, Math.max(3, screenRadius), 0, Math.PI * 2);
+        overlayCtx.stroke();
+        overlayCtx.restore();
+      }
+
+      for (const object of state.objects) {
+        const speed = length(object.vel);
+        if (speed < 0.28) {
+          continue;
+        }
+
+        const from = projectPoint(object.pos);
+        const to = projectPoint(add(object.pos, scale(object.vel, 0.18)));
+        if (!from || !to) {
+          continue;
+        }
+
+        const color = object.kind === "liquid" ? "rgb(90, 205, 255)" : object.kind === "bomb" ? "rgb(255, 126, 58)" : "rgb(94, 234, 212)";
+        drawArrow(from, to, color, clamp(speed / 6, 0.18, 0.75));
+      }
+
+      const selected = getSelectedObject();
+      if (selected) {
+        const screen = projectPoint(selected.pos);
+        if (screen) {
+          overlayCtx.save();
+          overlayCtx.strokeStyle = "rgba(255, 216, 94, 0.68)";
+          overlayCtx.lineWidth = 2;
+          overlayCtx.beginPath();
+          overlayCtx.arc(screen.x, screen.y, Math.max(14, selected.radius / screen.z * 1.75 * norm * 0.48), 0, Math.PI * 2);
+          overlayCtx.stroke();
+          overlayCtx.restore();
+        }
+      }
+    }
+
+    function pointerRay(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const norm = viewNorm(rect.width, rect.height);
+      const uv = {
+        x: (x * 2 - rect.width - view.offsetX * 2) / norm,
+        y: (rect.height - y * 2 + view.offsetY * 2) / norm
+      };
+      const camera = getCamera();
+      const direction = normalize(add(add(scale(camera.right, uv.x), scale(camera.up, uv.y)), scale(camera.forward, 1.75)));
+      return { origin: camera.position, direction };
+    }
+
+    function raySphere(ray, center, radius) {
+      const oc = sub(ray.origin, center);
+      const b = dot(oc, ray.direction);
+      const c = dot(oc, oc) - radius * radius;
+      const h = b * b - c;
+      if (h < 0) {
+        return Infinity;
+      }
+      const root = Math.sqrt(h);
+      const t = -b - root;
+      const t2 = -b + root;
+      if (t > 0.01) {
+        return t;
+      }
+      return t2 > 0.01 ? t2 : Infinity;
+    }
+
+    function rayAabb(ray, center, half) {
+      let tMin = -Infinity;
+      let tMax = Infinity;
+      const axes = ["x", "y", "z"];
+
+      for (const axis of axes) {
+        const origin = ray.origin[axis] - center[axis];
+        const direction = ray.direction[axis];
+        const min = -half[axis];
+        const max = half[axis];
+
+        if (Math.abs(direction) < 1e-6) {
+          if (origin < min || origin > max) {
+            return Infinity;
+          }
+          continue;
+        }
+
+        let t1 = (min - origin) / direction;
+        let t2 = (max - origin) / direction;
+        if (t1 > t2) {
+          const swap = t1;
+          t1 = t2;
+          t2 = swap;
+        }
+        tMin = Math.max(tMin, t1);
+        tMax = Math.min(tMax, t2);
+        if (tMin > tMax) {
+          return Infinity;
+        }
+      }
+
+      return tMin > 0.01 ? tMin : tMax > 0.01 ? tMax : Infinity;
+    }
+
+    function pickObject(ray) {
+      let picked = null;
+      let nearest = Infinity;
+
+      for (const object of state.objects) {
+        const t = object.type === "box"
+          ? rayAabb(ray, object.pos, object.half)
+          : raySphere(ray, object.pos, object.radius);
+
+        if (t < nearest) {
+          nearest = t;
+          picked = object;
+        }
+      }
+
+      return picked ? { object: picked, distance: nearest } : null;
+    }
+
+    // 터치 전용: 손가락 끝은 넓으니 광선이 살짝 빗나가도 화면에서 가까운(26px 이내) 물체를 집는다.
+    // 집는 깊이는 광선 위에서 물체 중심에 가장 가까운 지점이다.
+    function pickObjectNearTouch(event, ray) {
+      const rect = canvas.getBoundingClientRect();
+      const norm = viewNorm(rect.width, rect.height);
+      const camera = getCamera();
+      let picked = null;
+      let bestGap = 26;
+
+      for (const object of state.objects) {
+        const toPoint = sub(object.pos, camera.position);
+        const z = dot(toPoint, camera.forward);
+        if (z <= 0.05) {
+          continue;
+        }
+
+        const screenX = rect.left + (dot(toPoint, camera.right) / z * 1.75 * norm + rect.width) * 0.5 + view.offsetX;
+        const screenY = rect.top + (rect.height - dot(toPoint, camera.up) / z * 1.75 * norm) * 0.5 + view.offsetY;
+        const screenRadius = object.radius / z * 1.75 * norm * 0.5;
+        const gap = Math.hypot(event.clientX - screenX, event.clientY - screenY) - screenRadius;
+        if (gap < bestGap) {
+          bestGap = gap;
+          picked = object;
+        }
+      }
+
+      if (!picked) {
+        return null;
+      }
+      return { object: picked, distance: Math.max(0.5, dot(sub(picked.pos, ray.origin), ray.direction)) };
+    }
+
+    function intersectPlaneY(ray, y) {
+      if (Math.abs(ray.direction.y) < 0.0001) {
+        return null;
+      }
+      const t = (y - ray.origin.y) / ray.direction.y;
+      if (t <= 0) {
+        return null;
+      }
+      return add(ray.origin, scale(ray.direction, t));
+    }
+
+    function solveFloorAndBounds(object) {
+      const floorY = supportY(object);
+      if (object.pos.y < floorY) {
+        object.pos.y = floorY;
+        if (object.vel.y < 0) {
+          if (object.kind === "bomb" && Math.abs(object.vel.y) > 1.25) {
+            object.fuse = Math.min(object.fuse, 0.02);
+          }
+          if (object.kind === "liquid" && Math.abs(object.vel.y) > 1.0) {
+            addEffect("liquid", object.pos, { life: 0.38, maxRadius: 0.7, strength: 0.45, color: [0.23, 0.70, 1.0] });
+          }
+          object.vel.y = -object.vel.y * object.restitution;
+          object.vel.x *= Math.max(0, 1 - object.friction * 0.22);
+          object.vel.z *= Math.max(0, 1 - object.friction * 0.22);
+          if (Math.abs(object.vel.y) > 0.45) {
+            state.frameCollisions++;
+          }
+        }
+      }
+
+      const bound = 5.4;
+      const radius = supportXZ(object);
+      if (object.pos.x < -bound + radius) {
+        object.pos.x = -bound + radius;
+        object.vel.x = Math.abs(object.vel.x) * object.restitution;
+        state.frameCollisions++;
+      } else if (object.pos.x > bound - radius) {
+        object.pos.x = bound - radius;
+        object.vel.x = -Math.abs(object.vel.x) * object.restitution;
+        state.frameCollisions++;
+      }
+
+      if (object.pos.z < -bound + radius) {
+        object.pos.z = -bound + radius;
+        object.vel.z = Math.abs(object.vel.z) * object.restitution;
+        state.frameCollisions++;
+      } else if (object.pos.z > bound - radius) {
+        object.pos.z = bound - radius;
+        object.vel.z = -Math.abs(object.vel.z) * object.restitution;
+        state.frameCollisions++;
+      }
+    }
+
+    function sphereSphere(a, b) {
+      const delta = sub(b.pos, a.pos);
+      const dist = length(delta);
+      const radius = a.radius + b.radius;
+      if (dist >= radius) {
+        return null;
+      }
+      const normal = dist > 0.0001 ? scale(delta, 1 / dist) : vec(1, 0, 0);
+      return { normal, penetration: radius - dist };
+    }
+
+    function boxBox(a, b) {
+      const delta = sub(b.pos, a.pos);
+      const overlapX = a.half.x + b.half.x - Math.abs(delta.x);
+      const overlapY = a.half.y + b.half.y - Math.abs(delta.y);
+      const overlapZ = a.half.z + b.half.z - Math.abs(delta.z);
+
+      if (overlapX <= 0 || overlapY <= 0 || overlapZ <= 0) {
+        return null;
+      }
+
+      if (overlapX < overlapY && overlapX < overlapZ) {
+        return { normal: vec(Math.sign(delta.x) || 1, 0, 0), penetration: overlapX };
+      }
+      if (overlapY < overlapZ) {
+        return { normal: vec(0, Math.sign(delta.y) || 1, 0), penetration: overlapY };
+      }
+      return { normal: vec(0, 0, Math.sign(delta.z) || 1), penetration: overlapZ };
+    }
+
+    function sphereBox(sphere, box) {
+      const local = sub(sphere.pos, box.pos);
+      const closest = vec(
+        clamp(local.x, -box.half.x, box.half.x),
+        clamp(local.y, -box.half.y, box.half.y),
+        clamp(local.z, -box.half.z, box.half.z)
+      );
+      const fromBoxToSphere = sub(local, closest);
+      const dist = length(fromBoxToSphere);
+
+      if (dist > 0.0001) {
+        if (dist >= sphere.radius) {
+          return null;
+        }
+        return {
+          normal: scale(fromBoxToSphere, -1 / dist),
+          penetration: sphere.radius - dist
+        };
+      }
+
+      const dx = box.half.x - Math.abs(local.x);
+      const dy = box.half.y - Math.abs(local.y);
+      const dz = box.half.z - Math.abs(local.z);
+      if (dx < dy && dx < dz) {
+        return { normal: vec(-(Math.sign(local.x) || 1), 0, 0), penetration: sphere.radius + dx };
+      }
+      if (dy < dz) {
+        return { normal: vec(0, -(Math.sign(local.y) || 1), 0), penetration: sphere.radius + dy };
+      }
+      return { normal: vec(0, 0, -(Math.sign(local.z) || 1)), penetration: sphere.radius + dz };
+    }
+
+    function collisionInfo(a, b) {
+      const aSphere = a.type !== "box";
+      const bSphere = b.type !== "box";
+
+      if (aSphere && bSphere) {
+        return sphereSphere(a, b);
+      }
+      if (!aSphere && !bSphere) {
+        return boxBox(a, b);
+      }
+      if (aSphere && !bSphere) {
+        return sphereBox(a, b);
+      }
+
+      const info = sphereBox(b, a);
+      if (!info) {
+        return null;
+      }
+      return { normal: scale(info.normal, -1), penetration: info.penetration };
+    }
+
+    function resolvePair(a, b) {
+      const info = collisionInfo(a, b);
+      if (!info) {
+        return;
+      }
+
+      const invMassSum = a.invMass + b.invMass;
+      if (invMassSum <= 0) {
+        return;
+      }
+
+      const correction = Math.max(info.penetration - 0.002, 0) / invMassSum * 0.78;
+      addScaled(a.pos, info.normal, -correction * a.invMass);
+      addScaled(b.pos, info.normal, correction * b.invMass);
+
+      const relativeVelocity = sub(b.vel, a.vel);
+      const normalVelocity = dot(relativeVelocity, info.normal);
+      if (normalVelocity > 0) {
+        return;
+      }
+
+      const restitution = Math.min(a.restitution, b.restitution);
+      const impulseMagnitude = -(1 + restitution) * normalVelocity / invMassSum;
+      const impulse = scale(info.normal, impulseMagnitude);
+      addScaled(a.vel, impulse, -a.invMass);
+      addScaled(b.vel, impulse, b.invMass);
+
+      if (impulseMagnitude > 1.15) {
+        const contact = scale(add(a.pos, b.pos), 0.5);
+        addEffect("impact", contact, {
+          life: 0.32,
+          maxRadius: clamp(impulseMagnitude * 0.18, 0.18, 0.85),
+          strength: clamp(impulseMagnitude * 0.08, 0.2, 0.8),
+          color: [1.0, 0.86, 0.36]
+        });
+      }
+
+      if (impulseMagnitude > 1.7) {
+        if (a.kind === "bomb") {
+          a.fuse = Math.min(a.fuse, 0.02);
+        }
+        if (b.kind === "bomb") {
+          b.fuse = Math.min(b.fuse, 0.02);
+        }
+      }
+
+      const tangentVelocity = sub(relativeVelocity, scale(info.normal, normalVelocity));
+      const tangentSpeed = length(tangentVelocity);
+      if (tangentSpeed > 0.0001) {
+        const tangent = scale(tangentVelocity, 1 / tangentSpeed);
+        const friction = Math.sqrt(a.friction * b.friction);
+        const frictionMagnitude = clamp(-dot(relativeVelocity, tangent) / invMassSum, -impulseMagnitude * friction, impulseMagnitude * friction);
+        const frictionImpulse = scale(tangent, frictionMagnitude);
+        addScaled(a.vel, frictionImpulse, -a.invMass);
+        addScaled(b.vel, frictionImpulse, b.invMass);
+      }
+
+      state.frameCollisions++;
+    }
+
+    function applyLiquidCohesion(dt) {
+      const liquids = state.objects.filter((object) => object.kind === "liquid");
+      for (let i = 0; i < liquids.length; i++) {
+        for (let j = i + 1; j < liquids.length; j++) {
+          const a = liquids[i];
+          const b = liquids[j];
+          const delta = sub(b.pos, a.pos);
+          const distance = length(delta);
+          if (distance < 0.001 || distance > 1.15) {
+            continue;
+          }
+
+          const direction = scale(delta, 1 / distance);
+          const cohesion = (1.15 - distance) * 0.22 * dt;
+          addScaled(a.vel, direction, cohesion / Math.max(0.1, a.mass));
+          addScaled(b.vel, direction, -cohesion / Math.max(0.1, b.mass));
+        }
+      }
+    }
+
+    function stepPhysics(dt) {
+      if (state.paused) {
+        return;
+      }
+
+      state.frameCollisions = 0;
+      const dragId = state.dragMode === "object" ? state.dragObjectId : null;
+      applyLiquidCohesion(dt);
+
+      for (const object of state.objects) {
+        if (object.id === dragId) {
+          continue;
+        }
+
+        object.age += dt;
+        if (object.kind === "bomb") {
+          object.fuse -= dt;
+        }
+
+        object.vel.y += state.gravity * dt;
+        const drag = object.kind === "liquid" ? 0.986 : 0.998;
+        object.vel.x *= Math.pow(drag, dt * 60);
+        object.vel.z *= Math.pow(drag, dt * 60);
+        object.pos.x += object.vel.x * dt;
+        object.pos.y += object.vel.y * dt;
+        object.pos.z += object.vel.z * dt;
+        solveFloorAndBounds(object);
+      }
+
+      for (let iteration = 0; iteration < 3; iteration++) {
+        for (let i = 0; i < state.objects.length; i++) {
+          for (let j = i + 1; j < state.objects.length; j++) {
+            resolvePair(state.objects[i], state.objects[j]);
+          }
+        }
+        for (const object of state.objects) {
+          solveFloorAndBounds(object);
+        }
+      }
+
+      for (const object of [...state.objects]) {
+        if (object.kind === "bomb" && object.fuse <= 0) {
+          explodeBomb(object);
+        }
+      }
+
+      state.collisions += state.frameCollisions;
+    }
+
+    function kineticEnergy() {
+      let total = 0;
+      for (const object of state.objects) {
+        const speedSq = dot(object.vel, object.vel);
+        total += 0.5 * object.mass * speedSq;
+      }
+      return total;
+    }
+
+    function syncWorldControls() {
+      state.gravity = Number(ui.gravity.value);
+      state.timeScale = Number(ui.timeScale.value);
+      state.blend = Number(ui.blend.value);
+      state.maxSteps = Number(ui.steps.value);
+      state.epsilon = Number(ui.epsilon.value);
+
+      ui.gravityValue.textContent = state.gravity.toFixed(1);
+      ui.timeScaleValue.textContent = state.timeScale.toFixed(2);
+      ui.blendValue.textContent = state.blend.toFixed(2);
+      ui.stepsValue.textContent = String(state.maxSteps);
+      ui.epsilonValue.textContent = state.epsilon.toFixed(4);
+    }
+
+    function syncInspectorFromObject() {
+      const object = getSelectedObject();
+      if (!object) {
+        ui.inspector.hidden = true;
+        ui.emptyInspector.hidden = false;
+        ui.selectedTitle.textContent = "선택 없음";
+        state.uiDirty = true;
+        return;
+      }
+
+      ui.inspector.hidden = false;
+      ui.emptyInspector.hidden = true;
+      ui.selectedTitle.textContent = `${objectLabel(object)} #${object.id}`;
+      ui.shapeSelect.value = object.type;
+      ui.materialSelect.value = object.material;
+      ui.size.value = object.size;
+      ui.mass.value = object.mass;
+      ui.bounce.value = object.restitution;
+      ui.friction.value = object.friction;
+      updateInspectorOutputs();
+      state.uiDirty = true;
+    }
+
+    function updateInspectorOutputs() {
+      ui.sizeValue.textContent = Number(ui.size.value).toFixed(2);
+      ui.massValue.textContent = Number(ui.mass.value).toFixed(1);
+      ui.bounceValue.textContent = Number(ui.bounce.value).toFixed(2);
+      ui.frictionValue.textContent = Number(ui.friction.value).toFixed(2);
+    }
+
+    function applyInspectorToObject() {
+      const object = getSelectedObject();
+      if (!object) {
+        return;
+      }
+
+      setObjectType(object, ui.shapeSelect.value);
+      object.size = Number(ui.size.value);
+      object.mass = Number(ui.mass.value);
+      object.restitution = Number(ui.bounce.value);
+      object.friction = Number(ui.friction.value);
+      object.invMass = 1 / Math.max(object.mass, 0.001);
+      applyMaterial(object, ui.materialSelect.value, false);
+      updateShape(object);
+      object.pos.y = Math.max(object.pos.y, supportY(object) + 0.02);
+      ui.shapeSelect.value = object.type;
+      ui.selectedTitle.textContent = `${objectLabel(object)} #${object.id}`;
+      updateInspectorOutputs();
+      state.uiDirty = true;
+    }
+
+    function updateMaterialButtons() {
+      for (const button of ui.materialButtons.querySelectorAll("button")) {
+        button.classList.toggle("active", button.dataset.material === state.activeMaterial);
+      }
+    }
+
+    function renderMaterialControls() {
+      ui.materialButtons.textContent = "";
+      ui.materialSelect.textContent = "";
+
+      for (const [key, material] of Object.entries(materials)) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.material = key;
+        button.innerHTML = `<span class="swatch" style="background: rgb(${material.color.map((c) => Math.round(c * 255)).join(",")})"></span>${material.label}`;
+        button.addEventListener("click", () => {
+          state.activeMaterial = key;
+          const object = getSelectedObject();
+          if (object) {
+            applyMaterial(object, key, true);
+            syncInspectorFromObject();
+          }
+          updateMaterialButtons();
+        });
+        ui.materialButtons.appendChild(button);
+
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = material.label;
+        ui.materialSelect.appendChild(option);
+      }
+
+      updateMaterialButtons();
+    }
+
+    // 목록은 0.3초마다 갱신된다. 행을 매번 새로 만들면 누르는 도중에 행이 바뀌어 클릭/탭이 사라지므로
+    // 기존 행을 재사용하고 내용만 바꾼다.
+    function renderObjectList() {
+      ui.objectCount.textContent = `${state.objects.length} / ${MAX_OBJECTS}`;
+
+      const rows = ui.objectList.children;
+      while (rows.length > state.objects.length) {
+        ui.objectList.lastElementChild.remove();
+      }
+
+      for (let i = 0; i < state.objects.length; i++) {
+        const object = state.objects[i];
+        let row = rows[i];
+        if (!row) {
+          row = document.createElement("button");
+          row.type = "button";
+          row.className = "object-row";
+          row.innerHTML = `
+          <span class="object-dot" style="background: currentColor"></span>
+          <span class="object-name"></span>
+          <span class="object-speed"></span>
+        `;
+          row.addEventListener("click", () => {
+            state.selectedId = Number(row.dataset.id);
+            syncInspectorFromObject();
+          });
+          ui.objectList.appendChild(row);
+        }
+
+        const [dotEl, nameEl, speedEl] = row.children;
+        row.dataset.id = object.id;
+        row.classList.toggle("active", object.id === state.selectedId);
+        dotEl.style.color = `rgb(${object.color.map((c) => Math.round(c * 255)).join(",")})`;
+        nameEl.textContent = `${objectLabel(object)} #${object.id}`;
+        speedEl.textContent = `${length(object.vel).toFixed(1)}m/s`;
+      }
+    }
+
+    function updateStatus() {
+      ui.playState.textContent = state.paused ? "일시정지" : "실행 중";
+      ui.togglePause.textContent = state.paused ? "재생" : "일시정지";
+      if (ui.dockPause.textContent !== ui.togglePause.textContent) {
+        ui.dockPause.textContent = ui.togglePause.textContent;
+        ui.dockPause.classList.toggle("active", state.paused);
+      }
+      ui.collisionReadout.textContent = `충돌 ${state.collisions}`;
+      ui.energyReadout.textContent = `에너지 ${kineticEnergy().toFixed(1)}`;
+    }
+
+    function uploadObjects() {
+      objectTypeArray.fill(0);
+      objectPosArray.fill(0);
+      objectShapeArray.fill(0);
+      objectColorArray.fill(0);
+
+      for (let i = 0; i < state.objects.length; i++) {
+        const object = state.objects[i];
+        objectTypeArray[i] = object.type === "sphere" ? 0 : object.type === "box" ? 1 : 2;
+
+        const posOffset = i * 4;
+        objectPosArray[posOffset] = object.pos.x;
+        objectPosArray[posOffset + 1] = object.pos.y;
+        objectPosArray[posOffset + 2] = object.pos.z;
+        objectPosArray[posOffset + 3] = 0;
+
+        const shapeOffset = i * 4;
+        if (object.type === "sphere") {
+          objectShapeArray[shapeOffset] = object.radius;
+          objectShapeArray[shapeOffset + 1] = object.radius;
+          objectShapeArray[shapeOffset + 2] = object.radius;
+        } else if (object.type === "box") {
+          objectShapeArray[shapeOffset] = object.half.x;
+          objectShapeArray[shapeOffset + 1] = object.half.y;
+          objectShapeArray[shapeOffset + 2] = object.half.z;
+        } else {
+          objectShapeArray[shapeOffset] = object.major;
+          objectShapeArray[shapeOffset + 1] = object.minor;
+          objectShapeArray[shapeOffset + 2] = object.radius;
+        }
+
+        const colorOffset = i * 4;
+        let color = object.color;
+        if (object.kind === "bomb") {
+          const pulse = 0.35 + 0.65 * Math.max(0, Math.sin(performance.now() * 0.012 + object.id));
+          color = [
+            clamp(object.color[0] + pulse * 0.42, 0, 1),
+            clamp(object.color[1] + pulse * 0.18, 0, 1),
+            clamp(object.color[2] * (0.65 + pulse * 0.35), 0, 1)
+          ];
+        } else if (object.kind === "liquid") {
+          const shimmer = 0.08 * Math.sin(performance.now() * 0.006 + object.id * 1.7);
+          color = [
+            clamp(object.color[0] + shimmer, 0, 1),
+            clamp(object.color[1] + shimmer, 0, 1),
+            clamp(object.color[2] + shimmer * 0.5, 0, 1)
+          ];
+        }
+        objectColorArray[colorOffset] = color[0];
+        objectColorArray[colorOffset + 1] = color[1];
+        objectColorArray[colorOffset + 2] = color[2];
+        objectColorArray[colorOffset + 3] = 1;
+      }
+
+      gl.uniform1i(uniforms.objectCount, state.objects.length);
+      gl.uniform1iv(uniforms.objectType, objectTypeArray);
+      gl.uniform4fv(uniforms.objectPos, objectPosArray);
+      gl.uniform4fv(uniforms.objectShape, objectShapeArray);
+      gl.uniform4fv(uniforms.objectColor, objectColorArray);
+      gl.uniform1i(uniforms.selectedIndex, selectedIndex());
+    }
+
+    document.getElementById("addSphere").addEventListener("click", () => {
+      createObject("sphere", { x: -0.4 + Math.random() * 0.8, y: 5.0, z: -0.3 + Math.random() * 0.6, vx: -1.5 + Math.random() * 3 });
+    });
+
+    document.getElementById("addBox").addEventListener("click", () => {
+      createObject("box", { x: -0.4 + Math.random() * 0.8, y: 5.0, z: -0.3 + Math.random() * 0.6, vx: -1.2 + Math.random() * 2.4 });
+    });
+
+    document.getElementById("addTorus").addEventListener("click", () => {
+      createObject("torus", { x: -0.4 + Math.random() * 0.8, y: 5.2, z: -0.3 + Math.random() * 0.6, vx: -1.4 + Math.random() * 2.8 });
+    });
+
+    document.getElementById("addBomb").addEventListener("click", createBomb);
+    document.getElementById("addLiquid").addEventListener("click", () => {
+      const selected = getSelectedObject();
+      createLiquidSplash(selected ? add(selected.pos, vec(0, 1.1, 0)) : vec(0, 5.8, 0));
+    });
+    document.getElementById("pulseWorld").addEventListener("click", pulseWorld);
+
+    document.getElementById("dropStack").addEventListener("click", dropStack);
+    document.getElementById("resetWorld").addEventListener("click", resetWorld);
+    document.getElementById("kickObject").addEventListener("click", () => {
+      const object = getSelectedObject();
+      if (!object) {
+        return;
+      }
+      const camera = getCamera();
+      addScaled(object.vel, camera.forward, 7 / Math.max(0.7, object.mass));
+      object.vel.y += 2.0 / Math.max(0.7, object.mass);
+    });
+
+    document.getElementById("cloneObject").addEventListener("click", () => duplicateObject(getSelectedObject()));
+    document.getElementById("deleteObject").addEventListener("click", () => {
+      const object = getSelectedObject();
+      if (!object) {
+        return;
+      }
+      state.objects = state.objects.filter((item) => item.id !== object.id);
+      state.selectedId = state.objects[0]?.id ?? null;
+      syncInspectorFromObject();
+      state.uiDirty = true;
+    });
+
+    ui.togglePause.addEventListener("click", () => {
+      state.paused = !state.paused;
+      updateStatus();
+    });
+
+    for (const input of [ui.gravity, ui.timeScale, ui.blend, ui.steps, ui.epsilon]) {
+      input.addEventListener("input", syncWorldControls);
+    }
+
+    for (const input of [ui.shapeSelect, ui.materialSelect, ui.size, ui.mass, ui.bounce, ui.friction]) {
+      input.addEventListener("input", applyInspectorToObject);
+      input.addEventListener("change", applyInspectorToObject);
+    }
+
+    // ---- 캔버스 포인터 입력 ----
+    // 마우스는 기존과 똑같이 동작한다. 터치는 손가락마다 따로 추적한다:
+    // 첫 손가락 = 물체 끌기 / 카메라 회전, 물체를 잡은 채 두 번째 손가락으로 벌리기·오므리기 = 앞뒤 거리(마우스 휠 대응).
+    const activePointers = new Map();
+    const gesture = {
+      primaryId: null,
+      secondaryId: null,
+      offsetX: 0,
+      offsetY: 0,
+      pinchDistance: 1,
+      pinchDepth: 0
+    };
+    // 물체를 끄는 기준 위치: 한 손가락이면 그 손가락, 두 손가락이면 중점.
+    // 손가락 구성이 바뀔 때 물체가 튀지 않도록 offset으로 보정한다 (마우스는 항상 offset 0 = 기존과 동일).
+    const dragPointer = { clientX: 0, clientY: 0 };
+
+    function updateDragPointer() {
+      const first = activePointers.get(gesture.primaryId);
+      const second = gesture.secondaryId !== null ? activePointers.get(gesture.secondaryId) : null;
+      let x = first.x;
+      let y = first.y;
+      if (second) {
+        x = (x + second.x) * 0.5;
+        y = (y + second.y) * 0.5;
+      }
+      dragPointer.clientX = x + gesture.offsetX;
+      dragPointer.clientY = y + gesture.offsetY;
+    }
+
+    function rebaseDragPointer() {
+      const keepX = dragPointer.clientX;
+      const keepY = dragPointer.clientY;
+      gesture.offsetX = 0;
+      gesture.offsetY = 0;
+      updateDragPointer();
+      gesture.offsetX = keepX - dragPointer.clientX;
+      gesture.offsetY = keepY - dragPointer.clientY;
+      dragPointer.clientX = keepX;
+      dragPointer.clientY = keepY;
+    }
+
+    function releaseCanvasPointer(pointerId) {
+      if (pointerId !== undefined && pointerId !== null && canvas.hasPointerCapture(pointerId)) {
+        canvas.releasePointerCapture(pointerId);
+      }
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (gesture.primaryId !== null) {
+        // 한 손가락으로 물체를 잡고 있을 때의 두 번째 손가락만 핀치로 쓰고, 그 밖의 손가락은 무시한다
+        const first = activePointers.get(gesture.primaryId);
+        if (event.pointerType === "touch" && first && first.touch && gesture.secondaryId === null && state.dragMode === "object") {
+          activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY, touch: true });
+          gesture.secondaryId = event.pointerId;
+          gesture.pinchDistance = Math.max(24, Math.hypot(event.clientX - first.x, event.clientY - first.y));
+          gesture.pinchDepth = state.dragDepth;
+          canvas.setPointerCapture(event.pointerId);
+          rebaseDragPointer();
+        }
+        return;
+      }
+
+      gesture.primaryId = event.pointerId;
+      gesture.offsetX = 0;
+      gesture.offsetY = 0;
+      activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY, touch: event.pointerType === "touch" });
+      dragPointer.clientX = event.clientX;
+      dragPointer.clientY = event.clientY;
+
+      const ray = pointerRay(event);
+      let picked = pickObject(ray);
+      if (!picked && event.pointerType === "touch") {
+        picked = pickObjectNearTouch(event, ray);
+      }
+      state.lastPointer.x = event.clientX;
+      state.lastPointer.y = event.clientY;
+      canvas.classList.add("dragging");
+      canvas.setPointerCapture(event.pointerId);
+
+      if (picked) {
+        const object = picked.object;
+        state.selectedId = object.id;
+        state.dragMode = "object";
+        state.dragObjectId = object.id;
+        state.dragDepth = picked.distance;
+        const hitPoint = add(ray.origin, scale(ray.direction, picked.distance));
+        state.dragOffset = sub(hitPoint, object.pos);
+        object.vel = vec(0, 0, 0);
+        syncInspectorFromObject();
+      } else {
+        state.dragMode = "camera";
+      }
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      const tracked = activePointers.get(event.pointerId);
+      if (!tracked) {
+        return;
+      }
+      tracked.x = event.clientX;
+      tracked.y = event.clientY;
+
+      if (!state.dragMode) {
+        return;
+      }
+
+      if (state.dragMode === "camera") {
+        if (event.pointerId !== gesture.primaryId) {
+          return;
+        }
+        const dx = event.clientX - state.lastPointer.x;
+        const dy = event.clientY - state.lastPointer.y;
+        state.lastPointer.x = event.clientX;
+        state.lastPointer.y = event.clientY;
+        state.yaw -= dx * 0.006;
+        state.pitch = clamp(state.pitch + dy * 0.0048, -0.08, 1.18);
+        return;
+      }
+
+      const object = state.objects.find((item) => item.id === state.dragObjectId);
+      if (!object) {
+        return;
+      }
+
+      if (gesture.secondaryId !== null) {
+        // 두 손가락 사이가 벌어지면 가까이, 오므리면 멀리 (물체가 손가락 사이에서 커지고 작아지듯)
+        const first = activePointers.get(gesture.primaryId);
+        const second = activePointers.get(gesture.secondaryId);
+        const distance = Math.max(24, Math.hypot(first.x - second.x, first.y - second.y));
+        state.dragDepth = clamp(gesture.pinchDepth * gesture.pinchDistance / distance, 1.6, 13.0);
+      }
+      updateDragPointer();
+
+      const ray = pointerRay(dragPointer);
+      const targetPoint = add(ray.origin, scale(ray.direction, state.dragDepth));
+      const target = sub(targetPoint, state.dragOffset);
+      const oldPos = { ...object.pos };
+      object.pos.x = clamp(target.x, -5.0 + supportXZ(object), 5.0 - supportXZ(object));
+      object.pos.z = clamp(target.z, -5.0 + supportXZ(object), 5.0 - supportXZ(object));
+      object.pos.y = clamp(target.y, supportY(object), 8.5);
+      object.vel.x = (object.pos.x - oldPos.x) * 20;
+      object.vel.y = (object.pos.y - oldPos.y) * 20;
+      object.vel.z = (object.pos.z - oldPos.z) * 20;
+    });
+
+    function endPointer(event) {
+      if (!activePointers.has(event.pointerId)) {
+        return;
+      }
+      activePointers.delete(event.pointerId);
+
+      if (event.pointerId === gesture.secondaryId) {
+        // 두 번째 손가락만 뗐으면 다시 한 손가락 끌기로 돌아간다
+        gesture.secondaryId = null;
+        releaseCanvasPointer(event.pointerId);
+        rebaseDragPointer();
+        return;
+      }
+
+      state.dragMode = null;
+      state.dragObjectId = null;
+      canvas.classList.remove("dragging");
+      releaseCanvasPointer(event.pointerId);
+      if (gesture.secondaryId !== null) {
+        activePointers.delete(gesture.secondaryId);
+        releaseCanvasPointer(gesture.secondaryId);
+        gesture.secondaryId = null;
+      }
+      gesture.primaryId = null;
+    }
+
+    canvas.addEventListener("pointerup", endPointer);
+    canvas.addEventListener("pointercancel", endPointer);
+    canvas.addEventListener("lostpointercapture", endPointer);
+
+    // 터치로 길게 눌러도 컨텍스트 메뉴가 뜨지 않게 한다 (마우스 오른쪽 클릭은 기존 그대로)
+    let lastPointerType = "mouse";
+    window.addEventListener("pointerdown", (event) => {
+      lastPointerType = event.pointerType;
+    }, true);
+    document.addEventListener("contextmenu", (event) => {
+      if (lastPointerType === "touch") {
+        event.preventDefault();
+      }
+    });
+
+    if (coarsePointer) {
+      // iOS Safari는 user-scalable=no를 무시하므로 두 손가락 확대를 직접 막는다
+      document.addEventListener("gesturestart", (event) => event.preventDefault());
+    }
+
+    // ---- 좁은 화면 UI: 하단 독 버튼은 패널의 같은 버튼을 대신 누르고, 도구/속성 패널은 시트로 연다 ----
+    const dock = document.getElementById("dock");
+    const sheetToggles = dock.querySelectorAll(".sheet-toggle");
+    const touchHint = document.getElementById("touchHint");
+
+    function hideTouchHint() {
+      if (touchHint.hidden || touchHint.classList.contains("fade")) {
+        return;
+      }
+      touchHint.classList.add("fade");
+      setTimeout(() => {
+        touchHint.hidden = true;
+      }, 450);
+    }
+
+    function setSheet(name) {
+      document.body.dataset.sheet = name;
+      view.measuredAt = -1e9;
+      for (const toggle of sheetToggles) {
+        const open = toggle.dataset.sheet === name;
+        toggle.classList.toggle("active", open);
+        toggle.setAttribute("aria-expanded", String(open));
+      }
+      if (name) {
+        hideTouchHint();
+      }
+    }
+
+    dock.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) {
+        return;
+      }
+      if (button.dataset.proxy) {
+        document.getElementById(button.dataset.proxy).click();
+      } else if (button.dataset.sheet) {
+        setSheet(document.body.dataset.sheet === button.dataset.sheet ? "" : button.dataset.sheet);
+      }
+    });
+
+    for (const closeButton of document.querySelectorAll(".sheet-close")) {
+      closeButton.addEventListener("click", () => setSheet(""));
+    }
+    setSheet("");
+
+    if (coarsePointer) {
+      // 터치 기기: 처음 몇 초 동안 조작 안내를 보여 준다 (탭하면 바로 닫힘)
+      touchHint.hidden = false;
+      touchHint.addEventListener("click", hideTouchHint);
+      setTimeout(hideTouchHint, 9000);
+    }
+
+    canvas.addEventListener("wheel", (event) => {
+      if (state.dragMode !== "object") {
+        return;
+      }
+      event.preventDefault();
+      state.dragDepth = clamp(state.dragDepth + event.deltaY * 0.006, 1.6, 13.0);
+    }, { passive: false });
+
+    window.addEventListener("resize", () => {
+      view.measuredAt = -1e9;
+      resize();
+    });
+
+    renderMaterialControls();
+    syncWorldControls();
+    resetWorld();
+
+    let lastTime = performance.now();
+    let lastListRender = 0;
+    let accumulator = 0;
+    const fixedStep = 1 / 90;
+    const startTime = performance.now();
+
+    function render(now) {
+      resize();
+      tuneRenderScale(now - lastTime);
+
+      const realDt = Math.min(0.05, (now - lastTime) / 1000);
+      const elapsed = realDt * state.timeScale;
+      lastTime = now;
+      accumulator += elapsed;
+      updateEffects(realDt);
+      updateViewOffset(realDt, now);
+
+      while (accumulator >= fixedStep) {
+        stepPhysics(fixedStep);
+        accumulator -= fixedStep;
+      }
+
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+      uploadObjects();
+      gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
+      gl.uniform2f(uniforms.viewCenter, canvas.width * 0.5 + view.offsetX * view.glScale, canvas.height * 0.5 - view.offsetY * view.glScale);
+      gl.uniform1f(uniforms.viewScale, viewNorm(canvas.width, canvas.height));
+      gl.uniform1f(uniforms.time, (now - startTime) * 0.001);
+      gl.uniform2f(uniforms.camera, state.yaw, state.pitch);
+      gl.uniform1f(uniforms.blend, state.blend);
+      gl.uniform1i(uniforms.maxSteps, state.maxSteps);
+      gl.uniform1f(uniforms.epsilon, state.epsilon);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      drawOverlay();
+
+      updateStatus();
+      if (state.uiDirty || now - lastListRender > 300) {
+        renderObjectList();
+        state.uiDirty = false;
+        lastListRender = now;
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
