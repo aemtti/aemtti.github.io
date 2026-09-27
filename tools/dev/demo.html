@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>touch-kit demo</title>
+<style>html,body{margin:0;height:100%;background:#111;color:#ddd;font:14px system-ui;overflow:hidden}canvas{display:block;width:100vw;height:100vh}#log{position:fixed;left:8px;top:8px}</style>
+</head><body><canvas id="c"></canvas><div id="log"></div>
+<script src="touch-kit.js"></script>
+<script>
+const keys = new Set(), log = document.getElementById('log')
+addEventListener('keydown', e => { keys.add(e.code + ':' + e.keyCode) })
+addEventListener('keyup', e => { keys.delete(e.code + ':' + e.keyCode) })
+window.__aim = { x: 0, y: 0, on: false }
+const kit = TouchKit.create({
+  sticks: [{ id: 'move', side: 'left', label: 'MOVE', keys: 'wasd' },
+           { id: 'aim', side: 'right', label: 'AIM', onMove: (x, y, on) => { window.__aim = { x: +x.toFixed(2), y: +y.toFixed(2), on } } }],
+  buttons: [{ id: 'fire', label: 'FIRE', icon: '✦', key: 'Space', row: 0 }, { id: 'dash', label: 'DASH', icon: '»', key: 'ShiftLeft', row: 0, size: 's' },
+            { id: 'pause', icon: 'Ⅱ', size: 's', place: 'top-right', key: 'Escape', tap: true }],
+  landscape: true,
+})
+function frame() { log.textContent = [...keys].join(' ') + ' | aim ' + JSON.stringify(window.__aim); requestAnimationFrame(frame) }
+frame()
+window.__keys = () => [...keys].sort().join(',')
+</script></body></html>

@@ -2,3 +2,4 @@ node_modules/
 tools/.guard.local.json
 .DS_Store
 Thumbs.db
+out/

@@ -83,6 +83,18 @@ if (fs.existsSync(playDir)) for (const d of fs.readdirSync(playDir, { withFileTy
     if (e.isDirectory() && !collections.get(d.name).has(e.name)) fail(`unlisted item folder under play/${d.name}/ (id ${h(e.name)})`)
 }
 
+// Blank out runs of 160+ base64/url-safe characters (linear scan; a regex on multi-MB strings can overflow the stack)
+function readable(s) {
+  let out = '', last = 0, start = 0, run = 0
+  for (let i = 0; i <= s.length; i++) {
+    const c = i < s.length ? s.charCodeAt(i) : 0
+    const b64 = (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 43 || c === 47 || c === 61 || c === 95 || c === 45
+    if (i < s.length && b64) { if (run++ === 0) start = i }
+    else { if (run >= 160) { out += s.slice(last, start) + ' '; last = i } run = 0 }
+  }
+  return out + s.slice(last)
+}
+
 // 3 + 4. walk every published file
 const TEXT = /\.(html?|js|mjs|css|json|txt|md|svg|xml|csv|webmanifest)$/i
 let total = 0, files = 0
@@ -98,7 +110,9 @@ const walk = d => {
     if (/(^|\/)\.env(\.|$)|\.(pem|key|p12|pfx)$|id_rsa|cookies?\.txt$/i.test(rel)) fail(`credential-like file name (id ${h(rel)})`)
     if (TEXT.test(e.name) && st.size < 60 * 1024 * 1024 && !rel.startsWith('tools/') && !rel.startsWith('.github/')) {
       const s = fs.readFileSync(p, 'utf8')
-      for (const [k, re] of deny.entries()) if (re.test(s)) fail(`deny rule #${k + 1} matched file content (id ${h(rel)})`)
+      // deny rules look at readable text only: long base64/data runs (embedded audio, images) are blanked first
+      const text = readable(s)
+      for (const [k, re] of deny.entries()) if (re.test(text)) fail(`deny rule #${k + 1} matched file content (id ${h(rel)})`)
       for (const [name, re] of SECRET_RULES) if (re.test(s)) fail(`${name} pattern in ${rel}`)
     }
   }

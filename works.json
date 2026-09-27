@@ -1,19 +1,57 @@
 {
-  "updated": "2026-09-27",
-  "description": "코드로 만든 게임과 작은 작품들. 휴대폰과 PC 모두에서 바로 해 볼 수 있어요.",
-  "ogImage": "thumbs/harrow-creek.jpg",
-  "works": [
-    {
-      "slug": "harrow-creek", "title": "해로 크릭", "en": "Harrow Creek", "kind": "game", "orientation": "landscape",
-      "desc": "좀비로 가득한 밤의 마을에서 10분을 버티고 헬기까지 가는 생존 게임",
-      "mobile": "왼쪽 스틱 이동 · 오른쪽 스틱 조준·사격 · 대시·수류탄 버튼", "desktop": "WASD 이동 · 마우스 조준·클릭 사격",
-      "url": "https://aemtti.github.io/zombie-survival-mobile/", "external": true, "thumb": "thumbs/harrow-creek.jpg"
-    },
-    {
-      "slug": "lodestone", "title": "로드스톤", "en": "Lodestone", "kind": "toy", "orientation": "any",
-      "desc": "종이 위의 쇳가루. 손가락이 자석이 되고, 기울이고 두드리면 쇳가루가 움직여요",
-      "mobile": "손가락을 대면 자석 · 두드리기 · 기울이기", "desktop": "마우스를 누르면 자석 · 클릭으로 두드리기",
-      "url": "https://aemtti.github.io/lodestone/", "external": true, "thumb": "thumbs/lodestone.jpg"
-    }
-  ]
+ "updated": "2026-09-27",
+ "description": "코드로 만든 게임과 작은 작품들. 휴대폰과 PC 모두에서 바로 해 볼 수 있어요.",
+ "ogImage": "thumbs/harrow-creek.jpg",
+ "works": [
+  {
+   "slug": "harrow-creek",
+   "title": "해로 크릭",
+   "en": "Harrow Creek",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "좀비로 가득한 밤의 마을에서 10분을 버티고 헬기까지 가는 생존 게임",
+   "mobile": "왼쪽 스틱 이동 · 오른쪽 스틱 조준·사격 · 대시·수류탄 버튼",
+   "desktop": "WASD 이동 · 마우스 조준·클릭 사격",
+   "url": "https://aemtti.github.io/zombie-survival-mobile/",
+   "external": true,
+   "thumb": "thumbs/harrow-creek.jpg"
+  },
+  {
+   "slug": "lodestone",
+   "title": "로드스톤",
+   "en": "Lodestone",
+   "kind": "toy",
+   "orientation": "any",
+   "desc": "종이 위의 쇳가루. 손가락이 자석이 되고, 기울이고 두드리면 쇳가루가 움직여요",
+   "mobile": "손가락을 대면 자석 · 두드리기 · 기울이기",
+   "desktop": "마우스를 누르면 자석 · 클릭으로 두드리기",
+   "url": "https://aemtti.github.io/lodestone/",
+   "external": true,
+   "thumb": "thumbs/lodestone.jpg"
+  },
+  {
+   "slug": "galaxy-laundromat",
+   "title": "은하 세탁소",
+   "en": "Galaxy Laundromat",
+   "kind": "film",
+   "orientation": "any",
+   "desc": "세제를 너무 넣은 견습 세탁부와 성운 빨래 대소동. 코드로 그린 57초 뮤직비디오",
+   "mobile": "탭해서 재생·일시정지 · 막대를 끌어 이동 · 가로로 돌리면 크게",
+   "desktop": "클릭/Space 재생 · ←/→ 이동 · F 전체화면",
+   "url": "play/galaxy-laundromat/",
+   "thumb": "thumbs/galaxy-laundromat.jpg"
+  },
+  {
+   "slug": "showreel",
+   "title": "FULL STOP",
+   "en": "10분 모션 디자인 필름",
+   "kind": "film",
+   "orientation": "any",
+   "desc": "주황 점 하나가 점·선·면·입체를 지나 마침표가 되는 10분 필름과 짧은 쇼릴",
+   "mobile": "가운데 재생 버튼 · 장 버튼으로 바로 이동",
+   "desktop": "클릭해서 재생 · 장 버튼으로 이동",
+   "url": "play/showreel/",
+   "thumb": "thumbs/showreel.jpg"
+  }
+ ]
 }
