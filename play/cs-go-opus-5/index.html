@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>COUNTER-OFFENSIVE</title>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="game"></canvas>
+  <canvas id="hud"></canvas>
+
+  <!-- fullscreen tint layers -->
+  <div id="flash"></div>
+  <div id="vignette"></div>
+  <div id="scope" class="hidden">
+    <div class="scope-lens"></div>
+    <div class="scope-line h"></div>
+    <div class="scope-line v"></div>
+  </div>
+
+  <!-- ================= MAIN MENU ================= -->
+  <div id="menu" class="screen">
+    <div class="menu-bg"></div>
+    <div class="menu-inner">
+      <h1>COUNTER<span>-</span>OFFENSIVE</h1>
+      <p class="sub">GLOBAL &nbsp;OFFENSIVE &nbsp;/ &nbsp;de_sandstorm &nbsp;/ &nbsp;5v5 &nbsp;COMPETITIVE</p>
+      <div class="menu-cols">
+        <div class="menu-col">
+          <div class="lbl">SIDE</div>
+          <div class="seg" id="pick-team">
+            <button data-v="CT" class="on">COUNTER-TERRORIST</button>
+            <button data-v="T">TERRORIST</button>
+          </div>
+          <div class="lbl">BOT DIFFICULTY</div>
+          <div class="seg" id="pick-diff">
+            <button data-v="0">EASY</button>
+            <button data-v="1" class="on">NORMAL</button>
+            <button data-v="2">HARD</button>
+            <button data-v="3">EXPERT</button>
+          </div>
+          <div class="lbl">MATCH LENGTH</div>
+          <div class="seg" id="pick-len">
+            <button data-v="4">SHORT · MR4</button>
+            <button data-v="8">MR8</button>
+            <button data-v="12" class="on">COMPETITIVE · MR12</button>
+          </div>
+        </div>
+        <div class="menu-col">
+          <div class="lbl">CONTROLS</div>
+          <!-- touch screens (html.touch, set by src/ui/touch.js) -->
+          <table class="keys touch-only">
+            <tr><td>LEFT STICK</td><td>move</td></tr>
+            <tr><td>DRAG RIGHT</td><td>look (FIRE / SCOPE drag too)</td></tr>
+            <tr><td>FIRE · SCOPE</td><td>shoot / zoom, short throw</td></tr>
+            <tr><td>JUMP · CROUCH</td><td>crouch toggles</td></tr>
+            <tr><td>RELOAD · WALK</td><td>walk toggles (silent)</td></tr>
+            <tr><td>USE</td><td>plant / defuse (hold)</td></tr>
+            <tr><td>GUNS</td><td>slots 1-5 · last · drop</td></tr>
+            <tr><td>BUY · SCORE · ❚❚</td><td>buy menu · scoreboard · pause</td></tr>
+          </table>
+          <table class="keys desk-only">
+            <tr><td>W A S D</td><td>move</td></tr>
+            <tr><td>SHIFT / C</td><td>walk / crouch</td></tr>
+            <tr><td>SPACE</td><td>jump</td></tr>
+            <tr><td>MOUSE 1 / 2</td><td>fire / scope</td></tr>
+            <tr><td>R</td><td>reload</td></tr>
+            <tr><td>1 2 3 4 5</td><td>primary · pistol · knife · nades · c4</td></tr>
+            <tr><td>Q</td><td>last weapon</td></tr>
+            <tr><td>G</td><td>drop weapon</td></tr>
+            <tr><td>E</td><td>plant / defuse (hold)</td></tr>
+            <tr><td>B</td><td>buy menu (frees the mouse)</td></tr>
+            <tr><td>TAB</td><td>scoreboard</td></tr>
+            <tr><td>ESC</td><td>pause</td></tr>
+          </table>
+        </div>
+      </div>
+      <button id="btn-play" class="big">PLAY</button>
+      <button id="btn-settings" class="small">SETTINGS</button>
+      <button id="btn-debug" class="small">MAP INSPECTOR &nbsp;·&nbsp; NOCLIP + COLLISION DEBUG</button>
+      <div class="foot">procedural textures · synthesized audio · no external assets</div>
+    </div>
+  </div>
+
+  <!-- ================= SETTINGS ================= -->
+  <div id="settings" class="screen hidden">
+    <div class="menu-bg"></div>
+    <div class="panel">
+      <h2>SETTINGS</h2>
+      <div class="row touch-only"><label>TOUCH LOOK SENSITIVITY</label><input type="range" id="s-tsens" min="0.3" max="3" step="0.05"><span id="v-tsens"></span></div>
+      <div class="row"><label>MOUSE SENSITIVITY</label><input type="range" id="s-sens" min="0.2" max="6" step="0.05"><span id="v-sens"></span></div>
+      <div class="row"><label>FIELD OF VIEW</label><input type="range" id="s-fov" min="70" max="110" step="1"><span id="v-fov"></span></div>
+      <div class="row"><label>MASTER VOLUME</label><input type="range" id="s-vol" min="0" max="1" step="0.02"><span id="v-vol"></span></div>
+      <div class="row"><label>CROSSHAIR SIZE</label><input type="range" id="s-chs" min="0" max="14" step="1"><span id="v-chs"></span></div>
+      <div class="row"><label>CROSSHAIR GAP</label><input type="range" id="s-chg" min="-3" max="10" step="1"><span id="v-chg"></span></div>
+      <div class="row"><label for="s-chd">CROSSHAIR DOT</label><input type="checkbox" id="s-chd"></div>
+      <div class="row"><label for="s-chdyn">DYNAMIC CROSSHAIR</label><input type="checkbox" id="s-chdyn"></div>
+      <div class="row"><label>CROSSHAIR COLOUR</label>
+        <div class="seg" id="s-chcol">
+          <button data-v="#38ff5a" class="on">GREEN</button><button data-v="#ffffff">WHITE</button>
+          <button data-v="#38e0ff">CYAN</button><button data-v="#ffd23a">YELLOW</button><button data-v="#ff3a3a">RED</button>
+        </div>
+      </div>
+      <div class="row"><label for="s-bob">VIEWMODEL BOB</label><input type="checkbox" id="s-bob"></div>
+      <div class="row"><label for="s-shadow">SHADOWS</label><input type="checkbox" id="s-shadow"></div>
+      <div class="row"><label for="s-blood">BLOOD</label><input type="checkbox" id="s-blood"></div>
+      <button id="btn-settings-back" class="big">BACK</button>
+    </div>
+  </div>
+
+  <!-- ================= PAUSE ================= -->
+  <div id="pause" class="screen hidden">
+    <div class="panel">
+      <h2>PAUSED</h2>
+      <button id="btn-resume" class="big">RESUME</button>
+      <button id="btn-pause-settings" class="small">SETTINGS</button>
+      <button id="btn-quit" class="small">ABANDON MATCH</button>
+    </div>
+  </div>
+
+  <!-- ================= BUY MENU ================= -->
+  <div id="buy" class="hidden">
+    <div class="buy-head">
+      <span class="bm-title">BUY MENU</span>
+      <span class="bm-money" id="buy-money">$800</span>
+      <span class="bm-time" id="buy-time">0:20</span>
+      <button type="button" id="buy-close" class="touch-only">✕ CLOSE</button>
+    </div>
+    <div class="buy-body">
+      <div class="buy-cat" id="buy-cats"></div>
+      <div class="buy-items" id="buy-items"></div>
+    </div>
+    <div class="buy-foot" id="buy-foot">1-6 choose a category &nbsp;·&nbsp; or click anything &nbsp;·&nbsp; B closes</div>
+  </div>
+
+  <!-- ================= SCOREBOARD ================= -->
+  <div id="scoreboard" class="hidden"></div>
+
+  <!-- ================= END OF MATCH ================= -->
+  <div id="endmatch" class="screen hidden">
+    <div class="panel">
+      <h2 id="end-title">MATCH OVER</h2>
+      <div id="end-score"></div>
+      <div id="end-stats"></div>
+      <button id="btn-again" class="big">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- ================= DEBUG / MAP INSPECTOR ================= -->
+  <div id="debugpanel" class="hidden"><pre id="debugtext"></pre></div>
+  <pre id="debughelp" class="hidden"></pre>
+
+  <div id="loading"><div class="bar"><i></i></div><span>LOADING de_sandstorm</span></div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

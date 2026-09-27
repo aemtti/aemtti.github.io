@@ -1,0 +1,445 @@
+{
+    "playerSpawn": { "x": 4, "y": 0, "z": 5, "rotation": 0 },
+    "enemySpawn": { "room": "room_6", "x": 30, "y": -4, "z": 39 },
+
+    "rooms": [
+        {
+            "id": "room_1",
+            "name": "Entrance Foyer",
+            "x": 0, "z": 0,
+            "width": 8, "depth": 10,
+            "floorY": 0, "ceilingY": 3.5,
+            "surfaceType": "wood",
+            "wallTexture": "plaster",
+            "floorTexture": "wood",
+            "ambience": "quiet_wind",
+            "fogDensity": 0.04,
+            "lightColor": "0xffe4b5",
+            "lightIntensity": 0.3,
+            "furniture": [
+                { "type": "crate", "x": 1.5, "z": 1.5 },
+                { "type": "crate", "x": 6.5, "z": 8 },
+                { "type": "pillar", "x": 4, "z": 3 }
+            ]
+        },
+        {
+            "id": "room_2",
+            "name": "Reception",
+            "x": 12, "z": 0,
+            "width": 8, "depth": 10,
+            "floorY": 0, "ceilingY": 3.5,
+            "surfaceType": "tile",
+            "wallTexture": "plaster",
+            "floorTexture": "tile",
+            "ambience": "clock_ticking",
+            "fogDensity": 0.04,
+            "lightColor": "0xddeeff",
+            "lightIntensity": 0.25,
+            "furniture": [
+                { "type": "desk", "x": 14, "z": 2, "width": 2.5, "depth": 1.2 },
+                { "type": "chair", "x": 14, "z": 3.5 },
+                { "type": "shelf", "x": 19.2, "z": 4, "width": 0.5, "depth": 3 },
+                { "type": "crate", "x": 13, "z": 7 }
+            ]
+        },
+        {
+            "id": "room_3",
+            "name": "Storage Closet",
+            "x": 0, "z": 13,
+            "width": 4, "depth": 6,
+            "floorY": 0, "ceilingY": 3.0,
+            "surfaceType": "concrete",
+            "wallTexture": "brick",
+            "floorTexture": "concrete",
+            "ambience": "dripping",
+            "fogDensity": 0.06,
+            "lightColor": "0xffcc88",
+            "lightIntensity": 0.15,
+            "furniture": [
+                { "type": "shelf", "x": 0.8, "z": 14, "width": 0.5, "depth": 4 },
+                { "type": "crate", "x": 3, "z": 15 },
+                { "type": "crate", "x": 2.5, "z": 17.5 }
+            ]
+        },
+        {
+            "id": "room_4",
+            "name": "Laboratory",
+            "x": 8, "z": 13,
+            "width": 10, "depth": 8,
+            "floorY": 0, "ceilingY": 3.5,
+            "surfaceType": "tile",
+            "wallTexture": "metal",
+            "floorTexture": "tile",
+            "ambience": "electric_hum",
+            "fogDensity": 0.03,
+            "lightColor": "0xccffcc",
+            "lightIntensity": 0.35,
+            "furniture": [
+                { "type": "desk", "x": 11, "z": 15, "width": 3, "depth": 1.2 },
+                { "type": "desk", "x": 15, "z": 15, "width": 3, "depth": 1.2 },
+                { "type": "shelf", "x": 17.2, "z": 17, "width": 0.5, "depth": 3 },
+                { "type": "crate", "x": 9, "z": 19.5 }
+            ]
+        },
+        {
+            "id": "room_5",
+            "name": "Break Room",
+            "x": 22, "z": 13,
+            "width": 8, "depth": 8,
+            "floorY": 0, "ceilingY": 3.5,
+            "surfaceType": "wood",
+            "wallTexture": "plaster",
+            "floorTexture": "wood",
+            "ambience": "radio_static",
+            "fogDensity": 0.04,
+            "lightColor": "0xffddaa",
+            "lightIntensity": 0.2,
+            "furniture": [
+                { "type": "table", "x": 26, "z": 17, "width": 2.5, "depth": 1.5 },
+                { "type": "chair", "x": 25, "z": 17 },
+                { "type": "chair", "x": 27, "z": 17 },
+                { "type": "shelf", "x": 29.2, "z": 15, "width": 0.5, "depth": 3 }
+            ]
+        },
+        {
+            "id": "room_6",
+            "name": "Basement",
+            "x": 24, "z": 29,
+            "width": 12, "depth": 10,
+            "floorY": -4, "ceilingY": -0.5,
+            "surfaceType": "concrete",
+            "wallTexture": "brick",
+            "floorTexture": "concrete",
+            "ambience": "deep_rumble",
+            "fogDensity": 0.07,
+            "lightColor": "0xff8866",
+            "lightIntensity": 0.12,
+            "furniture": [
+                { "type": "crate", "x": 26, "z": 31 },
+                { "type": "crate", "x": 27, "z": 31.5 },
+                { "type": "crate", "x": 26.5, "z": 32.5 },
+                { "type": "shelf", "x": 35.2, "z": 33, "width": 0.5, "depth": 4 },
+                { "type": "pillar", "x": 30, "z": 34 },
+                { "type": "pillar", "x": 30, "z": 31 }
+            ]
+        },
+        {
+            "id": "room_7",
+            "name": "Library",
+            "x": 0, "z": 44,
+            "width": 10, "depth": 10,
+            "floorY": 4, "ceilingY": 7.5,
+            "surfaceType": "wood",
+            "wallTexture": "wood_panel",
+            "floorTexture": "wood",
+            "ambience": "creaking_shelves",
+            "fogDensity": 0.04,
+            "lightColor": "0xffcc77",
+            "lightIntensity": 0.25,
+            "furniture": [
+                { "type": "shelf", "x": 0.8, "z": 46, "width": 0.5, "depth": 6 },
+                { "type": "shelf", "x": 4, "z": 44.8, "width": 4, "depth": 0.5 },
+                { "type": "shelf", "x": 9.2, "z": 48, "width": 0.5, "depth": 4 },
+                { "type": "desk", "x": 5, "z": 50, "width": 2, "depth": 1.2 },
+                { "type": "chair", "x": 5, "z": 52 }
+            ]
+        },
+        {
+            "id": "room_8",
+            "name": "Director's Office",
+            "x": 0, "z": 57,
+            "width": 8, "depth": 8,
+            "floorY": 4, "ceilingY": 7.5,
+            "surfaceType": "wood",
+            "wallTexture": "wallpaper",
+            "floorTexture": "wood",
+            "ambience": "whispers",
+            "fogDensity": 0.05,
+            "lightColor": "0xffeecc",
+            "lightIntensity": 0.2,
+            "furniture": [
+                { "type": "desk", "x": 4, "z": 61, "width": 3, "depth": 1.5 },
+                { "type": "chair", "x": 4, "z": 63 },
+                { "type": "shelf", "x": 7.2, "z": 60, "width": 0.5, "depth": 4 },
+                { "type": "wardrobe", "x": 1, "z": 64 }
+            ]
+        },
+        {
+            "id": "room_9",
+            "name": "Server Room",
+            "x": 14, "z": 57,
+            "width": 6, "depth": 8,
+            "floorY": 4, "ceilingY": 7.5,
+            "surfaceType": "metal",
+            "wallTexture": "metal",
+            "floorTexture": "metal",
+            "ambience": "server_fans",
+            "fogDensity": 0.03,
+            "lightColor": "0x88ccff",
+            "lightIntensity": 0.3,
+            "furniture": [
+                { "type": "server_rack", "x": 14.8, "z": 59, "width": 0.6, "depth": 5 },
+                { "type": "server_rack", "x": 17, "z": 59, "width": 0.6, "depth": 5 },
+                { "type": "server_rack", "x": 19.2, "z": 59, "width": 0.6, "depth": 5 }
+            ]
+        },
+        {
+            "id": "room_10",
+            "name": "Rooftop Exit",
+            "x": 14, "z": 44,
+            "width": 10, "depth": 10,
+            "floorY": 4, "ceilingY": 8.5,
+            "surfaceType": "concrete",
+            "wallTexture": "concrete",
+            "floorTexture": "concrete",
+            "ambience": "wind_howling",
+            "fogDensity": 0.02,
+            "lightColor": "0x8899bb",
+            "lightIntensity": 0.4,
+            "furniture": [
+                { "type": "crate", "x": 16, "z": 46 },
+                { "type": "crate", "x": 22, "z": 52 },
+                { "type": "pillar", "x": 19, "z": 49 }
+            ]
+        }
+    ],
+
+    "hallways": [
+        {
+            "id": "hallway_1",
+            "name": "Ground Hallway",
+            "x": 0, "z": 10,
+            "width": 30, "depth": 3,
+            "floorY": 0, "ceilingY": 3.5,
+            "surfaceType": "tile",
+            "wallTexture": "plaster",
+            "floorTexture": "tile",
+            "lightColor": "0xccbbaa",
+            "lightIntensity": 0.15,
+            "lightCount": 3
+        },
+        {
+            "id": "hallway_2",
+            "name": "Connector Hallway",
+            "x": 26, "z": 21,
+            "width": 3, "depth": 8,
+            "floorY": 0, "ceilingY": 3.5,
+            "surfaceType": "concrete",
+            "wallTexture": "brick",
+            "floorTexture": "concrete",
+            "lightColor": "0xffaa77",
+            "lightIntensity": 0.1,
+            "lightCount": 1
+        },
+        {
+            "id": "hallway_3",
+            "name": "Upper Hallway",
+            "x": 0, "z": 54,
+            "width": 24, "depth": 3,
+            "floorY": 4, "ceilingY": 7.5,
+            "surfaceType": "wood",
+            "wallTexture": "plaster",
+            "floorTexture": "wood",
+            "lightColor": "0xddccbb",
+            "lightIntensity": 0.15,
+            "lightCount": 3
+        },
+        {
+            "id": "corridor_to_stairs",
+            "name": "Corridor to Stairs",
+            "x": 10, "z": 21,
+            "width": 4, "depth": 23,
+            "floorY": 0, "ceilingY": 3.5,
+            "surfaceType": "concrete",
+            "wallTexture": "brick",
+            "floorTexture": "concrete",
+            "lightColor": "0xccaa88",
+            "lightIntensity": 0.08,
+            "lightCount": 3
+        }
+    ],
+
+    "stairs": [
+        {
+            "id": "stairs_1",
+            "name": "Main Staircase",
+            "x": 10, "z": 44,
+            "width": 4, "depth": 10,
+            "fromY": 0, "toY": 4,
+            "surfaceType": "concrete",
+            "wallTexture": "brick",
+            "floorTexture": "concrete",
+            "lightColor": "0xccaa88",
+            "lightIntensity": 0.1
+        }
+    ],
+
+    "doors": [
+        {
+            "id": "door_r1_h1",
+            "from": "room_1", "to": "hallway_1",
+            "x": 4, "z": 10,
+            "facing": "z",
+            "locked": false,
+            "requiredKey": null
+        },
+        {
+            "id": "door_r2_h1",
+            "from": "room_2", "to": "hallway_1",
+            "x": 16, "z": 10,
+            "facing": "z",
+            "locked": false,
+            "requiredKey": null
+        },
+        {
+            "id": "door_r3_h1",
+            "from": "room_3", "to": "hallway_1",
+            "x": 2, "z": 13,
+            "facing": "z",
+            "locked": false,
+            "requiredKey": null
+        },
+        {
+            "id": "door_r4_h1",
+            "from": "room_4", "to": "hallway_1",
+            "x": 13, "z": 13,
+            "facing": "z",
+            "locked": false,
+            "requiredKey": null
+        },
+        {
+            "id": "door_r5_h1",
+            "from": "room_5", "to": "hallway_1",
+            "x": 26, "z": 13,
+            "facing": "z",
+            "locked": false,
+            "requiredKey": null
+        },
+        {
+            "id": "door_r5_h2",
+            "from": "room_5", "to": "hallway_2",
+            "x": 27.5, "z": 21,
+            "facing": "z",
+            "locked": false,
+            "requiredKey": null
+        },
+        {
+            "id": "door_r6_h2",
+            "from": "room_6", "to": "hallway_2",
+            "x": 27.5, "z": 29,
+            "facing": "z",
+            "locked": true,
+            "requiredKey": "key_1"
+        },
+        {
+            "id": "door_r7_h3",
+            "from": "room_7", "to": "hallway_3",
+            "x": 5, "z": 54,
+            "facing": "z",
+            "locked": false,
+            "requiredKey": null
+        },
+        {
+            "id": "door_r8_h3",
+            "from": "room_8", "to": "hallway_3",
+            "x": 4, "z": 57,
+            "facing": "z",
+            "locked": true,
+            "requiredKey": "key_2"
+        },
+        {
+            "id": "door_r9_h3",
+            "from": "room_9", "to": "hallway_3",
+            "x": 17, "z": 57,
+            "facing": "z",
+            "locked": false,
+            "requiredKey": null
+        },
+        {
+            "id": "door_r10_h3",
+            "from": "room_10", "to": "hallway_3",
+            "x": 19, "z": 54,
+            "facing": "z",
+            "locked": true,
+            "requiredKey": "key_3"
+        }
+    ],
+
+    "floorShells": [
+        {
+            "id": "ground_floor",
+            "floorY": 0,
+            "ceilingY": 3.5,
+            "wallTexture": "brick",
+            "vertices": [
+                [0,0], [30,0], [30,21], [29,21], [29,29], [26,29],
+                [26,21], [14,21], [14,44], [10,44], [10,21], [0,21]
+            ],
+            "openings": [
+                { "edge": [[14,44],[10,44]] },
+                { "edge": [[29,29],[26,29]] }
+            ],
+            "floorRects": [
+                { "x": 0, "z": 0, "w": 30, "d": 21 },
+                { "x": 10, "z": 21, "w": 4, "d": 23 },
+                { "x": 26, "z": 21, "w": 3, "d": 8 }
+            ]
+        },
+        {
+            "id": "upper_floor",
+            "floorY": 4,
+            "ceilingY": 7.5,
+            "wallTexture": "brick",
+            "vertices": [
+                [0,44], [24,44], [24,57], [20,57], [20,65],
+                [14,65], [14,57], [8,57], [8,65], [0,65]
+            ],
+            "openings": [
+                { "edge": [[10,44],[14,44]] }
+            ],
+            "floorRects": [
+                { "x": 0, "z": 44, "w": 24, "d": 13 },
+                { "x": 0, "z": 57, "w": 8, "d": 8 },
+                { "x": 14, "z": 57, "w": 6, "d": 8 }
+            ]
+        },
+        {
+            "id": "basement",
+            "floorY": -4,
+            "ceilingY": -0.5,
+            "wallTexture": "brick",
+            "vertices": [
+                [24,29], [36,29], [36,39], [24,39]
+            ],
+            "openings": [
+                { "edge": [[26,29],[29,29]] }
+            ],
+            "floorRects": [
+                { "x": 24, "z": 29, "w": 12, "d": 10 }
+            ]
+        }
+    ],
+
+    "interiorWalls": [
+        { "axis": "z", "pos": 10, "from": 0, "to": 30, "floorY": 0, "height": 3.5, "texture": "plaster" },
+        { "axis": "z", "pos": 13, "from": 0, "to": 30, "floorY": 0, "height": 3.5, "texture": "plaster" },
+        { "axis": "x", "pos": 8, "from": 0, "to": 10, "floorY": 0, "height": 3.5, "texture": "plaster" },
+        { "axis": "x", "pos": 12, "from": 0, "to": 10, "floorY": 0, "height": 3.5, "texture": "plaster" },
+        { "axis": "x", "pos": 4, "from": 13, "to": 19, "floorY": 0, "height": 3.0, "texture": "brick" },
+        { "axis": "x", "pos": 8, "from": 13, "to": 21, "floorY": 0, "height": 3.5, "texture": "metal" },
+        { "axis": "x", "pos": 18, "from": 13, "to": 21, "floorY": 0, "height": 3.5, "texture": "metal" },
+        { "axis": "x", "pos": 22, "from": 13, "to": 21, "floorY": 0, "height": 3.5, "texture": "plaster" },
+        { "axis": "z", "pos": 19, "from": 0, "to": 4, "floorY": 0, "height": 3.0, "texture": "brick" },
+        { "axis": "z", "pos": 21, "from": 8, "to": 10, "floorY": 0, "height": 3.5, "texture": "brick" },
+        { "axis": "z", "pos": 21, "from": 14, "to": 26, "floorY": 0, "height": 3.5, "texture": "brick" },
+        { "axis": "z", "pos": 21, "from": 26, "to": 29, "floorY": 0, "height": 3.5, "texture": "brick" },
+        { "axis": "z", "pos": 21, "from": 29, "to": 30, "floorY": 0, "height": 3.5, "texture": "plaster" },
+        { "axis": "z", "pos": 29, "from": 26, "to": 29, "floorY": 0, "height": 3.5, "texture": "brick" },
+        { "axis": "z", "pos": 54, "from": 0, "to": 10, "floorY": 4, "height": 3.5, "texture": "wood_panel" },
+        { "axis": "z", "pos": 54, "from": 14, "to": 24, "floorY": 4, "height": 3.5, "texture": "concrete" },
+        { "axis": "z", "pos": 57, "from": 0, "to": 24, "floorY": 4, "height": 3.5, "texture": "plaster" },
+        { "axis": "x", "pos": 8, "from": 57, "to": 65, "floorY": 4, "height": 3.5, "texture": "wallpaper" },
+        { "axis": "x", "pos": 14, "from": 57, "to": 65, "floorY": 4, "height": 3.5, "texture": "metal" },
+        { "axis": "x", "pos": 20, "from": 57, "to": 65, "floorY": 4, "height": 3.5, "texture": "metal" }
+    ]
+}

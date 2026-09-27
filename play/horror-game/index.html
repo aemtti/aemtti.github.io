@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
+    <title>Horror Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Three.js canvas injected here by main.js -->
+    </div>
+
+    <!-- HUD overlay -->
+    <div id="hud">
+        <div id="crosshair">+</div>
+    </div>
+
+    <!-- Debug HUD (hidden by default, toggled with T key) -->
+    <div id="debug-hud">
+        <div id="debug-label">DEBUG MODE</div>
+        <div id="debug-coords">X: 0  Y: 0  Z: 0</div>
+        <div id="debug-room">Room: none  Surface: unknown</div>
+    </div>
+
+    <!-- Click-to-start overlay -->
+    <div id="start-screen">
+        <div class="start-content">
+            <h1>HORROR GAME</h1>
+            <p class="desk-only">Click to start</p>
+            <p class="touch-only">Tap to start</p>
+            <div class="controls-hint desk-only">
+                <span>WASD — Move</span>
+                <span>Mouse — Look</span>
+                <span>Shift — Run</span>
+                <span>ESC — Pause</span>
+            </div>
+            <!-- Phones / tablets (shown when html has class "touch") -->
+            <div class="controls-hint touch-only">
+                <span>Left stick — Move</span>
+                <span>Drag right side — Look</span>
+                <span>RUN — Run · USE — Doors</span>
+                <span>❚❚ — Pause</span>
+            </div>
+            <label class="touch-only touch-settings">
+                <span>Look sensitivity</span>
+                <input type="range" id="touch-sens" min="0.3" max="3" step="0.05" value="1">
+                <b id="touch-sens-value">1.00×</b>
+            </label>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+        }
+    }
+    </script>
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

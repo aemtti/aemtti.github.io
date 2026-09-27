@@ -819,6 +819,66 @@
      "hidden": true
     }
    ]
+  },
+  {
+   "slug": "opus-skate",
+   "title": "콘크리트 정글",
+   "en": "OpusSkate",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "2000년대 뉴욕 한 블록에서 타는 3D 스트리트 스케이트보드 (C++ 원작의 웹판)",
+   "mobile": "왼쪽 스틱 밀기·방향 · OLLIE(누르고 떼기)·FLIP·GRAB·GRIND 버튼 + 스틱 방향으로 트릭",
+   "desktop": "W/S 밀기 · A/D 방향 · Space 올리 · J/K/L/I 트릭 · B 오토파일럿",
+   "url": "play/opus-skate/",
+   "thumb": "thumbs/opus-skate.jpg"
+  },
+  {
+   "slug": "open-city",
+   "title": "오픈 시티",
+   "en": "OPEN CITY",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "걷고 차를 몰며 미션을 하는 3D 오픈월드 도시",
+   "mobile": "도보: 스틱·드래그 시점·점프·탑승 · 운전: 조향·가속·브레이크 버튼",
+   "desktop": "클릭해 시작 · WASD 이동/운전 · 마우스 카메라 · F 탑승/하차",
+   "url": "play/open-city/",
+   "thumb": "thumbs/open-city.jpg"
+  },
+  {
+   "slug": "cs-go-opus-5",
+   "title": "카운터 오펜시브",
+   "en": "Counter-Offensive",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "봇 9명과 5대5 폭탄 설치·해체전을 벌이는 전술 FPS",
+   "mobile": "왼쪽 스틱 이동 · 드래그 조준 · FIRE·SCOPE·RELOAD·USE 버튼 · BUY 상점",
+   "desktop": "WASD · 마우스 조준·좌클릭 사격 · R 장전 · 1-5 무기 · B 상점",
+   "url": "play/cs-go-opus-5/",
+   "thumb": "thumbs/cs-go-opus-5.jpg"
+  },
+  {
+   "slug": "horror-fps",
+   "title": "호러 FPS",
+   "en": "Horror FPS",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "손전등 하나로 어두운 복도에서 열쇠를 찾아 탈출하는 1인칭 호러 (프로토타입)",
+   "mobile": "왼쪽 스틱 이동 · 드래그 시점 · LIGHT 손전등 · USE 열쇠/문",
+   "desktop": "클릭해 시작 · WASD · 마우스 시점 · F 손전등 · E 상호작용",
+   "url": "play/horror-fps/",
+   "thumb": "thumbs/horror-fps.jpg"
+  },
+  {
+   "slug": "horror-game",
+   "title": "호러 게임",
+   "en": "Horror Game",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "어두운 건물을 돌아다니며 문을 여는 1인칭 호러 (프로토타입)",
+   "mobile": "왼쪽 스틱 이동 · 드래그 시점 · USE 문 열기 · RUN · MAP",
+   "desktop": "클릭해 시작 · WASD · 마우스 시점 · E 문 · M 지도",
+   "url": "play/horror-game/",
+   "thumb": "thumbs/horror-game.jpg"
   }
  ]
 }
