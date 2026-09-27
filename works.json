@@ -124,6 +124,18 @@
      "thumb": "thumbs/chatgpt-playground--garden-anthropology.jpg"
     }
    ]
+  },
+  {
+   "slug": "nocturne",
+   "title": "녹턴",
+   "en": "NOCTURNE",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "20분의 밤을 버티는 서바이버풍 생존 액션 — 무기 진화, 달의 계약, 보스",
+   "mobile": "화면을 누르고 끌어 이동(공격 자동) · 가젯 버튼 · 카드를 눌러 선택",
+   "desktop": "WASD/방향키 이동(공격 자동) · Space 가젯 · 숫자키 선택 · Esc 일시정지",
+   "url": "play/nocturne/",
+   "thumb": "thumbs/nocturne.jpg"
   }
  ]
 }
