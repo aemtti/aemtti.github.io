@@ -1,0 +1,1311 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ELEMENT LAB — Falling Sand</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090b0e;
+      --panel: #11151a;
+      --panel-2: #171c22;
+      --line: #283039;
+      --text: #e8edf2;
+      --muted: #84909c;
+      --accent: #ffb84d;
+      --accent-soft: rgba(255, 184, 77, .14);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+    /* 휴대폰: 캔버스 밖으로 손가락이 미끄러져도 당겨서 새로고침·뒤로 가기 제스처가 걸리지 않게 */
+    html, body { overscroll-behavior: none; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 50% -20%, rgba(255, 184, 77, .08), transparent 36rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, Pretendard, "Segoe UI", system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+
+    button, input { font: inherit; }
+
+    .app {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 36px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 48px);
+      line-height: .95;
+      letter-spacing: -.045em;
+    }
+
+    .subtitle {
+      max-width: 510px;
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex: 0 0 auto;
+      min-width: 112px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(17, 21, 26, .82);
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #68d391;
+      box-shadow: 0 0 10px #68d391;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 218px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .stage-card,
+    .control-panel {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(17, 21, 26, .9);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .3);
+    }
+
+    .stage-card { padding: 10px; }
+
+    .canvas-shell {
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: 10px;
+      background: #050708;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+    }
+
+    .hint {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      color: rgba(232, 237, 242, .34);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: .04em;
+      transition: opacity .2s ease;
+    }
+
+    .hint.hidden { opacity: 0; }
+
+    .stage-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 5px 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .control-panel { padding: 14px; }
+
+    .section + .section {
+      margin-top: 17px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .element-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      height: 38px;
+      padding: 0 9px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      background: var(--panel-2);
+      color: #b8c1ca;
+      cursor: pointer;
+      transition: border-color .12s ease, background .12s ease, color .12s ease;
+    }
+
+    .element-btn:hover { border-color: #3b4651; color: #fff; }
+
+    .element-btn[aria-pressed="true"] {
+      border-color: var(--swatch);
+      background: color-mix(in srgb, var(--swatch) 12%, var(--panel-2));
+      color: #fff;
+    }
+
+    .swatch {
+      width: 11px;
+      height: 11px;
+      flex: 0 0 auto;
+      border-radius: 3px;
+      background: var(--swatch);
+      box-shadow: 0 0 9px color-mix(in srgb, var(--swatch) 55%, transparent);
+    }
+
+    .element-name {
+      overflow: hidden;
+      font-size: 12px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .range-value {
+      min-width: 35px;
+      padding: 4px 6px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--text);
+      font-size: 11px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .actions { display: grid; gap: 7px; }
+
+    .action-btn {
+      height: 39px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .action-btn:hover { border-color: #485562; }
+
+    .action-btn.primary {
+      border-color: #8b642c;
+      background: var(--accent-soft);
+      color: #ffd79a;
+    }
+
+    .legend {
+      margin: 0;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    kbd {
+      padding: 1px 5px;
+      border: 1px solid #3a444e;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: #161b21;
+      color: #c5cdd5;
+      font-size: 9px;
+    }
+
+    @media (max-width: 760px) {
+      .app { width: min(100% - 20px, 620px); padding-top: 20px; }
+      header { align-items: flex-start; }
+      .subtitle { display: none; }
+      .layout { grid-template-columns: 1fr; }
+      .control-panel { order: -1; }
+      .palette { grid-template-columns: repeat(3, 1fr); }
+      .section.actions-section { display: none; }
+    }
+
+    @media (max-width: 430px) {
+      .palette { grid-template-columns: repeat(2, 1fr); }
+      .status { min-width: 98px; }
+      .stage-footer span:last-child { display: none; }
+    }
+
+    /* ---- 휴대폰·태블릿 (터치): 버튼 44px, 글자 12px 이상, 일시정지·지우기 버튼 항상 표시 ---- */
+    .touch-only { display: none; }
+    @media (pointer: coarse) {
+      span.touch-only { display: inline; }
+      p.touch-only { display: block; }
+      .desk-only { display: none; }
+      .element-btn, .action-btn { height: 44px; touch-action: manipulation; }
+      input[type="range"] { height: 32px; touch-action: manipulation; }
+      .section-title, .range-value, .stage-footer, .legend { font-size: 12px; }
+      .section.actions-section { display: block; }
+      .actions { grid-template-columns: 1fr 1fr; }
+    }
+    /* 휴대폰 세로: 조절판과 캔버스가 한 화면에 들어오게 */
+    @media (pointer: coarse) and (max-width: 430px) {
+      .app { padding: 12px 0; }
+      header { margin-bottom: 12px; }
+      .palette { grid-template-columns: repeat(3, 1fr); }
+      .stage-footer, .legend-section { display: none; }
+    }
+
+    /* 휴대폰 가로: 캔버스를 화면 높이에 맞추고 오른쪽에 조절판 */
+    @media (orientation: landscape) and (max-height: 540px) {
+      .app { width: 100%; padding: 8px max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left)); }
+      header { display: none; }
+      .layout { grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+      .stage-card { padding: 8px; }
+      .canvas-shell { width: calc((100vh - 58px) * 4 / 3); height: calc(100vh - 58px); aspect-ratio: auto; }
+      @supports (height: 100dvh) {
+        .canvas-shell { width: calc((100dvh - 58px) * 4 / 3); height: calc(100dvh - 58px); }
+        .control-panel { max-height: calc(100dvh - 16px); }
+      }
+      .stage-footer { padding-top: 6px; }
+      .control-panel { order: 0; max-height: calc(100vh - 16px); overflow-y: auto; padding: 10px; }
+      .palette { grid-template-columns: repeat(4, 1fr); }
+      .element-btn { padding: 0 6px; gap: 6px; }
+      .legend-section { display: none; }
+      .section + .section { margin-top: 10px; padding-top: 10px; }
+      .section.actions-section { display: block; }
+      .actions { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <p class="eyebrow">Cellular Playground / 01</p>
+        <h1>ELEMENT LAB</h1>
+        <p class="subtitle">입자를 그리고, 섞고, 태워보세요. 120,000개의 셀이 실시간으로 서로 반응합니다.</p>
+      </div>
+      <div class="status" aria-live="polite">
+        <span class="status-dot"></span>
+        <span><strong id="fps">60</strong> FPS</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section class="stage-card" aria-label="시뮬레이션 영역">
+        <div class="canvas-shell">
+          <canvas id="sand-canvas" width="400" height="300" aria-label="Falling sand 시뮬레이션 캔버스"></canvas>
+          <div class="hint" id="hint">클릭하거나 드래그해서 입자를 그리세요</div>
+        </div>
+        <div class="stage-footer">
+          <span>GRID 400 × 300 · 120K CELLS</span>
+          <span class="touch-only">지우개를 골라 문지르면 지워져요</span>
+          <span class="desk-only">우클릭: 지우기 · <kbd>Space</kbd> 일시정지</span>
+        </div>
+      </section>
+
+      <aside class="control-panel" aria-label="시뮬레이션 컨트롤">
+        <section class="section">
+          <h2 class="section-title"><span>Materials</span><span>9 + 1</span></h2>
+          <div class="palette" id="palette"></div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title"><span>Brush size</span><span id="brush-label">8 px</span></h2>
+          <div class="range-row">
+            <input id="brush-size" type="range" min="1" max="24" value="8" aria-label="브러시 크기">
+            <span class="range-value" id="brush-value">08</span>
+          </div>
+        </section>
+
+        <section class="section actions-section">
+          <h2 class="section-title">Simulation</h2>
+          <div class="actions">
+            <button class="action-btn primary" id="pause-btn" type="button">일시정지</button>
+            <button class="action-btn" id="reset-btn" type="button">모두 지우기</button>
+          </div>
+        </section>
+
+        <section class="section legend-section">
+          <p class="legend desk-only"><kbd>[</kbd> <kbd>]</kbd> 브러시 조절<br><kbd>R</kbd> 모두 지우기 · <kbd>1–9</kbd> 원소 선택<br>모바일에서는 캔버스 위를 손가락으로 그리세요.</p>
+          <p class="legend touch-only">캔버스 위를 손가락으로 문질러 그리세요.<br>지우개 = 지우기 · 슬라이더 = 브러시 크기</p>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    'use strict';
+
+    /*
+      ARCHITECTURE
+      -------------------------------------------------------------------------
+      - 400×300 셀을 JS 객체로 만들면 GC와 포인터 추적 비용이 크다. 따라서 타입,
+        수명, 나이/냉각값을 구조 분할(SoA) TypedArray에 보관한다.
+      - 물리는 60Hz 고정 스텝이며, 제자리 갱신 뒤 movedStamp로 한 틱의 중복 이동을
+        막는다. 중력 입자에 유리한 아래→위 순회는 유지하되, 각 행의 좌우 주사 방향과
+        좌우 후보 순서를 프레임마다 섞어 한쪽으로만 흐르는 편향을 제거한다.
+      - 두 유체가 같은 빈 셀을 원하는 경우 먼저 처리된 입자가 셀을 선점한다.
+        별도 intent 배열은 메모리 대역폭을 크게 늘리므로 사용하지 않고, 대신 행 순서와
+        후보 순서를 계속 무작위화하여 선점 우선권이 시간 평균상 공평하도록 한다.
+      - 렌더링은 ImageData를 가진 오프스크린 캔버스(back buffer)에 먼저 완성한다.
+        변경 셀의 16×16 타일만 dirty로 표시하고 연속 타일을 직사각형으로 합쳐 화면에
+        복사한다. 즉, 시뮬레이션 중간 상태가 보이지 않는 더블 버퍼 + dirty rect 방식이다.
+      - 폭발 충격파는 기존 셀 배열을 바꾸지 않고 Int8 속도 배열 2개만 병렬로 추가한다.
+        불 글로우는 1/2 해상도 전용 버퍼에서 blur 후 lighter 합성해 픽셀 비용을 제한한다.
+    */
+
+    const W = 400;
+    const H = 300;
+    const SIZE = W * H;
+    const TILE = 16;
+    const TILE_COLS = Math.ceil(W / TILE);
+    const TILE_ROWS = Math.ceil(H / TILE);
+    const STEP_MS = 1000 / 60;
+
+    const EMPTY = 0;
+    const SAND = 1;
+    const WATER = 2;
+    const STONE = 3;
+    const WOOD = 4;
+    const FIRE = 5;
+    const SMOKE = 6;
+    const OIL = 7;
+    const STEAM = 8;
+    const BOMB = 9;
+
+    const MATERIALS = [
+      { id: SAND,  name: '모래', color: '#e5b962', rgb: [229, 185, 98] },
+      { id: WATER, name: '물',   color: '#3f86d9', rgb: [63, 134, 217] },
+      { id: STONE, name: '돌',   color: '#747d86', rgb: [116, 125, 134] },
+      { id: WOOD,  name: '나무', color: '#955f38', rgb: [149, 95, 56] },
+      { id: FIRE,  name: '불',   color: '#ff673d', rgb: [255, 103, 61] },
+      { id: SMOKE, name: '연기', color: '#73747d', rgb: [115, 116, 125] },
+      { id: OIL,   name: '기름', color: '#b69c35', rgb: [182, 156, 53] },
+      { id: STEAM, name: '증기', color: '#b9d5dd', rgb: [185, 213, 221] },
+      { id: BOMB,  name: '폭탄', color: '#e33b52', rgb: [227, 59, 82] },
+      { id: EMPTY, name: '지우개', color: '#303840', rgb: [5, 7, 8] }
+    ];
+
+    const COLORS = MATERIALS.reduce((map, item) => (map[item.id] = item.rgb, map), []);
+    COLORS[EMPTY] = [5, 7, 8];
+
+    const cells = new Uint8Array(SIZE);
+    const life = new Uint16Array(SIZE);
+    const age = new Uint16Array(SIZE);
+    const movedStamp = new Uint16Array(SIZE);
+    // 충격파에만 쓰는 작은 정수 속도. 평상시에는 0이므로 기존 업데이트 비용이 거의 없다.
+    const velocityX = new Int8Array(SIZE);
+    const velocityY = new Int8Array(SIZE);
+    const dirtyTiles = new Uint8Array(TILE_COLS * TILE_ROWS);
+
+    const canvas = document.getElementById('sand-canvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const backCanvas = document.createElement('canvas');
+    backCanvas.width = W;
+    backCanvas.height = H;
+    const backCtx = backCanvas.getContext('2d', { alpha: false });
+    const image = backCtx.createImageData(W, H);
+    const pixels = image.data;
+
+    // 글로우는 1/2 해상도에서 만들고 확대한다. blur 픽셀 수를 1/4로 줄여 60fps를 지킨다.
+    const GLOW_SCALE = 0.5;
+    const GLOW_W = W * GLOW_SCALE;
+    const GLOW_H = H * GLOW_SCALE;
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = GLOW_W;
+    glowCanvas.height = GLOW_H;
+    const glowCtx = glowCanvas.getContext('2d');
+    const glowImage = glowCtx.createImageData(GLOW_W, GLOW_H);
+    const glowPixels = glowImage.data;
+
+    ctx.imageSmoothingEnabled = false;
+    backCtx.imageSmoothingEnabled = false;
+
+    let selected = SAND;
+    let brushSize = 8;
+    let paused = false;
+    let pointerDown = false;
+    let lastPoint = null;
+    let tick = 1;
+    let stamp = 1;
+    let rngState = 0x9e3779b9;
+    let accumulator = 0;
+    let previousTime = performance.now();
+    let fpsFrames = 0;
+    let fpsTime = previousTime;
+    let hasDrawn = false;
+    let fireCount = 0;
+    let flashStrength = 0;
+    const blastEffects = [];
+
+    function random32() {
+      // 빠른 xorshift32: 시각 효과용이며 암호학적 난수는 필요하지 않다.
+      let x = rngState;
+      x ^= x << 13;
+      x ^= x >>> 17;
+      x ^= x << 5;
+      rngState = x >>> 0;
+      return rngState;
+    }
+
+    function chance(oneIn) {
+      return random32() % oneIn === 0;
+    }
+
+    function markDirty(index) {
+      const y = (index / W) | 0;
+      const x = index - y * W;
+      dirtyTiles[((y / TILE) | 0) * TILE_COLS + ((x / TILE) | 0)] = 1;
+    }
+
+    function paintPixel(index) {
+      const type = cells[index];
+      const color = COLORS[type];
+      const p = index * 4;
+      let shade = 0;
+
+      // 균일한 단색보다 입자감을 주되 매 프레임 깜빡이지 않도록 위치 해시를 사용한다.
+      if (type !== EMPTY) shade = ((index * 1103515245 + 12345) >>> 29) - 3;
+
+      if (type === FIRE) {
+        const y = (index / W) | 0;
+        const x = index - y * W;
+        let neighbors = 0;
+        if (y > 0 && cells[index - W] === FIRE) neighbors++;
+        if (y < H - 1 && cells[index + W] === FIRE) neighbors++;
+        if (x > 0 && cells[index - 1] === FIRE) neighbors++;
+        if (x < W - 1 && cells[index + 1] === FIRE) neighbors++;
+
+        // 남은 수명(온도) + 불 군집 중심도를 합쳐 흰색→노랑→주황→암적색으로 보간한다.
+        const temperature = Math.min(1, life[index] / 70);
+        const heat = Math.min(1, temperature * 0.72 + neighbors * 0.085);
+        const flicker = (((Math.imul(index ^ tick, 0x45d9f3b) >>> 28) & 7) - 3) * 3;
+        let r, g, b;
+        if (heat > 0.82) {
+          const t = (heat - 0.82) / 0.18;
+          r = 255; g = 221 + 34 * t; b = 66 + 168 * t;
+        } else if (heat > 0.5) {
+          const t = (heat - 0.5) / 0.32;
+          r = 255; g = 88 + 133 * t; b = 18 + 48 * t;
+        } else if (heat > 0.2) {
+          const t = (heat - 0.2) / 0.3;
+          r = 170 + 85 * t; g = 24 + 64 * t; b = 8 + 10 * t;
+        } else {
+          const t = heat / 0.2;
+          r = 72 + 98 * t; g = 5 + 19 * t; b = 4 + 4 * t;
+        }
+        pixels[p] = Math.max(0, Math.min(255, r + flicker));
+        pixels[p + 1] = Math.max(0, Math.min(255, g + flicker * 0.55));
+        pixels[p + 2] = Math.max(0, Math.min(255, b));
+      } else {
+        if (type === BOMB && life[index] > 0 && ((life[index] >> 2) & 1) === 0) shade += 38;
+        pixels[p] = Math.max(0, Math.min(255, color[0] + shade));
+        pixels[p + 1] = Math.max(0, Math.min(255, color[1] + shade));
+        pixels[p + 2] = Math.max(0, Math.min(255, color[2] + shade));
+      }
+      pixels[p + 3] = 255;
+    }
+
+    function initializeState(index, type) {
+      life[index] = 0;
+      age[index] = 0;
+      if (type === FIRE) life[index] = 24 + (random32() % 38);
+      else if (type === SMOKE) life[index] = 90 + (random32() % 110);
+      else if (type === STEAM) life[index] = 150 + (random32() % 110);
+    }
+
+    function setCell(index, type) {
+      if (index < 0 || index >= SIZE || cells[index] === type) return;
+      if (cells[index] === FIRE) fireCount--;
+      if (type === FIRE) fireCount++;
+      cells[index] = type;
+      initializeState(index, type);
+      velocityX[index] = 0;
+      velocityY[index] = 0;
+      paintPixel(index);
+      markDirty(index);
+    }
+
+    function swapCells(a, b) {
+      const t = cells[a]; cells[a] = cells[b]; cells[b] = t;
+      const l = life[a]; life[a] = life[b]; life[b] = l;
+      const g = age[a]; age[a] = age[b]; age[b] = g;
+      const vx = velocityX[a]; velocityX[a] = velocityX[b]; velocityX[b] = vx;
+      const vy = velocityY[a]; velocityY[a] = velocityY[b]; velocityY[b] = vy;
+      paintPixel(a);
+      paintPixel(b);
+      markDirty(a);
+      markDirty(b);
+      movedStamp[a] = stamp;
+      movedStamp[b] = stamp;
+    }
+
+    function moveCell(from, to) {
+      cells[to] = cells[from];
+      life[to] = life[from];
+      age[to] = age[from];
+      velocityX[to] = velocityX[from];
+      velocityY[to] = velocityY[from];
+      cells[from] = EMPTY;
+      life[from] = 0;
+      age[from] = 0;
+      velocityX[from] = 0;
+      velocityY[from] = 0;
+      paintPixel(from);
+      paintPixel(to);
+      markDirty(from);
+      markDirty(to);
+      movedStamp[from] = stamp;
+      movedStamp[to] = stamp;
+    }
+
+    function canFallInto(type) {
+      return type === EMPTY || type === WATER || type === OIL;
+    }
+
+    function updateSand(i, x, y) {
+      if (y === H - 1) return;
+      const below = i + W;
+      if (canFallInto(cells[below])) {
+        cells[below] === EMPTY ? moveCell(i, below) : swapCells(i, below);
+        return;
+      }
+
+      const first = (random32() & 1) ? -1 : 1;
+      for (let n = 0; n < 2; n++) {
+        const dx = n === 0 ? first : -first;
+        if ((dx < 0 && x === 0) || (dx > 0 && x === W - 1)) continue;
+        const target = below + dx;
+        if (canFallInto(cells[target])) {
+          cells[target] === EMPTY ? moveCell(i, target) : swapCells(i, target);
+          return;
+        }
+      }
+    }
+
+    function updateWater(i, x, y) {
+      if (y < H - 1) {
+        const below = i + W;
+        if (cells[below] === EMPTY) {
+          moveCell(i, below);
+          return;
+        }
+        // 물은 기름보다 무거우므로 기름을 통과해 아래로 가며, 결과적으로 기름이 뜬다.
+        if (cells[below] === OIL) {
+          swapCells(i, below);
+          return;
+        }
+      }
+
+      const first = (random32() & 1) ? -1 : 1;
+      const maxSpread = 3 + (random32() & 3);
+      for (let side = 0; side < 2; side++) {
+        const dx = side === 0 ? first : -first;
+        for (let d = 1; d <= maxSpread; d++) {
+          const nx = x + dx * d;
+          if (nx < 0 || nx >= W) break;
+          const target = i + dx * d;
+          if (cells[target] !== EMPTY) break;
+          if (y < H - 1 && cells[target + W] === EMPTY) {
+            moveCell(i, target);
+            return;
+          }
+          if (d === 1 || chance(3)) {
+            moveCell(i, target);
+            return;
+          }
+        }
+      }
+    }
+
+    function updateOil(i, x, y) {
+      // 위가 물이면 서로 바꿔 밀도 역전을 바로 해소한다(기름이 물 위로 상승).
+      if (y > 0 && cells[i - W] === WATER) {
+        swapCells(i, i - W);
+        return;
+      }
+      if (y < H - 1 && cells[i + W] === EMPTY) {
+        moveCell(i, i + W);
+        return;
+      }
+
+      const first = (random32() & 1) ? -1 : 1;
+      for (let n = 0; n < 2; n++) {
+        const dx = n === 0 ? first : -first;
+        if ((dx < 0 && x === 0) || (dx > 0 && x === W - 1)) continue;
+        const side = i + dx;
+        if (cells[side] === EMPTY) {
+          if (y < H - 1 && cells[side + W] === EMPTY) moveCell(i, side + W);
+          else moveCell(i, side);
+          return;
+        }
+      }
+    }
+
+    function applyImpulse(i, x, y) {
+      let vx = velocityX[i];
+      let vy = velocityY[i];
+      if ((vx === 0 && vy === 0) || cells[i] === STONE || cells[i] === WOOD) return false;
+
+      const steps = Math.max(Math.abs(vx), Math.abs(vy));
+      let target = i;
+      // 충격파가 벽을 순간이동해 통과하지 않도록 선분상의 셀을 순서대로 검사한다.
+      for (let s = 1; s <= steps; s++) {
+        const nx = x + Math.round(vx * s / steps);
+        const ny = y + Math.round(vy * s / steps);
+        if (nx < 0 || nx >= W || ny < 0 || ny >= H) break;
+        const next = ny * W + nx;
+        if (cells[next] !== EMPTY) break;
+        target = next;
+      }
+
+      if (target !== i) {
+        moveCell(i, target);
+        velocityX[target] = (vx * 0.62) | 0;
+        velocityY[target] = (vy * 0.62) | 0;
+        return true;
+      }
+
+      velocityX[i] = (vx * 0.35) | 0;
+      velocityY[i] = (vy * 0.35) | 0;
+      return false;
+    }
+
+    const pendingExplosions = [];
+    let pendingExplosionHead = 0;
+
+    function queueBombExplosion(index) {
+      if (index < 0 || index >= SIZE || cells[index] !== BOMB) return;
+      const y = (index / W) | 0;
+      const x = index - y * W;
+      setCell(index, EMPTY); // 즉시 제거해 같은 폭탄이 중복 예약되는 것을 막는다.
+      pendingExplosions.push({ x, y });
+    }
+
+    function explodeAt(cx, cy) {
+      const blastRadius = 21;
+      const shockRadius = 34;
+      const blastR2 = blastRadius * blastRadius;
+      const shockR2 = shockRadius * shockRadius;
+      let waterCount = 0;
+
+      for (let dy = -10; dy <= 10; dy++) {
+        const y = cy + dy;
+        if (y < 0 || y >= H) continue;
+        const span = Math.floor(Math.sqrt(100 - dy * dy));
+        for (let dx = -span; dx <= span; dx++) {
+          const x = cx + dx;
+          if (x >= 0 && x < W && cells[y * W + x] === WATER) waterCount++;
+        }
+      }
+      const underwater = waterCount > 18;
+
+      const minX = Math.max(0, cx - shockRadius);
+      const maxX = Math.min(W - 1, cx + shockRadius);
+      const minY = Math.max(0, cy - shockRadius);
+      const maxY = Math.min(H - 1, cy + shockRadius);
+
+      for (let y = minY; y <= maxY; y++) {
+        const dy = y - cy;
+        for (let x = minX; x <= maxX; x++) {
+          const dx = x - cx;
+          const distance2 = dx * dx + dy * dy;
+          if (distance2 > shockR2 || distance2 === 0) continue;
+          const i = y * W + x;
+          const type = cells[i];
+          if (type === EMPTY) continue;
+
+          if (distance2 <= blastR2) {
+            if (type === BOMB) {
+              // 유폭은 큐에 넣어 다음 최대 8개씩 처리한다. 큰 폭탄 무리도 한 프레임을 독점하지 않는다.
+              queueBombExplosion(i);
+            } else if (type === STONE) {
+              if (chance(2)) setCell(i, EMPTY); // 돌의 내폭성: 정확히 절반 확률로 생존.
+            } else if (type === WATER) {
+              setCell(i, chance(5) ? EMPTY : STEAM);
+            } else if (type === OIL) {
+              setCell(i, FIRE); // 폭압보다 먼저 점화되어 주변 기름으로 기존 연소 규칙이 이어진다.
+              life[i] += 28;
+            } else {
+              setCell(i, EMPTY);
+            }
+          } else if (type !== STONE && type !== WOOD) {
+            const distance = Math.sqrt(distance2);
+            const speed = Math.max(1, Math.round((1 - distance / shockRadius) * 11));
+            velocityX[i] = Math.max(-8, Math.min(8, Math.round(dx / distance * speed)));
+            velocityY[i] = Math.max(-8, Math.min(8, Math.round(dy / distance * speed)));
+          }
+        }
+      }
+
+      // 폭발 중심의 빈 공간을 불/연기로 채운다. 수중이면 같은 에너지가 증기 구름이 된다.
+      const cloudRadius = underwater ? 12 : 9;
+      for (let dy = -cloudRadius; dy <= cloudRadius; dy++) {
+        const y = cy + dy;
+        if (y < 0 || y >= H) continue;
+        for (let dx = -cloudRadius; dx <= cloudRadius; dx++) {
+          const x = cx + dx;
+          if (x < 0 || x >= W || dx * dx + dy * dy > cloudRadius * cloudRadius) continue;
+          const i = y * W + x;
+          if (cells[i] !== EMPTY || chance(3)) continue;
+          if (underwater) setCell(i, chance(4) ? SMOKE : STEAM);
+          else setCell(i, chance(3) ? SMOKE : FIRE);
+        }
+      }
+
+      flashStrength = Math.min(1, flashStrength + 0.88);
+      blastEffects.push({ x: cx, y: cy, age: 0, maxAge: 24, radius: shockRadius });
+    }
+
+    function processExplosionQueue() {
+      // 연쇄 폭발 처리량을 틱당 제한해 최악의 경우에도 프레임 시간이 튀지 않게 한다.
+      const count = Math.min(8, pendingExplosions.length - pendingExplosionHead);
+      for (let n = 0; n < count; n++) {
+        const blast = pendingExplosions[pendingExplosionHead++];
+        explodeAt(blast.x, blast.y);
+      }
+      // Array.shift의 O(n) 복사를 피하고, 충분히 소비됐을 때만 한 번 압축한다.
+      if (pendingExplosionHead > 256 && pendingExplosionHead * 2 > pendingExplosions.length) {
+        pendingExplosions.splice(0, pendingExplosionHead);
+        pendingExplosionHead = 0;
+      }
+    }
+
+    function updateBomb(i, x, y) {
+      const touchesFire =
+        (y > 0 && cells[i - W] === FIRE) ||
+        (y < H - 1 && cells[i + W] === FIRE) ||
+        (x > 0 && cells[i - 1] === FIRE) ||
+        (x < W - 1 && cells[i + 1] === FIRE);
+      if (touchesFire) {
+        queueBombExplosion(i);
+        return;
+      }
+
+      if (age[i] > 0 && life[i] > 0) {
+        life[i]--;
+        if (life[i] === 0) {
+          queueBombExplosion(i);
+          return;
+        }
+      }
+
+      if (y < H - 1 && canFallInto(cells[i + W])) {
+        cells[i + W] === EMPTY ? moveCell(i, i + W) : swapCells(i, i + W);
+        return;
+      }
+
+      // life=0은 아직 착지하지 않은 상태. 착지 순간 60~120틱(1~2초) 퓨즈를 건다.
+      if (age[i] === 0) {
+        age[i] = 1;
+        life[i] = 60 + (random32() % 61);
+      }
+      paintPixel(i);
+      markDirty(i);
+      if (life[i] === 0) queueBombExplosion(i);
+    }
+
+    function updateFire(i, x, y) {
+      // 이웃 검사 시작점/방향도 섞어 특정 방향의 연소 전파 우선권을 없앤다.
+      const neighbors = [];
+      if (y > 0) neighbors.push(i - W);
+      if (x > 0) neighbors.push(i - 1);
+      if (x < W - 1) neighbors.push(i + 1);
+      if (y < H - 1) neighbors.push(i + W);
+      const start = random32() % neighbors.length;
+      const direction = (random32() & 1) ? 1 : -1;
+
+      for (let n = 0; n < neighbors.length; n++) {
+        const target = neighbors[(start + direction * n + neighbors.length * 2) % neighbors.length];
+        const type = cells[target];
+        if (type === WATER) {
+          // 불 + 물 = 증기. 반응한 불도 증기로 바꿔 에너지가 무한 증식하지 않게 한다.
+          setCell(target, STEAM);
+          setCell(i, chance(3) ? SMOKE : STEAM);
+          movedStamp[target] = stamp;
+          movedStamp[i] = stamp;
+          return;
+        }
+        if (type === BOMB) {
+          queueBombExplosion(target);
+        } else if (type === OIL && chance(2)) {
+          setCell(target, FIRE);
+          movedStamp[target] = stamp;
+        } else if (type === WOOD && chance(target === i - W ? 7 : 13)) {
+          setCell(target, FIRE);
+          life[target] += 35; // 나무 불은 기름 불보다 오래 남는다.
+          movedStamp[target] = stamp;
+        }
+      }
+
+      if (life[i] > 0) life[i]--;
+      age[i]++;
+      if (life[i] === 0) {
+        setCell(i, chance(3) ? SMOKE : EMPTY);
+        movedStamp[i] = stamp;
+        return;
+      }
+
+      // 수명이 줄어드는 매 틱 다시 칠해 온도 그라데이션과 플리커가 실제로 움직이게 한다.
+      paintPixel(i);
+      markDirty(i);
+
+      // 열린 공간에서 불꽃이 위로 번지고, 원래 불은 수명을 계속 소모한다.
+      if (y > 0 && cells[i - W] === EMPTY && chance(6)) {
+        setCell(i - W, FIRE);
+        life[i - W] = Math.max(8, life[i] >> 1);
+        movedStamp[i - W] = stamp;
+      }
+    }
+
+    function updateSmoke(i, x, y) {
+      if (life[i] > 0) life[i]--;
+      if (life[i] === 0 || chance(260)) {
+        setCell(i, EMPTY);
+        movedStamp[i] = stamp;
+        return;
+      }
+
+      const first = (random32() & 1) ? -1 : 1;
+      if (y > 0) {
+        const up = i - W;
+        if (cells[up] === EMPTY && !chance(4)) {
+          moveCell(i, up);
+          return;
+        }
+        for (let n = 0; n < 2; n++) {
+          const dx = n === 0 ? first : -first;
+          if ((dx < 0 && x === 0) || (dx > 0 && x === W - 1)) continue;
+          if (cells[up + dx] === EMPTY) {
+            moveCell(i, up + dx);
+            return;
+          }
+        }
+      }
+      if (x + first >= 0 && x + first < W && cells[i + first] === EMPTY && chance(3)) {
+        moveCell(i, i + first);
+      }
+    }
+
+    function updateSteam(i, x, y) {
+      age[i]++;
+      if (life[i] > 0) life[i]--;
+
+      // 천장은 냉각면처럼 동작한다. 천장 접촉 시 높은 확률로 물방울이 된다.
+      const atCeiling = y === 0 || (y > 0 && cells[i - W] !== EMPTY && cells[i - W] !== SMOKE);
+      if ((atCeiling && chance(35)) || (age[i] > 105 && chance(240)) || life[i] === 0) {
+        setCell(i, WATER);
+        movedStamp[i] = stamp;
+        return;
+      }
+
+      const first = (random32() & 1) ? -1 : 1;
+      if (y > 0) {
+        const up = i - W;
+        if (cells[up] === EMPTY || cells[up] === SMOKE) {
+          cells[up] === EMPTY ? moveCell(i, up) : swapCells(i, up);
+          return;
+        }
+        for (let n = 0; n < 2; n++) {
+          const dx = n === 0 ? first : -first;
+          if ((dx < 0 && x === 0) || (dx > 0 && x === W - 1)) continue;
+          const target = up + dx;
+          if (cells[target] === EMPTY) {
+            moveCell(i, target);
+            return;
+          }
+        }
+      }
+      if (x + first >= 0 && x + first < W && cells[i + first] === EMPTY && chance(2)) {
+        moveCell(i, i + first);
+      }
+    }
+
+    function simulate() {
+      tick = (tick + 1) >>> 0;
+      stamp++;
+      if (stamp === 65535) {
+        movedStamp.fill(0);
+        stamp = 1;
+      }
+
+      // 중력에 맞춰 아래→위로 처리. 행마다 좌→우/우→좌를 위치 해시로 바꾼다.
+      for (let y = H - 1; y >= 0; y--) {
+        const rowHash = Math.imul((tick ^ (y * 0x45d9f3b)), 0x27d4eb2d);
+        const leftToRight = (rowHash >>> 31) === 0;
+        let x = leftToRight ? 0 : W - 1;
+        const end = leftToRight ? W : -1;
+        const dx = leftToRight ? 1 : -1;
+
+        for (; x !== end; x += dx) {
+          const i = y * W + x;
+          if (movedStamp[i] === stamp) continue;
+          if ((velocityX[i] !== 0 || velocityY[i] !== 0) && applyImpulse(i, x, y)) continue;
+          switch (cells[i]) {
+            case SAND: updateSand(i, x, y); break;
+            case WATER: updateWater(i, x, y); break;
+            case FIRE: updateFire(i, x, y); break;
+            case SMOKE: updateSmoke(i, x, y); break;
+            case OIL: updateOil(i, x, y); break;
+            case STEAM: updateSteam(i, x, y); break;
+            case BOMB: updateBomb(i, x, y); break;
+          }
+        }
+      }
+      processExplosionQueue();
+    }
+
+    function renderDirty() {
+      // 한 타일 행에서 이어진 dirty 타일을 하나의 rect로 합쳐 API 호출 수를 줄인다.
+      for (let ty = 0; ty < TILE_ROWS; ty++) {
+        let tx = 0;
+        while (tx < TILE_COLS) {
+          const tileIndex = ty * TILE_COLS + tx;
+          if (!dirtyTiles[tileIndex]) { tx++; continue; }
+
+          const start = tx;
+          while (tx < TILE_COLS && dirtyTiles[ty * TILE_COLS + tx]) {
+            dirtyTiles[ty * TILE_COLS + tx] = 0;
+            tx++;
+          }
+          const sx = start * TILE;
+          const sy = ty * TILE;
+          const sw = Math.min(W, tx * TILE) - sx;
+          const sh = Math.min(TILE, H - sy);
+
+          // ImageData → back buffer에는 변경 rect만 업로드한다. 최종 합성은 아래에서 GPU 1회 bl릿한다.
+          backCtx.putImageData(image, 0, 0, sx, sy, sw, sh);
+        }
+      }
+    }
+
+    function renderFireGlow() {
+      if (fireCount <= 0) return;
+      glowPixels.fill(0);
+
+      // 별도 저해상도 버퍼에는 불만 기록한다. 셀 전체 스캔은 연속 TypedArray 접근이라 저렴하다.
+      for (let i = 0; i < SIZE; i++) {
+        if (cells[i] !== FIRE) continue;
+        const y = (i / W) | 0;
+        const x = i - y * W;
+        const gx = (x * GLOW_SCALE) | 0;
+        const gy = (y * GLOW_SCALE) | 0;
+        const p = (gy * GLOW_W + gx) * 4;
+        const intensity = Math.min(255, 105 + life[i] * 3);
+        glowPixels[p] = 255;
+        glowPixels[p + 1] = Math.max(glowPixels[p + 1], intensity * 0.55);
+        glowPixels[p + 2] = Math.max(glowPixels[p + 2], intensity * 0.1);
+        glowPixels[p + 3] = Math.max(glowPixels[p + 3], intensity);
+      }
+
+      glowCtx.putImageData(glowImage, 0, 0);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.52 + ((tick * 17 & 7) - 3) * 0.012; // 프레임별 미세 플리커.
+      ctx.filter = 'blur(5px)';
+      ctx.drawImage(glowCanvas, 0, 0, GLOW_W, GLOW_H, 0, 0, W, H);
+      ctx.restore();
+    }
+
+    function renderBlastEffects() {
+      for (let n = blastEffects.length - 1; n >= 0; n--) {
+        const effect = blastEffects[n];
+        effect.age++;
+        const t = effect.age / effect.maxAge;
+        if (t >= 1) {
+          blastEffects.splice(n, 1);
+          continue;
+        }
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = (1 - t) * 0.92;
+        ctx.strokeStyle = t < 0.45 ? '#fff4bd' : '#ff7048';
+        ctx.lineWidth = Math.max(0.8, 3.8 * (1 - t));
+        ctx.beginPath();
+        ctx.arc(effect.x + 0.5, effect.y + 0.5, effect.radius * (0.12 + t), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (flashStrength > 0.01) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = `rgba(255,255,255,${Math.min(0.72, flashStrength * 0.62)})`;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+        flashStrength *= 0.64;
+      } else {
+        flashStrength = 0;
+      }
+    }
+
+    function composeFrame() {
+      // 셀 변경은 dirty rect로 back buffer에만 올리고, 완성된 장면+글로우+링을 한 프레임에 합성한다.
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.filter = 'none';
+      ctx.drawImage(backCanvas, 0, 0);
+      renderFireGlow();
+      renderBlastEffects();
+    }
+
+    function markAllDirty() {
+      dirtyTiles.fill(1);
+      for (let i = 0; i < SIZE; i++) paintPixel(i);
+    }
+
+    function reset() {
+      cells.fill(EMPTY);
+      life.fill(0);
+      age.fill(0);
+      movedStamp.fill(0);
+      velocityX.fill(0);
+      velocityY.fill(0);
+      fireCount = 0;
+      flashStrength = 0;
+      blastEffects.length = 0;
+      pendingExplosions.length = 0;
+      pendingExplosionHead = 0;
+      hasDrawn = false;
+      document.getElementById('hint').classList.remove('hidden');
+      markAllDirty();
+      renderDirty();
+      composeFrame();
+    }
+
+    function drawCircle(cx, cy, type) {
+      const radius = Math.max(0.5, brushSize / 2);
+      const r2 = radius * radius;
+      const minX = Math.max(0, Math.floor(cx - radius));
+      const maxX = Math.min(W - 1, Math.ceil(cx + radius));
+      const minY = Math.max(0, Math.floor(cy - radius));
+      const maxY = Math.min(H - 1, Math.ceil(cy + radius));
+
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const px = x + .5 - cx;
+          const py = y + .5 - cy;
+          if (px * px + py * py <= r2 && (type === EMPTY || !chance(100))) {
+            setCell(y * W + x, type);
+          }
+        }
+      }
+    }
+
+    function drawLine(from, to, type) {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const distance = Math.hypot(dx, dy);
+      const spacing = Math.max(1, brushSize * .28);
+      const steps = Math.max(1, Math.ceil(distance / spacing));
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        drawCircle(from.x + dx * t, from.y + dy * t, type);
+      }
+    }
+
+    function canvasPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: Math.max(0, Math.min(W - .01, (event.clientX - rect.left) * W / rect.width)),
+        y: Math.max(0, Math.min(H - .01, (event.clientY - rect.top) * H / rect.height))
+      };
+    }
+
+    function drawFromPointer(event) {
+      const point = canvasPoint(event);
+      const type = (event.buttons === 2 || event.button === 2) ? EMPTY : selected;
+      drawLine(lastPoint || point, point, type);
+      lastPoint = point;
+      if (!hasDrawn) {
+        hasDrawn = true;
+        document.getElementById('hint').classList.add('hidden');
+      }
+      if (paused) {
+        renderDirty();
+        composeFrame();
+      }
+    }
+
+    let drawPointer = null;   // 한 번에 한 손가락만 그린다
+    canvas.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      if (pointerDown && drawPointer !== event.pointerId) return;
+      drawPointer = event.pointerId;
+      pointerDown = true;
+      lastPoint = canvasPoint(event);
+      canvas.setPointerCapture(event.pointerId);
+      drawFromPointer(event);
+    });
+
+    canvas.addEventListener('pointermove', event => {
+      if (!pointerDown || event.pointerId !== drawPointer) return;
+      event.preventDefault();
+      drawFromPointer(event);
+    });
+
+    function endPointer(event) {
+      if (event.pointerId !== undefined && drawPointer !== null && event.pointerId !== drawPointer) return;
+      drawPointer = null;
+      pointerDown = false;
+      lastPoint = null;
+      if (event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
+    canvas.addEventListener('contextmenu', event => event.preventDefault());
+
+    const palette = document.getElementById('palette');
+    function selectMaterial(id) {
+      selected = id;
+      for (const button of palette.children) {
+        button.setAttribute('aria-pressed', Number(button.dataset.id) === id ? 'true' : 'false');
+      }
+    }
+
+    for (const material of MATERIALS) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'element-btn';
+      button.dataset.id = material.id;
+      button.style.setProperty('--swatch', material.color);
+      button.setAttribute('aria-pressed', material.id === selected ? 'true' : 'false');
+      button.setAttribute('aria-label', `${material.name} 선택`);
+      button.innerHTML = `<span class="swatch"></span><span class="element-name">${material.name}</span>`;
+      button.addEventListener('click', () => selectMaterial(material.id));
+      palette.appendChild(button);
+    }
+
+    const brushInput = document.getElementById('brush-size');
+    function setBrushSize(value) {
+      brushSize = Math.max(1, Math.min(24, value));
+      brushInput.value = brushSize;
+      document.getElementById('brush-label').textContent = `${brushSize} px`;
+      document.getElementById('brush-value').textContent = String(brushSize).padStart(2, '0');
+    }
+    brushInput.addEventListener('input', () => setBrushSize(Number(brushInput.value)));
+
+    const pauseButton = document.getElementById('pause-btn');
+    function togglePause() {
+      paused = !paused;
+      pauseButton.textContent = paused ? '계속하기' : '일시정지';
+      pauseButton.classList.toggle('primary', !paused);
+      document.querySelector('.status-dot').style.background = paused ? '#ffb84d' : '#68d391';
+      document.querySelector('.status-dot').style.boxShadow = paused ? '0 0 10px #ffb84d' : '0 0 10px #68d391';
+    }
+    pauseButton.addEventListener('click', togglePause);
+    document.getElementById('reset-btn').addEventListener('click', reset);
+
+    window.addEventListener('keydown', event => {
+      if (event.code === 'Space') { event.preventDefault(); togglePause(); }
+      else if (event.key.toLowerCase() === 'r') reset();
+      else if (event.key === '[') setBrushSize(brushSize - 1);
+      else if (event.key === ']') setBrushSize(brushSize + 1);
+      else if (/^[1-9]$/.test(event.key)) selectMaterial(Number(event.key));
+    });
+
+    function frame(now) {
+      const elapsed = Math.min(100, now - previousTime);
+      previousTime = now;
+      accumulator += elapsed;
+
+      if (!paused) {
+        let steps = 0;
+        // 느린 프레임 뒤 무한 catch-up에 빠지지 않도록 한 화면당 최대 3틱만 계산한다.
+        while (accumulator >= STEP_MS && steps < 3) {
+          simulate();
+          accumulator -= STEP_MS;
+          steps++;
+        }
+        if (steps === 3) accumulator = 0;
+      } else {
+        accumulator = 0;
+      }
+
+      renderDirty();
+      composeFrame();
+
+      fpsFrames++;
+      if (now - fpsTime >= 500) {
+        const fps = Math.round(fpsFrames * 1000 / (now - fpsTime));
+        document.getElementById('fps').textContent = String(fps);
+        fpsFrames = 0;
+        fpsTime = now;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    if (window.matchMedia && matchMedia('(pointer: coarse)').matches) {
+      document.getElementById('hint').textContent = '손가락으로 문질러 입자를 그리세요';
+    }
+
+    reset();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

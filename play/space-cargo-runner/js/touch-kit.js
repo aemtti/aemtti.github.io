@@ -1,5 +1,5 @@
 /* touch-kit.js — on-screen touch controls for keyboard/mouse web games. No dependencies.
- * Inline it into a single-file game (inside a script tag) or load it next to the game.
+ * Inline it into a single-file game (<script>…</script>) or load it next to the game.
  *
  *   const kit = TouchKit.create({
  *     sticks: [
@@ -73,14 +73,6 @@
 @keyframes tkr{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
 @media (orientation:portrait){.tk-rot.need{display:flex}}
 `
-  // A tap on a kit button is followed by a compatibility `click` at the same spot ~100–300 ms later. If the button just
-  // opened a game overlay/menu under the finger, that click would hit it (and often close it). Swallow it.
-  let clickBlockUntil = 0
-  function suppressClick() { clickBlockUntil = Date.now() + 450 }
-  document.addEventListener('click', e => {
-    if (Date.now() < clickBlockUntil && !(e.target && e.target.closest && e.target.closest('.tk-root'))) { e.stopPropagation(); e.preventDefault() }
-  }, true)
-
   function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e }
 
   function create(opt) {
@@ -165,7 +157,6 @@
         if (navigator.vibrate && b.buzz !== false) try { navigator.vibrate(8) } catch (x) {}
       }
       const up = e => {
-        suppressClick()
         if (b.toggle || e.pointerId !== bs.pid) return
         bs.pid = null; bs.down = false; btn.classList.remove('on')
         if (b.key && !b.tap) release(b.key)
@@ -176,10 +167,10 @@
     }
 
     // ---- portrait → ask to rotate (can be dismissed)
-    let rot = null, rotDismissed = false                      // once dismissed, show(true) must not bring the hint back
+    let rot = null
     if (opt.landscape) {
       rot = el('div', 'tk-rot', document.body, `<b>⟳</b><div>${opt.rotateText || '휴대폰을 가로로 돌려 주세요'}<br><small style="opacity:.6">Rotate your phone</small></div><button type="button">그래도 세로로 하기</button>`)
-      rot.querySelector('button').addEventListener('click', () => { rotDismissed = true; rot.classList.remove('need') })
+      rot.querySelector('button').addEventListener('click', () => rot.classList.remove('need'))
     }
 
     // ---- page hygiene for touch play: no pinch/double-tap zoom, no pull-to-refresh, no long-press menu on the game
@@ -191,7 +182,7 @@
     }
 
     api.show = on => {
-      api.visible = on; root.classList.toggle('tk-off', !on); if (rot) rot.classList.toggle('need', on && !!opt.landscape && !rotDismissed)
+      api.visible = on; root.classList.toggle('tk-off', !on); if (rot) rot.classList.toggle('need', on && !!opt.landscape)
       if (!on) { for (const s of Object.values(api.sticks)) s.reset && s.reset(); for (const [code] of held) sendKey('keyup', code); held.clear()
         for (const b of Object.values(api.buttons)) { b.down = false; b.pid = null; b.el.classList.remove('on') } }
     }

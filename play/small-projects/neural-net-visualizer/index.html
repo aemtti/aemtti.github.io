@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Neural Net Visualizer — WebGPU / WebGL2</title>
+<style>
+  /* ── 미니멀 다크 UI : 고대비, 저비용 ── */
+  :root{ --fg:#e8eefc; --dim:#8aa0c8; --acc:#36e0c8; --acc2:#ff5fa2; --panel:rgba(12,16,28,.82); --line:rgba(120,160,220,.18); }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; overflow:hidden; background:#05070d; color:var(--fg);
+    font:13px/1.45 ui-monospace,"SF Mono",Menlo,Consolas,monospace; -webkit-font-smoothing:antialiased; }
+  #view{ position:fixed; inset:0; display:block; touch-action:none; cursor:grab; }
+  #view.drag{ cursor:grabbing; }
+
+  /* HUD */
+  #hud{ position:fixed; top:12px; left:12px; padding:10px 12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; backdrop-filter:blur(8px);
+    pointer-events:none; min-width:208px; box-shadow:0 8px 30px rgba(0,0,0,.45); }
+  #hud .row{ display:flex; justify-content:space-between; gap:14px; }
+  #hud .k{ color:var(--dim); } #hud .v{ color:var(--fg); font-variant-numeric:tabular-nums; }
+  #hud .big{ font-size:21px; line-height:1.1; margin-bottom:2px; }
+  #hud .big .v{ color:var(--acc); }
+  #backend{ display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px;
+    background:rgba(54,224,200,.14); color:var(--acc); border:1px solid rgba(54,224,200,.35); }
+  #backend.gl{ background:rgba(255,170,60,.14); color:#ffb13c; border-color:rgba(255,170,60,.35); }
+  #fpsbar{ height:4px; margin-top:7px; border-radius:3px; background:#1a2236; overflow:hidden; }
+  #fpsfill{ height:100%; width:50%; background:linear-gradient(90deg,#ff5fa2,#ffd23c,#36e0c8); transition:width .12s; }
+
+  /* Controls */
+  #panel{ position:fixed; top:12px; right:12px; width:248px; padding:12px 13px 14px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; backdrop-filter:blur(8px);
+    box-shadow:0 8px 30px rgba(0,0,0,.45); max-height:calc(100vh - 24px); overflow:auto; }
+  #panel h1{ font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--acc);
+    margin:0 0 10px; font-weight:600; }
+  #panel label{ display:block; color:var(--dim); margin:11px 0 4px; font-size:11px;
+    text-transform:uppercase; letter-spacing:.06em; }
+  #panel .val{ color:var(--fg); float:right; font-variant-numeric:tabular-nums; }
+  select,input[type=range],input[type=number],button{ width:100%; font:inherit; color:var(--fg); }
+  select,input[type=number]{ background:#0c1120; border:1px solid var(--line); border-radius:7px; padding:6px 8px; }
+  input[type=range]{ -webkit-appearance:none; appearance:none; height:4px; background:#1a2236; border-radius:3px; margin:2px 0; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--acc); cursor:pointer; box-shadow:0 0 8px rgba(54,224,200,.6); }
+  .chk{ display:flex; align-items:center; gap:8px; margin:11px 0 0; }
+  .chk input{ width:auto; accent-color:var(--acc); }
+  .chk label{ margin:0; text-transform:none; letter-spacing:0; color:var(--fg); font-size:12px; }
+  button{ background:#13203a; border:1px solid var(--line); border-radius:8px; padding:9px; cursor:pointer;
+    margin-top:6px; transition:.15s; letter-spacing:.04em; }
+  button:hover{ background:#1b2c4e; border-color:var(--acc); }
+  button.hot{ background:linear-gradient(135deg,#7a1840,#b81f5e); border-color:var(--acc2); color:#fff; font-weight:600; }
+  button.hot.on{ box-shadow:0 0 0 2px rgba(255,95,162,.4),0 0 24px rgba(255,95,162,.5); }
+  .two{ display:flex; gap:7px; } .two button{ margin-top:6px; }
+
+  /* tooltip */
+  #tip{ position:fixed; pointer-events:none; padding:7px 10px; background:rgba(8,11,20,.94);
+    border:1px solid var(--acc); border-radius:8px; font-size:12px; display:none; z-index:20;
+    box-shadow:0 4px 18px rgba(0,0,0,.55); white-space:nowrap; }
+  #tip b{ color:var(--acc); }
+  #hint{ position:fixed; bottom:12px; left:12px; color:var(--dim); font-size:11px; background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:7px 11px; backdrop-filter:blur(8px); }
+  #hint b{ color:var(--fg); }
+
+  /* loading */
+  #load{ position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:#05070d; z-index:50; gap:16px; transition:opacity .5s; }
+  #load.hide{ opacity:0; pointer-events:none; }
+  #load .ring{ width:46px; height:46px; border:3px solid #1a2236; border-top-color:var(--acc);
+    border-radius:50%; animation:spin .8s linear infinite; }
+  #load .msg{ color:var(--dim); letter-spacing:.05em; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  #busy{ position:fixed; bottom:12px; left:50%; transform:translateX(-50%); background:var(--panel);
+    border:1px solid var(--acc); border-radius:20px; padding:6px 16px; display:none; z-index:30; color:var(--acc); }
+
+  /* ── 휴대폰·태블릿: 한 손가락 궤도 · 두 손가락 핀치 줌/이동 · 탭 = 노드 정보+트레이스 ── */
+  html,body{ overscroll-behavior:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  #hud{ top:max(12px,env(safe-area-inset-top)); left:max(12px,env(safe-area-inset-left)); }
+  #panel{ top:max(12px,env(safe-area-inset-top)); right:max(12px,env(safe-area-inset-right)); }
+  #hint{ left:max(12px,env(safe-area-inset-left)); bottom:max(12px,env(safe-area-inset-bottom)); }
+  #hint .t{ display:none; }
+  #panelToggle{ display:none; position:fixed; z-index:15; top:max(12px,env(safe-area-inset-top)); right:max(12px,env(safe-area-inset-right));
+    width:auto; min-width:44px; min-height:44px; margin:0; padding:8px 14px; background:var(--panel); backdrop-filter:blur(8px);
+    border:1px solid var(--line); border-radius:10px; color:var(--acc); }
+  @media (pointer:coarse){
+    #hint .d{ display:none; } #hint .t{ display:inline; }
+    #panel label,#backend,#hint,#tip{ font-size:12px; }
+    select,button{ min-height:44px; }
+    input[type=range]{ height:28px; background:transparent; }
+    input[type=range]::-webkit-slider-runnable-track{ height:4px; background:#1a2236; border-radius:3px; }
+    input[type=range]::-webkit-slider-thumb{ width:26px; height:26px; margin-top:-11px; }
+    .chk{ min-height:40px; } .chk input{ width:22px; height:22px; }
+  }
+  #panel .close{ display:none; }
+  /* 좁거나 낮은 화면: 조절판은 버튼으로 여닫고, 계기판은 작게 */
+  @media (max-width:760px), (max-height:520px){
+    #panelToggle{ display:block; }
+    #panel{ display:none; z-index:16; top:auto; bottom:0; right:0; left:0; width:auto; max-height:62vh; max-height:62dvh;
+      border-radius:14px 14px 0 0; padding-bottom:max(14px,env(safe-area-inset-bottom)); }
+    #panel.open{ display:block; }
+    #panel .close{ display:block; position:sticky; top:-4px; z-index:2; float:right; width:auto; margin:-4px 0 6px 8px; padding:8px 14px; background:#13203a; }
+    #hud{ min-width:0; padding:7px 10px; font-size:12px; }
+    #hud .big{ font-size:17px; }
+    #hud .row:nth-child(3){ display:none; }  /* draw calls */
+  }
+  @media (max-height:520px) and (orientation:landscape){
+    #panel{ top:0; left:auto; bottom:0; width:min(320px,46vw); max-height:none; border-radius:14px 0 0 14px; padding-top:max(12px,env(safe-area-inset-top)); }
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="hud">
+  <div class="row big"><span class="k">FPS</span><span class="v" id="hFps">—</span></div>
+  <div class="row"><span class="k">frame</span><span class="v"><span id="hMs">—</span> ms</span></div>
+  <div class="row"><span class="k">draw calls</span><span class="v" id="hDc">—</span></div>
+  <div class="row"><span class="k">nodes</span><span class="v" id="hNodes">—</span></div>
+  <div class="row"><span class="k">edges</span><span class="v" id="hEdges">—</span></div>
+  <div class="row" style="margin-top:6px"><span class="k">backend</span><span class="v"><span id="backend" class="">…</span></span></div>
+  <div id="fpsbar"><div id="fpsfill"></div></div>
+</div>
+
+<button id="panelToggle" type="button" aria-controls="panel" aria-expanded="false">◈ Control</button>
+<div id="panel">
+  <h1>◈ Control</h1>
+  <button class="close" id="panelClose" type="button">✕ Close</button>
+
+  <label>Topology preset</label>
+  <select id="selPreset">
+    <option value="deep">Deep — 16 layers (classifier)</option>
+    <option value="wide" selected>Wide — 6 layers (dense)</option>
+    <option value="pyramid">Pyramid — encoder→bottleneck</option>
+    <option value="huge">Huge — max capacity</option>
+  </select>
+
+  <label>Layout mode</label>
+  <select id="selMode">
+    <option value="layered" selected>Layered (deterministic)</option>
+    <option value="force">Force-directed (organic)</option>
+  </select>
+
+  <label>Visible nodes <span class="val" id="vNodes"></span></label>
+  <input type="range" id="rngNodes" min="0.004" max="1" step="0.002" value="0.03">
+
+  <label>Glow / 광원 세기 <span class="val" id="vGlow"></span></label>
+  <input type="range" id="rngGlow" min="0.03" max="1.5" step="0.01" value="0.32">
+
+  <label>Node size <span class="val" id="vSize"></span></label>
+  <input type="range" id="rngSize" min="0.3" max="2.5" step="0.05" value="1">
+
+  <label>Edge density <span class="val" id="vDensity"></span></label>
+  <input type="range" id="rngDensity" min="0" max="1" step="0.01" value="1">
+
+  <label>Signal speed <span class="val" id="vSpeed"></span></label>
+  <input type="range" id="rngSpeed" min="0" max="2.5" step="0.01" value="0.5">
+
+  <label>Target FPS <span class="val" id="vFps"></span></label>
+  <input type="range" id="rngFps" min="24" max="144" step="1" value="60">
+
+  <div class="chk"><input type="checkbox" id="chkAdaptive"><label for="chkAdaptive">Adaptive quality (saturate GPU)</label></div>
+  <div class="chk"><input type="checkbox" id="chkPulse" checked><label for="chkPulse">Forward-pass pulse</label></div>
+
+  <button id="btnStress" class="hot">⚡ Stress test — push to limit</button>
+  <div class="two">
+    <button id="btnReset">Reset view</button>
+    <button id="btnClear">Clear sel.</button>
+  </div>
+</div>
+
+<div id="tip"></div>
+<div id="hint"><span class="d">drag <b>orbit</b> · wheel <b>zoom</b> · right/shift-drag <b>pan</b> · hover <b>inspect</b> · click <b>trace</b></span><span class="t">drag <b>orbit</b> · pinch <b>zoom</b> · 2-finger <b>pan</b> · tap <b>inspect · trace</b></span></div>
+<div id="busy">computing layout…</div>
+
+<div id="load"><div class="ring"></div><div class="msg" id="loadMsg">detecting GPU…</div></div>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════════════
+   고성능 신경망 시각화 — 단일 HTML, 의존성 0 (file:// 더블클릭 실행)
+   • 백엔드: WebGPU(1순위, compute+render bundle) → WebGL2(폴백, POINTS+LINES)
+   • 핵심 최적화: 그래프 전체를 드로우콜 2개로 렌더(노드 1 + 엣지 1)
+                 포워드패스 펄스는 셰이더 내 해석적 계산 → 매 프레임 CPU 갱신 0
+                 모든 속성은 typed array, 핫패스에 per-node JS 객체 생성 금지
+                 용량(capacity)만큼 버퍼를 1회 할당 → 적응형으로 draw count만 조절
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────── 0. 전역 상태 ───────────────────────── */
+const S = {
+  backend:'', gpu:null, gl:null,
+  capNodes:0, capEdges:0,            // 버퍼 용량(1회 할당)
+  nodeCount:10000, edgeCount:30000,  // 현재 그리는 수(적응형으로 변동)
+  layerSizes:[], layerOf:null,       // 토폴로지
+  // typed array 풀 (핫패스 객체 금지)
+  nodePos:null, nodeDepth:null, nodeBase:null, nodeSize:null,
+  edgeIdx:null, edgeWeight:null, edgeMax:null, // edgeMax=정렬된 maxEndpoint(가시노드 사이 엣지 계산용)
+  evPos:null, evWeight:null, evNode:null, evDepth:null,
+  adjHead:null, adjList:null,        // BFS용 CSR 인접
+  hlData:null, hlW:0, hlH:0, hlDirty:false,
+  // 카메라
+  az:0.9, el:0.5, dist:62, tx:0, ty:0, tz:0,
+  viewProj:new Float32Array(16), camRight:new Float32Array(3), camUp:new Float32Array(3), camPos:new Float32Array(3),
+  // 애니메이션/품질
+  pulse:0, speed:0.5, pulseOn:true, mode:'layered', preset:'wide',
+  targetFps:60, adaptive:false, stress:false, stressMax:0,  // 적응형 기본 OFF(첫 화면을 차분하게)
+  densityFrac:1, nodeFrac:0.03, glow:0.32, sizeMul:1.0,     // glow=광원 세기(가산 발광 배율). 기본 낮게
+  hasSel:0, frameMs:16, fps:60, drawCalls:2, dpr:1,
+  hoverId:-1, picking:false
+};
+
+/* ───────────────────────── 1. mat4 (의존성 없이 최소 구현) ───────────────────────── */
+const M4 = {
+  perspective(o,fovy,a,n,f){ const t=1/Math.tan(fovy/2),nf=1/(n-f);
+    o[0]=t/a;o[1]=0;o[2]=0;o[3]=0; o[4]=0;o[5]=t;o[6]=0;o[7]=0;
+    o[8]=0;o[9]=0;o[10]=(f+n)*nf;o[11]=-1; o[12]=0;o[13]=0;o[14]=2*f*n*nf;o[15]=0; return o; },
+  mul(o,a,b){ for(let i=0;i<4;i++){ const ai0=a[i],ai1=a[i+4],ai2=a[i+8],ai3=a[i+12];
+    o[i]=ai0*b[0]+ai1*b[1]+ai2*b[2]+ai3*b[3]; o[i+4]=ai0*b[4]+ai1*b[5]+ai2*b[6]+ai3*b[7];
+    o[i+8]=ai0*b[8]+ai1*b[9]+ai2*b[10]+ai3*b[11]; o[i+12]=ai0*b[12]+ai1*b[13]+ai2*b[14]+ai3*b[15]; } return o; },
+  lookAt(o,e,c,u){ let x0,x1,x2,y0,y1,y2,z0,z1,z2,l;
+    z0=e[0]-c[0];z1=e[1]-c[1];z2=e[2]-c[2]; l=1/Math.hypot(z0,z1,z2); z0*=l;z1*=l;z2*=l;
+    x0=u[1]*z2-u[2]*z1; x1=u[2]*z0-u[0]*z2; x2=u[0]*z1-u[1]*z0; l=Math.hypot(x0,x1,x2); l=l?1/l:0; x0*=l;x1*=l;x2*=l;
+    y0=z1*x2-z2*x1; y1=z2*x0-z0*x2; y2=z0*x1-z1*x0;
+    o[0]=x0;o[1]=y0;o[2]=z0;o[3]=0; o[4]=x1;o[5]=y1;o[6]=z1;o[7]=0; o[8]=x2;o[9]=y2;o[10]=z2;o[11]=0;
+    o[12]=-(x0*e[0]+x1*e[1]+x2*e[2]); o[13]=-(y0*e[0]+y1*e[1]+y2*e[2]); o[14]=-(z0*e[0]+z1*e[1]+z2*e[2]); o[15]=1; return o; }
+};
+const _view=new Float32Array(16), _proj=new Float32Array(16), _eye=[0,0,0], _ctr=[0,0,0], _up=[0,1,0];
+
+function updateCamera(w,h){
+  const ce=Math.cos(S.el), se=Math.sin(S.el), ca=Math.cos(S.az), sa=Math.sin(S.az);
+  _eye[0]=S.tx+S.dist*ce*sa; _eye[1]=S.ty+S.dist*se; _eye[2]=S.tz+S.dist*ce*ca;
+  _ctr[0]=S.tx; _ctr[1]=S.ty; _ctr[2]=S.tz;
+  M4.perspective(_proj, 1.05, w/h, 0.5, 600);
+  M4.lookAt(_view, _eye, _ctr, _up);
+  M4.mul(S.viewProj, _proj, _view);
+  S.camPos[0]=_eye[0]; S.camPos[1]=_eye[1]; S.camPos[2]=_eye[2];
+  // 빌보드/팬용 카메라 기저 (view 행렬의 행 = world-space right/up)
+  S.camRight[0]=_view[0]; S.camRight[1]=_view[4]; S.camRight[2]=_view[8];
+  S.camUp[0]=_view[1];    S.camUp[1]=_view[5];    S.camUp[2]=_view[9];
+}
+
+/* ───────────────────────── 2. viridis 컬러맵 (다항 근사) ───────────────────────── */
+const VIRIDIS_GLSL = `vec3 viridis(float t){ t=clamp(t,0.0,1.0);
+  const vec3 c0=vec3(0.2777,0.0054,0.3341); const vec3 c1=vec3(0.1050,1.4046,1.3845);
+  const vec3 c2=vec3(-0.3308,0.2148,0.0950); const vec3 c3=vec3(-4.6342,-5.7991,-19.3324);
+  const vec3 c4=vec3(6.2282,14.1799,56.6905); const vec3 c5=vec3(4.7763,-13.7451,-65.3530);
+  const vec3 c6=vec3(-5.4354,4.6453,26.3124);
+  return c0+t*(c1+t*(c2+t*(c3+t*(c4+t*(c5+t*c6))))); }`;
+function viridisJS(t){ t=Math.max(0,Math.min(1,t));
+  const c=[[0.2777,0.0054,0.3341],[0.1050,1.4046,1.3845],[-0.3308,0.2148,0.0950],
+    [-4.6342,-5.7991,-19.3324],[6.2282,14.1799,56.6905],[4.7763,-13.7451,-65.3530],[-5.4354,4.6453,26.3124]];
+  const r=[0,0,0]; for(let k=0;k<3;k++){ let v=0; for(let i=6;i>=0;i--) v=v*t+c[i][k]; r[k]=Math.max(0,Math.min(1,v)); }
+  return 'rgb('+(r[0]*255|0)+','+(r[1]*255|0)+','+(r[2]*255|0)+')'; }
+
+/* ───────────────────────── 3. 디바이스 능력 감지 → 용량 프리셋 ───────────────────────── */
+async function detect(){
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  let hasGPU = !!navigator.gpu, tier = 2;
+  // WebGL renderer 문자열로 GPU 티어 추정
+  try{
+    const c=document.createElement('canvas'), g=c.getContext('webgl2');
+    if(g){ const ext=g.getExtension('WEBGL_debug_renderer_info');
+      const r=(ext?g.getParameter(ext.UNMASKED_RENDERER_WEBGL):'').toString();
+      if(/RTX|RX 6|RX 7|M[123] (Pro|Max|Ultra)|A100|Quadro|Radeon Pro/i.test(r)) tier=3;
+      else if(/GTX|RX 5|Radeon|GeForce|Apple M|Iris/i.test(r)) tier=2;
+      else if(/Intel|UHD|Mali|Adreno|llvmpipe|SwiftShader/i.test(r)) tier=1;
+    }
+  }catch(e){}
+  if(isMobile) tier=Math.min(tier,1);
+  // WebGPU adapter 실제 획득 여부 확인
+  let adapter=null;
+  if(hasGPU){ try{ adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'}); }catch(e){} if(!adapter) hasGPU=false; }
+  // 용량 결정 (메모리/드로우 안전 범위 내에서 성능 목표 충족)
+  let capN, capE;
+  if(hasGPU && tier>=3){ capN=500000; capE=1000000; }
+  else if(hasGPU){ capN=300000; capE=700000; }
+  else if(tier>=3){ capN=200000; capE=600000; }
+  else if(tier>=2){ capN=120000; capE=320000; }
+  else { capN=45000; capE=110000; }
+  // allocNodes/allocEdges = 디바이스 최대(버퍼 1회 할당 크기). capNodes/capEdges = 현재 토폴로지 실제 수(≤alloc)
+  S.allocNodes=capN; S.allocEdges=capE; S.capNodes=capN; S.capEdges=capE;
+  return { hasGPU, adapter, tier, isMobile };
+}
+
+/* ───────────────────────── 4. 토폴로지 + 레이어드 레이아웃 (typed array) ───────────────────────── */
+function makeLayerSizes(preset, capN){
+  // 모양만 정의 → capN 도달까지 채움 (마지막 레이어 절단)
+  let shape;
+  if(preset==='deep')   shape=[1.0,.9,.85,.8,.78,.75,.72,.7,.66,.6,.55,.5,.42,.32,.2,.08];
+  else if(preset==='wide') shape=[1.0,1.0,1.0,.95,.9,.5];
+  else if(preset==='pyramid') shape=[1.0,.7,.45,.28,.16,.08,.16,.28,.45,.7];
+  else /*huge*/ shape=[1,1,1,1,1,1,1,1];
+  const L=shape.length, sum=shape.reduce((a,b)=>a+b,0);
+  const sizes=[]; let total=0;
+  for(let i=0;i<L;i++){ let w=Math.max(2, Math.round(capN*shape[i]/sum)); sizes.push(w); total+=w; }
+  // capN 초과 방지 위해 비례 축소
+  const k=capN/total; let acc=0;
+  for(let i=0;i<L;i++){ sizes[i]=Math.max(2, Math.floor(sizes[i]*k)); acc+=sizes[i]; }
+  return sizes;
+}
+function allocArrays(){
+  const N=S.allocNodes, E=S.allocEdges; // 버퍼는 디바이스 최대치로 1회 할당
+  S.nodePos=new Float32Array(N*3); S.nodeDepth=new Float32Array(N);
+  S.nodeBase=new Float32Array(N);  S.nodeSize=new Float32Array(N); S.layerOf=new Int32Array(N);
+  S.edgeIdx=new Int32Array(E*2);   S.edgeWeight=new Float32Array(E);
+  S.evPos=new Float32Array(E*2*3); S.evWeight=new Float32Array(E*2);
+  S.evNode=new Float32Array(E*2);  S.evDepth=new Float32Array(E*2);
+  // 하이라이트 LUT 텍스처 (id로 인덱싱; 노드·엣지 셰이더가 공유 샘플)
+  S.hlW=2048; S.hlH=Math.ceil(N/S.hlW); S.hlData=new Uint8Array(S.hlW*S.hlH);
+}
+let rngState=1234567;
+function rnd(){ rngState^=rngState<<13; rngState^=rngState>>>17; rngState^=rngState<<5; return ((rngState>>>0)/4294967296); }
+function gauss(){ return (rnd()+rnd()+rnd()+rnd()-2)/2; } // ~[-1,1]
+
+function layoutLayered(){
+  // 결정론적·초저비용: 물리 불필요. 깊이축(X)=레이어, 레이어 내부는 2D 격자
+  const sizes=S.layerSizes, L=sizes.length, SPAN=54, R=22; let idx=0;
+  for(let l=0;l<L;l++){
+    const w=sizes[l], cols=Math.max(1,Math.ceil(Math.sqrt(w))), rows=Math.ceil(w/cols);
+    const depth=L>1? l/(L-1):0.5, x=(depth-0.5)*SPAN;
+    for(let j=0;j<w && idx<S.capNodes;j++,idx++){
+      const cx=j%cols, cy=(j/cols)|0;
+      const ny=((cy/(rows-1||1))-0.5)*2, nz=((cx/(cols-1||1))-0.5)*2;
+      S.nodePos[idx*3]  = x + gauss()*0.5;
+      S.nodePos[idx*3+1]= ny*R*(0.8+0.2*Math.cos(depth*6.28)) + gauss()*0.3;
+      S.nodePos[idx*3+2]= nz*R*(0.8+0.2*Math.cos(depth*6.28)) + gauss()*0.3;
+      S.nodeDepth[idx]=depth; S.layerOf[idx]=l;
+      S.nodeBase[idx]=0.12+rnd()*0.22; S.nodeSize[idx]=1.3+rnd()*0.9;
+    }
+  }
+}
+function buildEdges(){
+  // 희소 연결: 각 노드를 다음 레이어의 deg개 노드와 연결 (가중치 가우시안). 소스 레이어순 정렬
+  const sizes=S.layerSizes, L=sizes.length, capE=S.allocEdges;
+  const start=[]; let s=0; for(let l=0;l<L;l++){ start.push(s); s+=sizes[l]; }
+  const avgDeg=Math.max(2, Math.round(capE/Math.max(1,S.capNodes)));
+  let e=0;
+  for(let l=0;l<L-1 && e<capE;l++){
+    const a0=start[l], an=sizes[l], b0=start[l+1], bn=sizes[l+1];
+    const deg=Math.min(bn, Math.max(2, avgDeg + ((avgDeg*0.5)*gauss()|0)) );
+    for(let i=0;i<an && e<capE;i++){
+      const src=a0+i;
+      for(let d=0; d<deg && e<capE; d++){
+        const dst=b0 + ((rnd()*bn)|0);
+        S.edgeIdx[e*2]=src; S.edgeIdx[e*2+1]=dst;
+        S.edgeWeight[e]= Math.max(-1,Math.min(1, gauss()*0.9));
+        e++;
+      }
+    }
+  }
+  S.capEdges=e; // 현재 토폴로지의 실제 엣지 수(≤allocEdges)
+}
+function rebuildEdgeVertices(count){
+  // edgeIdx + nodePos → GPU용 엣지 정점 버퍼. 레이아웃 변경 시에만 호출(1회)
+  const c=count==null? S.capEdges : Math.min(count,S.capEdges);
+  for(let e=0;e<c;e++){
+    const a=S.edgeIdx[e*2], b=S.edgeIdx[e*2+1], w=S.edgeWeight[e];
+    const va=e*2, vb=e*2+1;
+    S.evPos[va*3]=S.nodePos[a*3]; S.evPos[va*3+1]=S.nodePos[a*3+1]; S.evPos[va*3+2]=S.nodePos[a*3+2];
+    S.evPos[vb*3]=S.nodePos[b*3]; S.evPos[vb*3+1]=S.nodePos[b*3+1]; S.evPos[vb*3+2]=S.nodePos[b*3+2];
+    S.evWeight[va]=w; S.evWeight[vb]=w;
+    S.evNode[va]=a;   S.evNode[vb]=b;
+    S.evDepth[va]=S.nodeDepth[a]; S.evDepth[vb]=S.nodeDepth[b]; // 정점별 깊이 → 펄스가 엣지를 타고 이동
+  }
+}
+function buildAdjacency(){
+  // 무방향 CSR (BFS 트레이스용). 1회 구축
+  const N=S.capNodes, E=S.capEdges;
+  const deg=new Int32Array(N);
+  for(let e=0;e<E;e++){ deg[S.edgeIdx[e*2]]++; deg[S.edgeIdx[e*2+1]]++; }
+  S.adjHead=new Int32Array(N+1); for(let i=0;i<N;i++) S.adjHead[i+1]=S.adjHead[i]+deg[i];
+  S.adjList=new Int32Array(S.adjHead[N]);
+  const cur=S.adjHead.slice(0,N);
+  for(let e=0;e<E;e++){ const a=S.edgeIdx[e*2],b=S.edgeIdx[e*2+1];
+    S.adjList[cur[a]++]=b; S.adjList[cur[b]++]=a; }
+}
+// 노드를 '레이어 내 순위'로 인터리브 재정렬 → prefix[0,k)가 모든 레이어를 균등 표본.
+// (이전엔 레이어 연속 저장이라 visible nodes를 줄이면 거대한 입력층 일부만 보였음.
+//  이제 visible nodes를 줄여도 전 레이어 구조와 층간 연결이 그대로 유지됨.)
+function interleaveReorder(){
+  const N=S.capNodes, E=S.capEdges, sizes=S.layerSizes, B=8192;
+  // 1) 각 노드의 정렬키: 레이어 내 인덱스의 골든비 저불일치 수열 → 균등 분산 [0,1)
+  const key=new Float32Array(N); let idx=0;
+  for(let l=0;l<sizes.length;l++){ const w=sizes[l]; for(let j=0;j<w&&idx<N;j++,idx++){ key[idx]=(j*0.6180339887498949)%1; } }
+  // 2) 버킷 정렬로 key 순서 → ord (one-time O(N))
+  const cnt=new Int32Array(B+1);
+  for(let i=0;i<N;i++){ let b=(key[i]*B)|0; if(b>=B)b=B-1; cnt[b+1]++; }
+  for(let b=0;b<B;b++) cnt[b+1]+=cnt[b];
+  const ord=new Int32Array(N), cur=cnt.slice(0,B);
+  for(let i=0;i<N;i++){ let b=(key[i]*B)|0; if(b>=B)b=B-1; ord[cur[b]++]=i; }
+  const o2n=new Int32Array(N); for(let ni=0;ni<N;ni++) o2n[ord[ni]]=ni;
+  // 3) 노드 속성 재배치
+  const P=new Float32Array(N*3), D=new Float32Array(N), Ba=new Float32Array(N), Sz=new Float32Array(N), Lo=new Int32Array(N);
+  for(let o=0;o<N;o++){ const ni=o2n[o];
+    P[ni*3]=S.nodePos[o*3]; P[ni*3+1]=S.nodePos[o*3+1]; P[ni*3+2]=S.nodePos[o*3+2];
+    D[ni]=S.nodeDepth[o]; Ba[ni]=S.nodeBase[o]; Sz[ni]=S.nodeSize[o]; Lo[ni]=S.layerOf[o]; }
+  S.nodePos.set(P,0); S.nodeDepth.set(D,0); S.nodeBase.set(Ba,0); S.nodeSize.set(Sz,0); S.layerOf.set(Lo,0);
+  // 4) 엣지 인덱스 리맵 후 max(끝점) 기준 정렬 → prefix = 보이는 노드 사이의 엣지
+  for(let e=0;e<E;e++){ S.edgeIdx[e*2]=o2n[S.edgeIdx[e*2]]; S.edgeIdx[e*2+1]=o2n[S.edgeIdx[e*2+1]]; }
+  const emax=new Int32Array(E), cnt2=new Int32Array(B+1);
+  for(let e=0;e<E;e++){ const m=Math.max(S.edgeIdx[e*2],S.edgeIdx[e*2+1]); emax[e]=m; let b=((m/N)*B)|0; if(b>=B)b=B-1; cnt2[b+1]++; }
+  for(let b=0;b<B;b++) cnt2[b+1]+=cnt2[b];
+  const eord=new Int32Array(E), cur2=cnt2.slice(0,B);
+  for(let e=0;e<E;e++){ let b=((emax[e]/N)*B)|0; if(b>=B)b=B-1; eord[cur2[b]++]=e; }
+  const EI=new Int32Array(E*2), EW=new Float32Array(E), EM=new Int32Array(E);
+  for(let k=0;k<E;k++){ const e=eord[k]; EI[k*2]=S.edgeIdx[e*2]; EI[k*2+1]=S.edgeIdx[e*2+1]; EW[k]=S.edgeWeight[e]; EM[k]=emax[e]; }
+  S.edgeIdx.set(EI,0); S.edgeWeight.set(EW,0); S.edgeMax=EM; // EM 오름차순 → 이진탐색으로 edgeCount 산출
+}
+function buildTopology(preset){
+  S.preset=preset; rngState=1234567;          // 결정론적 재현(레이어드 재빌드 시 동일 결과)
+  S.layerSizes=makeLayerSizes(preset, S.allocNodes);
+  // 실제 노드 수 = 레이어 합 (allocNodes 이하)
+  let tot=S.layerSizes.reduce((a,b)=>a+b,0); S.capNodes=Math.min(S.allocNodes,tot);
+  layoutLayered();
+  buildEdges();
+  interleaveReorder();   // ★ 인터리브 재정렬(노드·엣지) — visible nodes 축소 시 전 레이어 유지
+  rebuildEdgeVertices();
+  buildAdjacency();
+}
+// 유기적(포스) 모드 전용: 작고 '연결된' 다층 그래프를 버퍼 앞부분에 직접 생성한다.
+// (레이어드 토폴로지의 앞 N개 노드는 거대한 입력층에 몰려 내부 엣지가 거의 없으므로 —
+//  그대로 포스 시뮬레이션하면 스프링 없이 반발만 남아 중심으로 붕괴(별빛 폭발)함. 그래서 전용 그래프 생성.)
+function buildForceGraph(){
+  rngState=987654321;
+  const shape=[0.5,0.8,1.0,1.0,0.9,0.72,0.55,0.4,0.26], L=shape.length;
+  const target=Math.min(4200, FORCE_CAP, S.allocNodes), ssum=shape.reduce((a,b)=>a+b,0);
+  const sizes=shape.map(s=>Math.max(6,Math.round(target*s/ssum)));
+  const start=[]; let M=0; for(let l=0;l<L;l++){ start.push(M); M+=sizes[l]; }
+  M=Math.min(M, FORCE_CAP, S.allocNodes);
+  let idx=0;
+  for(let l=0;l<L;l++){ const w=sizes[l], depth=L>1?l/(L-1):0.5;
+    for(let j=0;j<w && idx<M;j++,idx++){
+      S.nodePos[idx*3]=(depth-0.5)*28+gauss()*7; S.nodePos[idx*3+1]=gauss()*9; S.nodePos[idx*3+2]=gauss()*9; // 더 조밀하게 시작→반발로 확산
+      S.nodeDepth[idx]=depth; S.layerOf[idx]=l; S.nodeBase[idx]=0.15+rnd()*0.3; S.nodeSize[idx]=1.7+rnd()*1.1; // 작게→코어 과포화 완화
+    }
+  }
+  let e=0; const deg=7;
+  for(let l=0;l<L-1;l++){ const a0=start[l],an=sizes[l],b0=start[l+1],bn=sizes[l+1];
+    for(let i=0;i<an;i++){ const src=a0+i; if(src>=M) break;
+      for(let d=0;d<deg && e<S.allocEdges;d++){ const dst=b0+((rnd()*bn)|0); if(dst>=M) continue;
+        S.edgeIdx[e*2]=src; S.edgeIdx[e*2+1]=dst; S.edgeWeight[e]=Math.max(-1,Math.min(1,gauss()*0.9)); e++;
+      }
+    }
+  }
+  S.capNodes=M; S.capEdges=e;     // 포스 모드의 논리적 카운트(버퍼 크기는 alloc 고정이라 안전)
+  S.layerSizes=sizes; buildAdjacency(); // 모든 엣지의 양끝<M → BFS·스프링 정상 동작
+}
+
+/* ───────────────────────── 5. 포스 디렉티드 레이아웃 (인라인 Web Worker, O(n) 공간격자) ───────────────────────── */
+/* 렌더는 메인 스레드(인터랙션·피킹 안정성)에 두되, "비싼" 1회 레이아웃 계산만 워커로 분리.
+   O(n²) 금지 → 셀 리스트(공간 해시) 기반 국소 반발 + 엣지 스프링. 분자동역학식 표준 기법. */
+const forceWorkerFn = function(){
+  self.onmessage = function(ev){
+    const d=ev.data, pos=d.pos, edges=d.edges, n=d.n, m=d.m, iters=d.iters;
+    const vel=new Float32Array(n*3);
+    // REST=이상 엣지길이, KATT=스프링, KREP=반발, CENTER=중심중력(이탈방지), MAXV=속도상한(스파이크방지)
+    const REST=3.0, KATT=0.04, KREP=6.0, CELL=4.0, DAMP=0.84, STEP=0.6, CENTER=0.015, MAXV=2.5;
+    function key(x,y,z){ return ((x*73856093)^(y*19349663)^(z*83492791))>>>0; }
+    for(let it=0; it<iters; it++){
+      // 1) 공간 격자 구축
+      const grid=new Map();
+      for(let i=0;i<n;i++){
+        const gx=Math.floor(pos[i*3]/CELL), gy=Math.floor(pos[i*3+1]/CELL), gz=Math.floor(pos[i*3+2]/CELL);
+        const k=key(gx&1023,gy&1023,gz&1023); let a=grid.get(k); if(!a){ a=[]; grid.set(k,a);} a.push(i);
+      }
+      const fx=new Float32Array(n), fy=new Float32Array(n), fz=new Float32Array(n);
+      // 2) 국소 반발 (이웃 27셀만)
+      for(let i=0;i<n;i++){
+        const px=pos[i*3],py=pos[i*3+1],pz=pos[i*3+2];
+        const cx=Math.floor(px/CELL),cy=Math.floor(py/CELL),cz=Math.floor(pz/CELL);
+        for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++)for(let oz=-1;oz<=1;oz++){
+          const a=grid.get(key((cx+ox)&1023,(cy+oy)&1023,(cz+oz)&1023)); if(!a) continue;
+          for(let q=0;q<a.length;q++){ const j=a[q]; if(j===i) continue;
+            let dx=px-pos[j*3],dy=py-pos[j*3+1],dz=pz-pos[j*3+2];
+            let d2=dx*dx+dy*dy+dz*dz+0.01; if(d2>CELL*CELL*4) continue;
+            const f=KREP/d2, inv=1/Math.sqrt(d2); fx[i]+=dx*inv*f; fy[i]+=dy*inv*f; fz[i]+=dz*inv*f;
+          }
+        }
+        fx[i]-=px*CENTER; fy[i]-=py*CENTER; fz[i]-=pz*CENTER; // 약한 중심 인력
+      }
+      // 3) 엣지 스프링 인력
+      for(let e=0;e<m;e++){ const i=edges[e*2],j=edges[e*2+1];
+        let dx=pos[j*3]-pos[i*3],dy=pos[j*3+1]-pos[i*3+1],dz=pos[j*3+2]-pos[i*3+2];
+        const dist=Math.sqrt(dx*dx+dy*dy+dz*dz)+1e-4, f=KATT*(dist-REST)/dist;
+        fx[i]+=dx*f; fy[i]+=dy*f; fz[i]+=dz*f; fx[j]-=dx*f; fy[j]-=dy*f; fz[j]-=dz*f;
+      }
+      // 4) 적분: 냉각(점진 수렴) + 속도 클램프(이탈 스파이크 방지)
+      const cool=1-0.8*it/iters;
+      for(let i=0;i<n;i++){
+        let vx=(vel[i*3]+fx[i]*STEP*cool)*DAMP, vy=(vel[i*3+1]+fy[i]*STEP*cool)*DAMP, vz=(vel[i*3+2]+fz[i]*STEP*cool)*DAMP;
+        const sp=Math.sqrt(vx*vx+vy*vy+vz*vz); if(sp>MAXV){ const s=MAXV/sp; vx*=s; vy*=s; vz*=s; }
+        vel[i*3]=vx; vel[i*3+1]=vy; vel[i*3+2]=vz;
+        pos[i*3]+=vx; pos[i*3+1]+=vy; pos[i*3+2]+=vz;
+      }
+      if((it&15)===0) self.postMessage({progress:it/iters});
+    }
+    self.postMessage({pos:pos}, [pos.buffer]);
+  };
+};
+let forceWorker=null;
+function getForceWorker(){
+  if(forceWorker) return forceWorker;
+  try{ const src='('+forceWorkerFn.toString()+')()';
+    const url=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));
+    forceWorker=new Worker(url); return forceWorker;
+  }catch(e){ return null; }
+}
+const FORCE_CAP=20000; // 유기적 모드는 가독성·반응성 위해 노드 수 제한
+function runForceLayout(){
+  buildForceGraph();                          // 전용 연결 그래프 생성(버퍼 앞부분)
+  const M=S.capNodes, e=S.capEdges;
+  S.nodeCount=M; S.edgeCount=e;
+  rebuildEdgeVertices(e); engine.uploadTopology(); engine.uploadHighlight();
+  // 워커로 1회 레이아웃 계산(메인 스레드 비차단)
+  const p=new Float32Array(M*3); for(let i=0;i<M*3;i++) p[i]=S.nodePos[i];
+  const es=new Int32Array(e*2);  for(let i=0;i<e*2;i++) es[i]=S.edgeIdx[i];
+  const w=getForceWorker(); busy(true,'computing force layout…');
+  const apply=(np)=>{ for(let i=0;i<M*3;i++) S.nodePos[i]=np[i]; rebuildEdgeVertices(e); engine.uploadPositions(); busy(false); };
+  if(w){
+    w.onmessage=(ev)=>{ if(ev.data.progress!=null){ busy(true,'force layout '+(ev.data.progress*100|0)+'%'); return; } apply(ev.data.pos); };
+    w.postMessage({pos:p, edges:es, n:M, m:e, iters:320}, [p.buffer, es.buffer]);
+  } else { apply(p); } // 워커 불가 시: 초기 배치라도 표시
+}
+function exitToLayered(){                      // 포스 → 레이어드 복귀: 전체 토폴로지 재구성
+  busy(true,'rebuilding layered…');
+  setTimeout(()=>{ buildTopology(S.preset); recomputeEdgeCount();
+    setNodeCount(Math.min(S.capNodes, 40000));
+    engine.uploadTopology(); engine.uploadHighlight(); busy(false); }, 10);
+}
+/* ───────────────────────── 6. WebGL2 엔진 (폴백 주력 경로) ───────────────────────── */
+function GLEngine(canvas){
+  const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance',desynchronized:true});
+  if(!gl) throw new Error('no webgl2');
+  S.gl=gl;
+  const ext=gl.getExtension('EXT_color_buffer_float');
+  function sh(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)+'\n'+src); return s; }
+  function prog(vs,fs){ const p=gl.createProgram(); gl.attachShader(p,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
+    gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); return p; }
+
+  // ── 노드 셰이더 (gl.POINTS, 1 드로우콜) ──
+  const nodeVS=`#version 300 es
+  precision highp float;
+  layout(location=0) in vec3 aPos; layout(location=1) in float aDepth;
+  layout(location=2) in float aBase; layout(location=3) in float aSize;
+  uniform mat4 uVP; uniform vec3 uCam; uniform float uPulse,uPW,uScale,uHasSel,uPulseOn,uSizeMul;
+  uniform sampler2D uHl; uniform vec2 uHlSz;
+  out float vAct,vHl;
+  void main(){ vec3 P=aPos; gl_Position=uVP*vec4(P,1.0);
+    float dist=distance(uCam,P);
+    // 펄스: 입력→출력 파동 (셰이더 내 해석적 계산 → CPU 갱신 0). pow(음수,2)는 미정의이므로 dd*dd 사용
+    float dd=(aDepth-uPulse)/uPW; float pulse=uPulseOn*exp(-dd*dd);
+    float act=clamp(aBase*0.5+pulse,0.0,1.0); vAct=act;
+    int id=gl_VertexID; ivec2 uv=ivec2(id%int(uHlSz.x), id/int(uHlSz.x));
+    float hl=texelFetch(uHl,uv,0).r; vHl=hl;
+    float sz=aSize*(1.0+act*1.6)*uScale*uSizeMul/max(dist,0.001); // LOD: 거리 기반 크기 감쇠
+    if(uHasSel>0.5 && hl<0.5) sz*=0.55;
+    gl_PointSize=clamp(sz,1.0,64.0); }`;
+  const nodeFS=`#version 300 es
+  precision highp float; in float vAct,vHl; uniform float uHasSel,uGlow; out vec4 frag;
+  ${VIRIDIS_GLSL}
+  void main(){ vec2 pc=gl_PointCoord*2.0-1.0; float r2=dot(pc,pc); if(r2>1.0) discard;
+    float glow=pow(1.0-r2,2.0); vec3 col=viridis(vAct); float a=glow;
+    if(vHl>0.5){ col=mix(col,vec3(1.0,0.95,0.7),0.6); a*=1.6; } else if(uHasSel>0.5){ a*=0.32; }
+    frag=vec4(col*a*(0.55+vAct)*uGlow, a); }`; // additive(ONE,ONE), uGlow=광원 세기 배율
+  // ── 엣지 셰이더 (gl.LINES, 1 드로우콜) ──
+  const edgeVS=`#version 300 es
+  precision highp float;
+  layout(location=0) in vec3 aPos; layout(location=1) in float aDepth;
+  layout(location=2) in float aW; layout(location=3) in float aNode;
+  uniform mat4 uVP; uniform float uPulse,uPW,uHasSel,uPulseOn; uniform sampler2D uHl; uniform vec2 uHlSz;
+  out float vAct,vW,vHl;
+  void main(){ gl_Position=uVP*vec4(aPos,1.0);
+    float dd=(aDepth-uPulse)/uPW; vAct=uPulseOn*exp(-dd*dd); vW=aW;
+    int id=int(aNode); ivec2 uv=ivec2(id%int(uHlSz.x), id/int(uHlSz.x)); vHl=texelFetch(uHl,uv,0).r; }`;
+  const edgeFS=`#version 300 es
+  precision highp float; in float vAct,vW,vHl; uniform float uHasSel,uGlow; out vec4 frag;
+  void main(){ vec3 pos=vec3(0.2,0.85,1.0), neg=vec3(1.0,0.32,0.62);
+    vec3 base=mix(neg,pos,clamp(vW*0.5+0.5,0.0,1.0));
+    float a=(0.018+0.22*abs(vW))*(0.28+vAct*1.3);   // 가중치→밝기, 펄스→발광 (additive 밀도)
+    if(vHl>0.5){ base=mix(base,vec3(1.0,0.95,0.7),0.5); a*=2.2; } else if(uHasSel>0.5){ a*=0.12; }
+    frag=vec4(base*a*uGlow, a); }`; // uGlow=광원 세기 배율
+  // ── 피킹 셰이더 (offscreen, gl_VertexID 인코딩) ──
+  const pickVS=`#version 300 es
+  precision highp float; layout(location=0) in vec3 aPos; layout(location=3) in float aSize;
+  uniform mat4 uVP; uniform vec3 uCam; uniform float uScale,uSizeMul; out vec3 vId;
+  void main(){ gl_Position=uVP*vec4(aPos,1.0); float dist=distance(uCam,aPos);
+    float id=float(gl_VertexID+1); vId=vec3(mod(id,256.0),mod(floor(id/256.0),256.0),floor(id/65536.0))/255.0;
+    gl_PointSize=clamp(aSize*uScale*uSizeMul/max(dist,0.001),6.0,48.0); }`;
+  const pickFS=`#version 300 es
+  precision highp float; in vec3 vId; out vec4 frag;
+  void main(){ vec2 pc=gl_PointCoord*2.0-1.0; if(dot(pc,pc)>1.0) discard; frag=vec4(vId,1.0); }`;
+
+  const pNode=prog(nodeVS,nodeFS), pEdge=prog(edgeVS,edgeFS), pPick=prog(pickVS,pickFS);
+  const U=(p,n)=>gl.getUniformLocation(p,n);
+  const uNode={vp:U(pNode,'uVP'),cam:U(pNode,'uCam'),pulse:U(pNode,'uPulse'),pw:U(pNode,'uPW'),scale:U(pNode,'uScale'),
+    hasSel:U(pNode,'uHasSel'),pulseOn:U(pNode,'uPulseOn'),hl:U(pNode,'uHl'),hlsz:U(pNode,'uHlSz'),glow:U(pNode,'uGlow'),sizeMul:U(pNode,'uSizeMul')};
+  const uEdge={vp:U(pEdge,'uVP'),pulse:U(pEdge,'uPulse'),pw:U(pEdge,'uPW'),hasSel:U(pEdge,'uHasSel'),
+    pulseOn:U(pEdge,'uPulseOn'),hl:U(pEdge,'uHl'),hlsz:U(pEdge,'uHlSz'),glow:U(pEdge,'uGlow')};
+  const uPick={vp:U(pPick,'uVP'),cam:U(pPick,'uCam'),scale:U(pPick,'uScale'),sizeMul:U(pPick,'uSizeMul')};
+
+  // ── 버퍼/VAO ──
+  function buf(data,loc,size){ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b);
+    gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW); gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc,size,gl.FLOAT,false,0,0); return b; }
+  const nodeVAO=gl.createVertexArray(); gl.bindVertexArray(nodeVAO);
+  const bPos=buf(S.nodePos,0,3), bDep=buf(S.nodeDepth,1,1), bBase=buf(S.nodeBase,2,1), bSize=buf(S.nodeSize,3,1);
+  const edgeVAO=gl.createVertexArray(); gl.bindVertexArray(edgeVAO);
+  const bEP=buf(S.evPos,0,3), bED=buf(S.evDepth,1,1), bEW=buf(S.evWeight,2,1), bEN=buf(S.evNode,3,1);
+  gl.bindVertexArray(null);
+
+  // 하이라이트 텍스처 (R8)
+  const hlTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,hlTex);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,S.hlW,S.hlH,0,gl.RED,gl.UNSIGNED_BYTE,S.hlData);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+
+  // 피킹 FBO
+  let pickFBO=gl.createFramebuffer(), pickTex=gl.createTexture(), pickRB=gl.createRenderbuffer();
+  function sizePick(w,h){ gl.bindTexture(gl.TEXTURE_2D,pickTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.bindRenderbuffer(gl.RENDERBUFFER,pickRB); gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,w,h);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,pickFBO);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,pickTex,0);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,pickRB);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null); }
+  let vw=1,vh=1;
+
+  this.resize=(w,h)=>{ canvas.width=w; canvas.height=h; vw=w; vh=h; gl.viewport(0,0,w,h); sizePick(w,h); };
+  this.uploadPositions=()=>{ gl.bindBuffer(gl.ARRAY_BUFFER,bPos); gl.bufferSubData(gl.ARRAY_BUFFER,0,S.nodePos);
+    gl.bindBuffer(gl.ARRAY_BUFFER,bDep); gl.bufferSubData(gl.ARRAY_BUFFER,0,S.nodeDepth);
+    gl.bindBuffer(gl.ARRAY_BUFFER,bEP); gl.bufferSubData(gl.ARRAY_BUFFER,0,S.evPos);
+    gl.bindBuffer(gl.ARRAY_BUFFER,bED); gl.bufferSubData(gl.ARRAY_BUFFER,0,S.evDepth);
+    gl.bindBuffer(gl.ARRAY_BUFFER,bEN); gl.bufferSubData(gl.ARRAY_BUFFER,0,S.evNode);
+    gl.bindBuffer(gl.ARRAY_BUFFER,bEW); gl.bufferSubData(gl.ARRAY_BUFFER,0,S.evWeight); };
+  this.uploadTopology=()=>{ // 프리셋 변경 시 전체 재업로드
+    gl.bindBuffer(gl.ARRAY_BUFFER,bBase); gl.bufferSubData(gl.ARRAY_BUFFER,0,S.nodeBase);
+    gl.bindBuffer(gl.ARRAY_BUFFER,bSize); gl.bufferSubData(gl.ARRAY_BUFFER,0,S.nodeSize);
+    this.uploadPositions(); };
+  this.uploadHighlight=()=>{ gl.bindTexture(gl.TEXTURE_2D,hlTex);
+    gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,S.hlW,S.hlH,gl.RED,gl.UNSIGNED_BYTE,S.hlData); };
+
+  const scale=()=>vh*0.25; // 포인트 크기 스케일(해상도 비례). 근거리=큼/원거리=작음(자연 LOD)
+  this.render=()=>{
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,vw,vh);
+    gl.clearColor(0.016,0.024,0.045,1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.disable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE); // additive 발광
+    // 엣지 (드로우콜 #1)
+    gl.useProgram(pEdge); gl.uniformMatrix4fv(uEdge.vp,false,S.viewProj);
+    gl.uniform1f(uEdge.pulse,S.pulse); gl.uniform1f(uEdge.pw,0.07); gl.uniform1f(uEdge.hasSel,S.hasSel);
+    gl.uniform1f(uEdge.pulseOn,S.pulseOn?1:0); gl.uniform1i(uEdge.hl,0); gl.uniform2f(uEdge.hlsz,S.hlW,S.hlH);
+    gl.uniform1f(uEdge.glow,S.glow);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,hlTex);
+    gl.bindVertexArray(edgeVAO); gl.drawArrays(gl.LINES,0,S.edgeCount*2);
+    // 노드 (드로우콜 #2)
+    gl.useProgram(pNode); gl.uniformMatrix4fv(uNode.vp,false,S.viewProj); gl.uniform3fv(uNode.cam,S.camPos);
+    gl.uniform1f(uNode.pulse,S.pulse); gl.uniform1f(uNode.pw,0.07); gl.uniform1f(uNode.scale,scale());
+    gl.uniform1f(uNode.hasSel,S.hasSel); gl.uniform1f(uNode.pulseOn,S.pulseOn?1:0);
+    gl.uniform1i(uNode.hl,0); gl.uniform2f(uNode.hlsz,S.hlW,S.hlH);
+    gl.uniform1f(uNode.glow,S.glow); gl.uniform1f(uNode.sizeMul,S.sizeMul);
+    gl.bindVertexArray(nodeVAO); gl.drawArrays(gl.POINTS,0,S.nodeCount);
+    gl.bindVertexArray(null); S.drawCalls=2;
+  };
+  const pbuf=new Uint8Array(4);
+  this.pick=(mx,my)=>{ // GPU 피킹: id 인코딩 렌더 → 1px readPixels
+    gl.bindFramebuffer(gl.FRAMEBUFFER,pickFBO); gl.viewport(0,0,vw,vh);
+    gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+    gl.useProgram(pPick); gl.uniformMatrix4fv(uPick.vp,false,S.viewProj); gl.uniform3fv(uPick.cam,S.camPos); gl.uniform1f(uPick.scale,scale()); gl.uniform1f(uPick.sizeMul,S.sizeMul);
+    gl.bindVertexArray(nodeVAO); gl.drawArrays(gl.POINTS,0,S.nodeCount); gl.bindVertexArray(null);
+    const px=Math.round(mx*S.dpr), py=Math.round((vh- my*S.dpr));
+    gl.readPixels(px,py,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pbuf);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    const id=pbuf[0]+pbuf[1]*256+pbuf[2]*65536-1; return id;
+  };
+  this.resize(canvas.width||1,canvas.height||1);
+}
+
+/* ───────────────────────── 7. WebGPU 엔진 (1순위: compute + render bundle) ───────────────────────── */
+const WGSL_COMMON=`
+struct U { vp:mat4x4<f32>, camRight:vec4<f32>, camUp:vec4<f32>, camPos:vec4<f32>, p:vec4<f32>, p2:vec4<f32>, }; // p2.x=glow, p2.y=sizeMul
+fn viridis(t0:f32)->vec3<f32>{ let t=clamp(t0,0.0,1.0);
+  let c0=vec3<f32>(0.2777,0.0054,0.3341); let c1=vec3<f32>(0.1050,1.4046,1.3845);
+  let c2=vec3<f32>(-0.3308,0.2148,0.0950); let c3=vec3<f32>(-4.6342,-5.7991,-19.3324);
+  let c4=vec3<f32>(6.2282,14.1799,56.6905); let c5=vec3<f32>(4.7763,-13.7451,-65.3530);
+  let c6=vec3<f32>(-5.4354,4.6453,26.3124);
+  return c0+t*(c1+t*(c2+t*(c3+t*(c4+t*(c5+t*c6))))); }`;
+async function GPUEngine(canvas, adapter){
+  const device=await adapter.requestDevice();
+  const ctx=canvas.getContext('webgpu'); const format=navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({device,format,alphaMode:'opaque'});
+  S.gpu=device;
+
+  // ── 버퍼 (디바이스 최대 용량으로 1회 할당) ──
+  const N=S.allocNodes, E=S.allocEdges;
+  // 노드 인스턴스: pos(3)+size(1)
+  const nodeInst=new Float32Array(N*4);
+  for(let i=0;i<N;i++){ nodeInst[i*4]=S.nodePos[i*3]; nodeInst[i*4+1]=S.nodePos[i*3+1]; nodeInst[i*4+2]=S.nodePos[i*3+2]; nodeInst[i*4+3]=S.nodeSize[i]; }
+  // 노드 깊이/베이스 (compute 입력)
+  const nodeDB=new Float32Array(N*2); for(let i=0;i<N;i++){ nodeDB[i*2]=S.nodeDepth[i]; nodeDB[i*2+1]=S.nodeBase[i]; }
+  // 엣지 정점: pos(3)+weight(1)+node(1)
+  const edgeV=new Float32Array(E*2*5);
+  for(let v=0; v<E*2; v++){ edgeV[v*5]=S.evPos[v*3]; edgeV[v*5+1]=S.evPos[v*3+1]; edgeV[v*5+2]=S.evPos[v*3+2]; edgeV[v*5+3]=S.evWeight[v]; edgeV[v*5+4]=S.evNode[v]; }
+  const quad=new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
+
+  function mkBuf(data,usage){ const b=device.createBuffer({size:(data.byteLength+3)&~3,usage,mappedAtCreation:true});
+    new (data.constructor)(b.getMappedRange()).set(data); b.unmap(); return b; }
+  const VTX=GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST, STO=GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST;
+  const quadBuf=mkBuf(quad,GPUBufferUsage.VERTEX);
+  const instBuf=mkBuf(nodeInst,VTX);
+  const edgeBuf=mkBuf(edgeV,VTX);
+  const dbBuf=mkBuf(nodeDB,STO);
+  const actBuf=device.createBuffer({size:N*4,usage:GPUBufferUsage.STORAGE});
+  const hlF=new Float32Array(N); const hlBuf=mkBuf(hlF,STO);
+  const uniBuf=device.createBuffer({size:144,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}); // +p2(glow,sizeMul)
+
+  // ── compute: 포워드패스 활성도를 storage에 기록 (GPU 상 "신호 물리") ──
+  const compMod=device.createShaderModule({code:`${WGSL_COMMON}
+    @group(0) @binding(0) var<uniform> u:U;
+    @group(0) @binding(1) var<storage,read> db:array<vec2<f32>>;
+    @group(0) @binding(2) var<storage,read_write> act:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>){
+      let i=g.x; if(i>=arrayLength(&act)){ return; }
+      let d=db[i]; let dd=(d.x-u.p.x)/u.p.y; let pulse=u.p.w*exp(-dd*dd); // pow(음수,2) 회피
+      act[i]=clamp(d.y*0.5+pulse,0.0,1.0); }`});
+  // ── 노드 렌더: 인스턴스드 빌보드 ──
+  const nodeMod=device.createShaderModule({code:`${WGSL_COMMON}
+    @group(0) @binding(0) var<uniform> u:U;
+    @group(0) @binding(1) var<storage,read> act:array<f32>;
+    @group(0) @binding(2) var<storage,read> hl:array<f32>;
+    struct VO{ @builtin(position) pos:vec4<f32>, @location(0) uv:vec2<f32>, @location(1) a:f32, @location(2) h:f32 };
+    @vertex fn vs(@location(0) corner:vec2<f32>, @location(1) ip:vec3<f32>, @location(2) sz:f32, @builtin(instance_index) ii:u32)->VO{
+      var o:VO; let a=act[ii]; let h=hl[ii];
+      var s=clamp(sz*(1.0+a*1.6)*0.06*u.p2.y, 0.008, 4.0); if(u.p.z>0.5 && h<0.5){ s=s*0.55; } // p2.y=sizeMul
+      let world=ip + u.camRight.xyz*corner.x*s + u.camUp.xyz*corner.y*s;
+      o.pos=u.vp*vec4<f32>(world,1.0); o.uv=corner; o.a=a; o.h=h; return o; }
+    @fragment fn fs(i:VO)->@location(0) vec4<f32>{
+      let r2=dot(i.uv,i.uv); if(r2>1.0){ discard; }
+      let glow=pow(1.0-r2,2.0); var col=viridis(i.a); var a=glow;
+      if(i.h>0.5){ col=mix(col,vec3<f32>(1.0,0.95,0.7),0.6); a=a*1.6; } else if(u.p.z>0.5){ a=a*0.32; }
+      return vec4<f32>(col*a*(0.55+i.a)*u.p2.x, a); }`}); // p2.x=glow
+  // ── 엣지 렌더: line-list ──
+  const edgeMod=device.createShaderModule({code:`${WGSL_COMMON}
+    @group(0) @binding(0) var<uniform> u:U;
+    @group(0) @binding(1) var<storage,read> act:array<f32>;
+    @group(0) @binding(2) var<storage,read> hl:array<f32>;
+    struct EO{ @builtin(position) pos:vec4<f32>, @location(0) a:f32, @location(1) w:f32, @location(2) h:f32 };
+    @vertex fn vs(@location(0) p:vec3<f32>, @location(1) w:f32, @location(2) nid:f32)->EO{
+      var o:EO; o.pos=u.vp*vec4<f32>(p,1.0); let n=u32(nid); o.a=act[n]; o.w=w; o.h=hl[n]; return o; }
+    @fragment fn fs(i:EO)->@location(0) vec4<f32>{
+      let pc=vec3<f32>(0.2,0.85,1.0); let ng=vec3<f32>(1.0,0.32,0.62);
+      var base=mix(ng,pc,clamp(i.w*0.5+0.5,0.0,1.0));
+      var a=(0.018+0.22*abs(i.w))*(0.28+i.a*1.3);
+      if(i.h>0.5){ base=mix(base,vec3<f32>(1.0,0.95,0.7),0.5); a=a*2.2; } else if(u.p.z>0.5){ a=a*0.12; }
+      return vec4<f32>(base*a*u.p2.x, a); }`}); // p2.x=glow
+
+  const addBlend={color:{srcFactor:'one',dstFactor:'one',operation:'add'},alpha:{srcFactor:'one',dstFactor:'one',operation:'add'}};
+  const compPipe=await device.createComputePipelineAsync({layout:'auto',compute:{module:compMod,entryPoint:'main'}});
+  const nodePipe=await device.createRenderPipelineAsync({ layout:'auto',
+    vertex:{ module:nodeMod, entryPoint:'vs', buffers:[
+      {arrayStride:8, attributes:[{shaderLocation:0,offset:0,format:'float32x2'}]},
+      {arrayStride:16, stepMode:'instance', attributes:[{shaderLocation:1,offset:0,format:'float32x3'},{shaderLocation:2,offset:12,format:'float32'}]} ]},
+    fragment:{ module:nodeMod, entryPoint:'fs', targets:[{format,blend:addBlend}]},
+    primitive:{topology:'triangle-list'} });
+  const edgePipe=await device.createRenderPipelineAsync({ layout:'auto',
+    vertex:{ module:edgeMod, entryPoint:'vs', buffers:[
+      {arrayStride:20, attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32'},{shaderLocation:2,offset:16,format:'float32'}]} ]},
+    fragment:{ module:edgeMod, entryPoint:'fs', targets:[{format,blend:addBlend}]},
+    primitive:{topology:'line-list'} });
+
+  const compBG=device.createBindGroup({layout:compPipe.getBindGroupLayout(0),entries:[
+    {binding:0,resource:{buffer:uniBuf}},{binding:1,resource:{buffer:dbBuf}},{binding:2,resource:{buffer:actBuf}}]});
+  const nodeBG=device.createBindGroup({layout:nodePipe.getBindGroupLayout(0),entries:[
+    {binding:0,resource:{buffer:uniBuf}},{binding:1,resource:{buffer:actBuf}},{binding:2,resource:{buffer:hlBuf}}]});
+  const edgeBG=device.createBindGroup({layout:edgePipe.getBindGroupLayout(0),entries:[
+    {binding:0,resource:{buffer:uniBuf}},{binding:1,resource:{buffer:actBuf}},{binding:2,resource:{buffer:hlBuf}}]});
+
+  const uni=new Float32Array(36); // mat4(16)+camRight4+camUp4+camPos4+p4+p2(4)
+  let bundle=null, bundleN=-1, bundleE=-1;
+  function recordBundle(){ // render bundle: 드로우콜 인코딩을 1회 기록 → 매 프레임 CPU 오버헤드 최소화
+    const enc=device.createRenderBundleEncoder({colorFormats:[format]});
+    enc.setBindGroup(0,edgeBG); enc.setPipeline(edgePipe); enc.setVertexBuffer(0,edgeBuf); enc.draw(S.edgeCount*2);
+    enc.setBindGroup(0,nodeBG); enc.setPipeline(nodePipe); enc.setVertexBuffer(0,quadBuf); enc.setVertexBuffer(1,instBuf); enc.draw(6,S.nodeCount);
+    bundle=enc.finish(); bundleN=S.nodeCount; bundleE=S.edgeCount;
+  }
+  // async 함수는 생성자가 아니므로 this 대신 명시적 객체 api 반환 (strict mode 안전)
+  const api={};
+  api.resize=(w,h)=>{ canvas.width=w; canvas.height=h; };
+  api.uploadPositions=()=>{ for(let i=0;i<S.capNodes;i++){ nodeInst[i*4]=S.nodePos[i*3]; nodeInst[i*4+1]=S.nodePos[i*3+1]; nodeInst[i*4+2]=S.nodePos[i*3+2]; }
+    device.queue.writeBuffer(instBuf,0,nodeInst);
+    for(let v=0; v<S.capEdges*2; v++){ edgeV[v*5]=S.evPos[v*3]; edgeV[v*5+1]=S.evPos[v*3+1]; edgeV[v*5+2]=S.evPos[v*3+2]; }
+    device.queue.writeBuffer(edgeBuf,0,edgeV); };
+  api.uploadTopology=()=>{ for(let i=0;i<S.capNodes;i++){ nodeInst[i*4+3]=S.nodeSize[i]; nodeDB[i*2]=S.nodeDepth[i]; nodeDB[i*2+1]=S.nodeBase[i]; }
+    device.queue.writeBuffer(dbBuf,0,nodeDB);
+    for(let v=0; v<S.capEdges*2; v++){ edgeV[v*5+3]=S.evWeight[v]; edgeV[v*5+4]=S.evNode[v]; }
+    device.queue.writeBuffer(edgeBuf,0,edgeV); api.uploadPositions(); };
+  api.uploadHighlight=()=>{ for(let i=0;i<S.capNodes;i++) hlF[i]=S.hlData[i]?1:0; device.queue.writeBuffer(hlBuf,0,hlF); };
+
+  api.render=()=>{
+    // 유니폼 갱신
+    uni.set(S.viewProj,0);
+    uni[16]=S.camRight[0]; uni[17]=S.camRight[1]; uni[18]=S.camRight[2]; uni[19]=0;
+    uni[20]=S.camUp[0]; uni[21]=S.camUp[1]; uni[22]=S.camUp[2]; uni[23]=0;
+    uni[24]=S.camPos[0]; uni[25]=S.camPos[1]; uni[26]=S.camPos[2]; uni[27]=0;
+    uni[28]=S.pulse; uni[29]=0.07; uni[30]=S.hasSel; uni[31]=S.pulseOn?1:0;
+    uni[32]=S.glow; uni[33]=S.sizeMul; uni[34]=0; uni[35]=0; // p2
+    device.queue.writeBuffer(uniBuf,0,uni);
+    if(bundle==null||bundleN!==S.nodeCount||bundleE!==S.edgeCount) recordBundle();
+    const cmd=device.createCommandEncoder();
+    const cp=cmd.beginComputePass(); cp.setPipeline(compPipe); cp.setBindGroup(0,compBG);
+    cp.dispatchWorkgroups(Math.ceil(S.nodeCount/64)); cp.end();
+    const rp=cmd.beginRenderPass({colorAttachments:[{view:ctx.getCurrentTexture().createView(),
+      clearValue:{r:0.016,g:0.024,b:0.045,a:1},loadOp:'clear',storeOp:'store'}]});
+    rp.executeBundles([bundle]); rp.end();
+    device.queue.submit([cmd.finish()]); S.drawCalls=2;
+  };
+  // WebGPU 경로 피킹: CPU 투영(스로틀). 대규모에선 스트라이드 샘플로 비용 제한
+  api.pick=(mx,my)=>cpuPick(mx*S.dpr,my*S.dpr); // CSS→프레임버퍼 좌표
+  api.uploadTopology();
+  return api;
+}
+// CPU 피킹 (WebGPU/폴백 공용) — 화면 투영 최근접 노드
+function cpuPick(mx,my){
+  const w=S.cw, h=S.ch, vp=S.viewProj; let best=-1, bd=18*18;
+  const stride=Math.max(1, Math.floor(S.nodeCount/60000)); // 6만 초과 시 표본화
+  const sx=mx, sy=my;
+  for(let i=0;i<S.nodeCount;i+=stride){
+    const x=S.nodePos[i*3],y=S.nodePos[i*3+1],z=S.nodePos[i*3+2];
+    const cx=vp[0]*x+vp[4]*y+vp[8]*z+vp[12], cy=vp[1]*x+vp[5]*y+vp[9]*z+vp[13], cw=vp[3]*x+vp[7]*y+vp[11]*z+vp[15];
+    if(cw<=0) continue; const px=(cx/cw*0.5+0.5)*w, py=(-cy/cw*0.5+0.5)*h;
+    const dx=px-sx, dy=py-sy, d=dx*dx+dy*dy; if(d<bd){ bd=d; best=i; }
+  }
+  return best;
+}
+
+/* ───────────────────────── 8. BFS 트레이스 / 하이라이트 ───────────────────────── */
+const bfsQ=new Int32Array(8192);
+function traceFrom(seed){
+  S.hlData.fill(0);
+  if(seed<0){ S.hasSel=0; engine.uploadHighlight(); return; }
+  let head=0,tail=0; bfsQ[tail++]=seed; S.hlData[seed]=255; let count=1;
+  const maxN=5000;
+  while(head<tail && count<maxN){
+    const u=bfsQ[head++], s=S.adjHead[u], e=S.adjHead[u+1];
+    for(let k=s;k<e;k++){ const v=S.adjList[k];
+      if(!S.hlData[v]){ S.hlData[v]=255; if(v<S.nodeCount){ count++; if(tail<bfsQ.length) bfsQ[tail++]=v; } } }
+  }
+  S.hasSel=1; engine.uploadHighlight();
+}
+
+/* ───────────────────────── 9. 적응형 품질 / 스트레스 ───────────────────────── */
+function recomputeEdgeCount(){
+  // 포스 모드: edgeMax 없음(전용 그래프) → 단순 비례
+  if(S.mode==='force' || !S.edgeMax){ S.edgeCount=Math.max(0, Math.min(S.capEdges, Math.floor(S.capEdges*S.densityFrac))); return; }
+  // 레이어드: 보이는 노드 prefix[0,nodeCount) 사이의 엣지 수 = max(끝점)<nodeCount (정렬됨 → 이진탐색)
+  const T=S.nodeCount; let lo=0, hi=S.capEdges, em=S.edgeMax;
+  while(lo<hi){ const mid=(lo+hi)>>1; if(em[mid]<T) lo=mid+1; else hi=mid; }
+  S.edgeCount=Math.floor(lo*S.densityFrac);
+}
+function setNodeCount(n){ S.nodeCount=Math.max(64, Math.min(S.capNodes, n|0)); recomputeEdgeCount(); }
+let accF=0, accT=0;
+function adaptiveStep(dt){
+  accF++; accT+=dt; if(accF<18) return; const fps=accF/accT; accF=0; accT=0;
+  const t=S.targetFps;
+  if(S.mode==='force') return; // 유기적 모드는 고정 규모
+  if(fps>t*1.06 && S.nodeCount<S.capNodes) setNodeCount(S.nodeCount*1.12);
+  else if(fps<t*0.94) setNodeCount(S.nodeCount*0.86);
+}
+function stressStep(){
+  if(S.mode==='force') return;
+  const budget=1000/S.targetFps;
+  if(S.frameMs<budget*0.92 && S.nodeCount<S.capNodes) setNodeCount(S.nodeCount*1.05);
+  else if(S.frameMs>budget*1.2) setNodeCount(S.nodeCount*0.97);
+  if(S.nodeCount>S.stressMax) S.stressMax=S.nodeCount;
+}
+
+/* ───────────────────────── 10. 메인 루프 + HUD ───────────────────────── */
+let engine=null, lastT=performance.now(), fpsSmooth=60, hudT=0;
+function frame(now){
+  const dt=Math.min(0.1,(now-lastT)/1000); lastT=now; const t0=performance.now();
+  const w=S.cw, h=S.ch; updateCamera(w,h);
+  if(S.pulseOn){ S.pulse+=S.speed*dt; if(S.pulse>1.15) S.pulse=-0.15; }
+  if(S.stress) stressStep(); else if(S.adaptive) adaptiveStep(dt);
+  engine.render();
+  S.frameMs=performance.now()-t0;
+  fpsSmooth+=(1/Math.max(dt,0.001)-fpsSmooth)*0.1; S.fps=fpsSmooth; // 실측 프레임 간격 기반 FPS
+  hudT+=dt; if(hudT>0.12){ hudT=0; updateHUD(); }
+  requestAnimationFrame(frame);
+}
+const $=id=>document.getElementById(id);
+function fmtK(n){ return n>=1e6? (n/1e6).toFixed(2)+'M' : n>=1e3? (n/1e3).toFixed(1)+'K' : ''+n; }
+function updateHUD(){
+  $('hFps').textContent=S.fps.toFixed(0);
+  $('hMs').textContent=S.frameMs.toFixed(1);
+  $('hDc').textContent=S.drawCalls + (S.picking?' (+1 pick)':'');
+  $('hNodes').textContent=fmtK(S.nodeCount);
+  $('hEdges').textContent=fmtK(S.edgeCount);
+  const fill=Math.max(2,Math.min(100,S.fps/Math.max(1,S.targetFps)*100));
+  $('fpsfill').style.width=fill+'%';
+  if(S.stress){ $('btnStress').textContent='⚡ STRESS · max '+fmtK(S.stressMax); }
+}
+
+/* ───────────────────────── 11. 인터랙션 ───────────────────────── */
+function setupInteraction(canvas){
+  let drag=false, pan=false, lx=0, ly=0, moved=0;
+  // 터치: 두 손가락 = 핀치 줌 + 이동(팬). 한 손가락 드래그 = 궤도, 탭 = 노드 정보 + 트레이스
+  const touches=new Map(); let multi=false, pinchD=0, pmx=0, pmy=0;
+  const two=()=>{ const [a,b]=[...touches.values()]; return { d:Math.hypot(a.x-b.x,a.y-b.y), x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; };
+  const panBy=(dx,dy)=>{ const k=S.dist*0.0016; S.tx-=(S.camRight[0]*dx - S.camUp[0]*dy)*k; S.ty-=(S.camRight[1]*dx - S.camUp[1]*dy)*k; S.tz-=(S.camRight[2]*dx - S.camUp[2]*dy)*k; };
+  canvas.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='touch'){ touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(touches.size>=2){ if(!multi){ multi=true; drag=false; const t=two(); pinchD=t.d; pmx=t.x; pmy=t.y; hideTip(); }
+        try{ canvas.setPointerCapture(e.pointerId); }catch(_){} return; } }
+    if(multi) return;
+    drag=true; pan=(e.button===2||e.shiftKey); lx=e.clientX; ly=e.clientY; moved=0;
+    canvas.classList.add('drag'); canvas.setPointerCapture(e.pointerId); });
+  const release=e=>{
+    if(e.pointerType==='touch'){ touches.delete(e.pointerId);
+      if(multi){ if(!touches.size) multi=false; drag=false; canvas.classList.remove('drag'); return; } }
+    if(!drag) return;
+    drag=false; canvas.classList.remove('drag');
+    if(e.type==='pointerup' && moved<5){ const id=doPick(e.clientX,e.clientY); traceFrom(id); // 클릭 → 트레이스
+      if(e.pointerType==='touch') hoverPick(e.clientX,e.clientY); } };               // 터치 탭 = 호버 정보도 표시
+  canvas.addEventListener('pointerup',release);
+  canvas.addEventListener('pointercancel',release);
+  canvas.addEventListener('contextmenu',e=>e.preventDefault());
+  let hoverTimer=0;
+  canvas.addEventListener('pointermove',e=>{
+    if(e.pointerType==='touch' && touches.has(e.pointerId)) touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(multi){ if(touches.size>=2){ const t=two();
+        if(pinchD>0 && t.d>0) S.dist=Math.max(6,Math.min(320,S.dist*pinchD/t.d));
+        pinchD=t.d; panBy(t.x-pmx, t.y-pmy); pmx=t.x; pmy=t.y; }
+      return; }
+    if(drag){ const dx=e.clientX-lx, dy=e.clientY-ly; lx=e.clientX; ly=e.clientY; moved+=Math.abs(dx)+Math.abs(dy);
+      if(pan){ panBy(dx,dy); }
+      else { S.az-=dx*0.005; S.el=Math.max(-1.5,Math.min(1.5,S.el+dy*0.005)); }
+      hideTip();
+    } else if(e.pointerType!=='touch'){ // 호버 피킹 (스로틀)
+      const nowT=performance.now(); if(nowT-hoverTimer>40){ hoverTimer=nowT; hoverPick(e.clientX,e.clientY); }
+    }
+  });
+  canvas.addEventListener('wheel',e=>{ e.preventDefault(); S.dist=Math.max(6,Math.min(320,S.dist*Math.exp(e.deltaY*0.0012))); },{passive:false});
+}
+function doPick(mx,my){ S.picking=true; // 클릭: CSS 좌표 전달, 엔진이 내부에서 dpr 처리
+  let id; try{ id=engine.pick(mx,my); }catch(e){ id=cpuPick(mx*S.dpr,my*S.dpr); } S.picking=false; return id;
+}
+function hoverPick(mx,my){
+  // WebGL2는 GPU 피킹(임의 규모), WebGPU는 CPU 투영(8만 이하만 — 대규모 호버는 비활성)
+  const id = (S.backend==='WebGL2' || S.nodeCount<=80000) ? engine.pick(mx,my) : -1;
+  const tip=$('tip');
+  if(id>=0 && id<S.nodeCount){ S.hoverId=id;
+    const l=S.layerOf[id], act=(S.nodeBase[id]*0.5 + (S.pulseOn?Math.exp(-Math.pow((S.nodeDepth[id]-S.pulse)/0.07,2)):0));
+    tip.style.display='block'; tip.style.left=(mx+14)+'px'; tip.style.top=(my+14)+'px';
+    tip.innerHTML='<b>node #'+id+'</b><br>layer '+l+' / '+S.layerSizes.length+'<br>activation <b style="color:'+viridisJS(Math.min(1,act))+'">'+Math.min(1,act).toFixed(3)+'</b>';
+  } else { hideTip(); }
+}
+function layerStart(l){ let s=0; for(let i=0;i<l;i++) s+=S.layerSizes[i]; return s; }
+function hideTip(){ $('tip').style.display='none'; S.hoverId=-1; }
+
+/* ───────────────────────── 12. UI 바인딩 ───────────────────────── */
+function bindUI(){
+  const sync=()=>{ $('vNodes').textContent=fmtK(S.nodeCount)+' / '+fmtK(S.capNodes);
+    $('vDensity').textContent=(S.densityFrac*100|0)+'%'; $('vSpeed').textContent=S.speed.toFixed(2);
+    $('vFps').textContent=S.targetFps; $('vGlow').textContent=S.glow.toFixed(2); $('vSize').textContent=S.sizeMul.toFixed(2)+'×'; };
+  $('rngNodes').addEventListener('input',e=>{ S.nodeFrac=+e.target.value;
+    if(S.mode==='force'){ sync(); return; }   // 포스 모드는 고정 규모(전용 그래프)
+    setNodeCount(S.capNodes*S.nodeFrac);
+    if(S.adaptive){ $('chkAdaptive').checked=false; S.adaptive=false; } sync(); });
+  $('rngGlow').addEventListener('input',e=>{ S.glow=+e.target.value; sync(); });   // 광원 세기
+  $('rngSize').addEventListener('input',e=>{ S.sizeMul=+e.target.value; sync(); }); // 노드 크기 배율
+  $('rngDensity').addEventListener('input',e=>{ S.densityFrac=+e.target.value; recomputeEdgeCount(); sync(); });
+  $('rngSpeed').addEventListener('input',e=>{ S.speed=+e.target.value; sync(); });
+  $('rngFps').addEventListener('input',e=>{ S.targetFps=+e.target.value; sync(); });
+  $('chkAdaptive').addEventListener('change',e=>{ S.adaptive=e.target.checked; });
+  $('chkPulse').addEventListener('change',e=>{ S.pulseOn=e.target.checked; });
+  $('btnStress').addEventListener('click',e=>{ S.stress=!S.stress; S.stressMax=S.nodeCount; e.target.classList.toggle('on',S.stress);
+    if(!S.stress) e.target.textContent='⚡ Stress test — push to limit'; });
+  $('btnReset').addEventListener('click',()=>{ S.az=0.9; S.el=0.5; S.dist=62; S.tx=S.ty=S.tz=0; });
+  $('btnClear').addEventListener('click',()=>traceFrom(-1));
+  $('selMode').addEventListener('change',e=>{ S.mode=e.target.value; traceFrom(-1); // 선택 초기화(인접 변경)
+    if(S.mode==='force') runForceLayout(); else exitToLayered(); sync(); });
+  $('selPreset').addEventListener('change',e=>{ rebuildTopology(e.target.value); });
+  // 좁은 화면: 조절판 여닫기
+  const setPanel=open=>{ $('panel').classList.toggle('open',open); $('panelToggle').setAttribute('aria-expanded',String(open)); $('panelToggle').style.visibility=open?'hidden':''; };
+  $('panelToggle').addEventListener('click',()=>setPanel(true));
+  $('panelClose').addEventListener('click',()=>setPanel(false));
+  sync();
+}
+function rebuildTopology(preset){
+  busy(true,'rebuilding topology…');
+  setTimeout(()=>{ // UI 갱신 후 무거운 작업
+    buildTopology(preset); recomputeEdgeCount(); setNodeCount(Math.min(S.capNodes,40000));
+    engine.uploadTopology(); engine.uploadHighlight(); busy(false);
+    if(S.mode==='force') runForceLayout();   // 포스 모드 중 프리셋 변경 시 전용 그래프 재생성
+  },20);
+}
+
+/* ───────────────────────── 13. 부팅 ───────────────────────── */
+function busy(on,msg){ const b=$('busy'); b.style.display=on?'block':'none'; if(msg) b.textContent=msg; }
+function resize(){ const dpr=Math.min(window.devicePixelRatio||1,1.5); S.dpr=dpr;
+  S.cw=Math.floor(innerWidth*dpr); S.ch=Math.floor(innerHeight*dpr);
+  const cv=$('view'); cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px';
+  if(engine) engine.resize(S.cw,S.ch); }
+async function boot(){
+  const cap=await detect();
+  $('loadMsg').textContent='allocating buffers ('+fmtK(S.capNodes)+' nodes)…';
+  await new Promise(r=>setTimeout(r,16));
+  allocArrays();
+  $('loadMsg').textContent='building topology…';
+  await new Promise(r=>setTimeout(r,16));
+  buildTopology('wide');
+  setNodeCount(S.capNodes*0.03); // 전 레이어 균등 표본으로 시작(차분한 첫 화면)
+  const canvas=$('view');
+  // 백엔드 초기화: WebGPU 우선, 실패 시 자동 WebGL2 폴백 (try/catch 안전망)
+  let ok=false;
+  if(cap.hasGPU && cap.adapter){
+    try{ $('loadMsg').textContent='initializing WebGPU…';
+      engine=await GPUEngine(canvas, cap.adapter); S.backend='WebGPU';
+      resize(); engine.render(); ok=true;
+    }catch(err){ console.warn('WebGPU init failed → WebGL2 fallback:',err); engine=null; }
+  }
+  if(!ok){
+    try{ $('loadMsg').textContent='initializing WebGL2…';
+      engine=new GLEngine(canvas); S.backend='WebGL2'; engine.uploadTopology(); engine.uploadHighlight(); resize();
+    }catch(err){ $('loadMsg').textContent='WebGL2 unavailable: '+err.message; return; }
+  }
+  // 백엔드 배지
+  const bd=$('backend'); bd.textContent=S.backend; if(S.backend==='WebGL2') bd.classList.add('gl');
+  window.addEventListener('resize',resize);
+  setupInteraction(canvas); bindUI();
+  $('load').classList.add('hide');
+  requestAnimationFrame(frame);
+}
+boot();
+/* end of application */
+</script>
+</body>
+</html>

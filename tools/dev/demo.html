@@ -14,7 +14,8 @@ const kit = TouchKit.create({
   sticks: [{ id: 'move', side: 'left', label: 'MOVE', keys: 'wasd' },
            { id: 'aim', side: 'right', label: 'AIM', onMove: (x, y, on) => { window.__aim = { x: +x.toFixed(2), y: +y.toFixed(2), on } } }],
   buttons: [{ id: 'fire', label: 'FIRE', icon: '✦', key: 'Space', row: 0 }, { id: 'dash', label: 'DASH', icon: '»', key: 'ShiftLeft', row: 0, size: 's' },
-            { id: 'pause', icon: 'Ⅱ', size: 's', place: 'top-right', key: 'Escape', tap: true }],
+            { id: 'pause', icon: 'Ⅱ', size: 's', place: 'top-right', key: 'Escape', tap: true },
+            { id: 'menu', icon: '☰', size: 's', place: 'top-left', onDown: () => { const o = document.createElement('div'); o.id = 'ov'; o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2147483100'; o.addEventListener('click', () => o.remove()); document.body.appendChild(o) } }],
   landscape: true,
 })
 function frame() { log.textContent = [...keys].join(' ') + ' | aim ' + JSON.stringify(window.__aim); requestAnimationFrame(frame) }

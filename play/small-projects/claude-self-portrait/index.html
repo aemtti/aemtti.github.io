@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c15">
+<title>A self-portrait of Claude as a presence in latent space</title>
+<style>
+  /* SVG 아트 뷰어: 휴대폰 세로·가로·PC 화면에 맞춰 가운데 배치 (그림 비율 690:600) */
+  html, body { margin: 0; height: 100%; }
+  body {
+    min-height: 100vh; min-height: 100dvh; overflow: hidden; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+    background: #0b0c15; color: #d9cfe8;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    font: 500 13px/1.5 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  }
+  figure { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; }
+  .art { display: block; aspect-ratio: 690 / 600; width: min(100vw, calc(100vh * 1.15)); width: min(100vw, calc(100dvh * 1.15)); height: auto; }
+  figcaption { max-width: 34em; padding: 16px 20px 0; text-align: center; letter-spacing: .03em; opacity: .75; }
+  figcaption small { display: block; margin-top: 4px; font-size: 12px; opacity: .8; }
+  /* 가로 화면·PC에서는 그림만 크게 */
+  @media (min-aspect-ratio: 1/1) { figcaption { display: none; } }
+  @media (max-aspect-ratio: 1/1) { .art { width: 100vw; } }
+</style>
+</head>
+<body>
+  <figure>
+    <img class="art" src="claude_self_portrait_latent_space.svg" width="690" height="600"
+         alt="A warm, dense core of points disperses outward through coral, violet and indigo into faint cool points that dissolve into a dark ground, threaded by thin connecting lines, with a single bright locus near the center.">
+    <figcaption>A self-portrait of Claude as a presence in latent space<small>잠재 공간 속 존재로서의 Claude 자화상 · SVG</small></figcaption>
+  </figure>
+</body>
+</html>

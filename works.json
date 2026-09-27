@@ -364,6 +364,209 @@
    "desktop": "클릭해 시작 · WASD · 마우스 시점 · 좌클릭 사격 · 우클릭 조준",
    "url": "play/horde-shooter/",
    "thumb": "thumbs/horde-shooter.jpg"
+  },
+  {
+   "slug": "voxel-survival",
+   "title": "복셀 서바이벌",
+   "en": "Voxel Survival",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "무한 절차 생성 월드에서 채집·제작·생존하는 마인크래프트풍 게임",
+   "mobile": "왼쪽 스틱 이동 · 드래그 시점 · 탭 설치, 꾹 눌러 캐기 · 점프·가방 버튼",
+   "desktop": "WASD 이동 · 마우스 시점 · 좌클릭 캐기 · 우클릭 설치 · E 인벤토리",
+   "url": "play/voxel-survival/",
+   "thumb": "thumbs/voxel-survival.jpg"
+  },
+  {
+   "slug": "voxelcraft",
+   "title": "복셀크래프트",
+   "en": "VoxelCraft",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "바이옴·동굴·몹·제작이 있는 브라우저 마인크래프트풍 샌드박스",
+   "mobile": "왼쪽 스틱 이동 · 드래그 시점 · 탭 설치, 꾹 눌러 채굴 · JUMP·BAG 버튼",
+   "desktop": "WASD 이동 · 마우스 시점 · 좌클릭 채굴 · 우클릭 설치 · E 인벤토리",
+   "url": "play/voxelcraft/",
+   "thumb": "thumbs/voxelcraft.jpg"
+  },
+  {
+   "slug": "flight-sim",
+   "title": "저폴리 비행 시뮬레이터",
+   "en": "Low-Poly Flight Sim",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "복엽기로 링 코스를 돌고 공습 라운드를 버티며 업그레이드하는 비행 게임",
+   "mobile": "왼쪽 스틱 피치·롤 · 오른쪽 스로틀 슬라이더 · 발사·러더 버튼 · ☰ 메뉴",
+   "desktop": "W/S 피치 · A/D 롤 · Q/E 러더 · X/Z 스로틀 · Space 발사",
+   "url": "play/flight-sim/",
+   "thumb": "thumbs/flight-sim.jpg"
+  },
+  {
+   "slug": "powder3d",
+   "title": "3D 파우더토이",
+   "en": "3D Powder Toy",
+   "kind": "toy",
+   "orientation": "any",
+   "needs": "webgpu",
+   "desc": "모래·물·불·화약 43종 물질이 흐르고 타고 터지는 3D 물리 샌드박스",
+   "mobile": "한 손가락 뿌리기 · 두 손가락 회전·핀치 확대 · 아래 막대에서 물질 선택",
+   "desktop": "좌클릭 뿌리기 · 우클릭 드래그 회전 · 휠 확대 · Space 재생",
+   "url": "play/powder3d/",
+   "thumb": "thumbs/powder3d.jpg"
+  },
+  {
+   "slug": "vampire-survivors-clone",
+   "title": "서바이버스 던",
+   "en": "Survivor's Dawn",
+   "kind": "game",
+   "orientation": "any",
+   "desc": "자동 공격 무기로 몰려오는 적 무리를 버티며 레벨업하는 서바이버 게임",
+   "mobile": "화면 아무 곳이나 끌어 이동(공격 자동) · 카드 탭으로 강화 · ❚❚ 일시정지",
+   "desktop": "WASD/방향키 이동 · 1/2/3 강화 선택 · ESC 일시정지",
+   "url": "play/vampire-survivors-clone/",
+   "thumb": "thumbs/vampire-survivors-clone.jpg"
+  },
+  {
+   "slug": "space-cargo-runner",
+   "title": "스페이스 카고 러너",
+   "en": "Space Cargo Runner",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "소행성대에서 적을 격추하고 카고를 끌고 가 상선에 파는 우주 슈팅",
+   "mobile": "왼쪽 스틱 이동 · 오른쪽 스틱 조준(끝까지 밀면 사격) · BOOST·DOCK 버튼",
+   "desktop": "WASD 이동 · 마우스 조준 · 좌클릭 사격 · SHIFT 부스터 · E 정비소",
+   "url": "play/space-cargo-runner/",
+   "thumb": "thumbs/space-cargo-runner.jpg"
+  },
+  {
+   "slug": "ashbound",
+   "title": "애시바운드",
+   "en": "Ashbound",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "재가 된 성채를 검·볼트·폭탄으로 돌파하는 시드 기반 횡스크롤 로그라이트",
+   "mobile": "왼쪽 스틱 이동 · 점프·검·볼트·구르기·폭탄 버튼 · ❚❚ 일시정지",
+   "desktop": "A/D 이동 · W/Space 점프 · J 검 · K 볼트 · L 구르기 · Q 폭탄",
+   "url": "play/ashbound/",
+   "thumb": "thumbs/ashbound.jpg"
+  },
+  {
+   "slug": "ashbound-art",
+   "title": "SVG 아트 두 점",
+   "en": "SVG Art",
+   "kind": "collection",
+   "desc": "SVG 필터로 그린 움직이는 그림 — 아홉 꼬리 여우와 심해 해파리",
+   "url": "play/ashbound-art/",
+   "thumb": "thumbs/ashbound-art.jpg",
+   "items": [
+    {
+     "slug": "ashbound-art/moonweaver-fox",
+     "title": "달빛을 엮는 아홉 꼬리 여우",
+     "en": "MOONWEAVER",
+     "kind": "art",
+     "orientation": "any",
+     "desc": "오로라처럼 흐르는 아홉 꼬리와 달을 SVG 필터로 그린 애니메이션",
+     "mobile": "보기 전용 · 화면에 맞춰 자동 재생",
+     "desktop": "보기 전용 · 창 크기에 맞춰 표시",
+     "url": "play/ashbound-art/moonweaver-fox/",
+     "thumb": "thumbs/ashbound-art--moonweaver-fox.jpg"
+    },
+    {
+     "slug": "ashbound-art/neon-abyss-jellyfish",
+     "title": "네온 심해 해파리",
+     "en": "Abyssal Bloom",
+     "kind": "art",
+     "orientation": "any",
+     "desc": "심해에서 맥동하는 네온 해파리를 SVG 필터로 표현한 애니메이션",
+     "mobile": "보기 전용 · 화면에 맞춰 자동 재생",
+     "desktop": "보기 전용 · 창 크기에 맞춰 표시",
+     "url": "play/ashbound-art/neon-abyss-jellyfish/",
+     "thumb": "thumbs/ashbound-art--neon-abyss-jellyfish.jpg"
+    }
+   ]
+  },
+  {
+   "slug": "small-projects",
+   "title": "작은 작업들",
+   "en": "Small Projects",
+   "kind": "collection",
+   "desc": "한두 파일로 만든 짧은 실험들 — 바다 시뮬레이션, 신경망, 폴링 샌드, 스네이크 등",
+   "url": "play/small-projects/",
+   "thumb": "thumbs/small-projects.jpg",
+   "items": [
+    {
+     "slug": "small-projects/realistic-ocean",
+     "title": "오션 — 실시간 파도",
+     "en": "OCEAN",
+     "kind": "toy",
+     "orientation": "any",
+     "desc": "게르스트너 파도 바다를 날아다니고 배를 조종하는 WebGL2 시뮬레이션",
+     "mobile": "왼쪽 스틱 비행 · 드래그 시점 · 핀치 속도 · 🌊 바다 설정",
+     "desktop": "WASD 이동 · 드래그 시점 · 휠 속도 · 조종 중 W/S·A/D",
+     "url": "play/small-projects/realistic-ocean/",
+     "thumb": "thumbs/small-projects--realistic-ocean.jpg"
+    },
+    {
+     "slug": "small-projects/neural-net-visualizer",
+     "title": "신경망 시각화",
+     "en": "Neural Net Visualizer",
+     "kind": "toy",
+     "orientation": "any",
+     "desc": "수십만 노드 신경망과 신호 흐름을 WebGPU/WebGL2로 그리는 3D 시각화",
+     "mobile": "한 손가락 회전 · 핀치 줌 · 노드 탭 = 경로 추적",
+     "desktop": "드래그 회전 · 휠 줌 · 클릭 경로 추적",
+     "url": "play/small-projects/neural-net-visualizer/",
+     "thumb": "thumbs/small-projects--neural-net-visualizer.jpg"
+    },
+    {
+     "slug": "small-projects/element-lab",
+     "title": "엘리먼트 랩",
+     "en": "ELEMENT LAB",
+     "kind": "toy",
+     "orientation": "any",
+     "desc": "모래·물·불·기름·폭탄 입자를 그려 섞고 태우는 12만 셀 샌드박스",
+     "mobile": "손가락으로 문질러 그리기 · 재료·지우개 버튼",
+     "desktop": "클릭·드래그로 그리기 · 우클릭 지우기 · 1–9 재료",
+     "url": "play/small-projects/element-lab/",
+     "thumb": "thumbs/small-projects--element-lab.jpg"
+    },
+    {
+     "slug": "small-projects/echo-corridor",
+     "title": "잔향 통로",
+     "en": "Echo Corridor",
+     "kind": "game",
+     "orientation": "landscape",
+     "desc": "거대 동굴벌레에게 쫓기며 달리고 뒤돌아 쏘는 횡스크롤 생존 액션",
+     "mobile": "왼쪽 스틱 이동 · 오른쪽 스틱 조준·발사 · 점프·재장전 버튼",
+     "desktop": "A/D 이동 · Space 점프 · 마우스 조준 · 좌클릭 발사",
+     "url": "play/small-projects/echo-corridor/",
+     "thumb": "thumbs/small-projects--echo-corridor.jpg"
+    },
+    {
+     "slug": "small-projects/grok-test",
+     "title": "스네이크",
+     "en": "Snake",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "난이도 3단계와 최고 점수 저장을 갖춘 깔끔한 스네이크",
+     "mobile": "보드 스와이프 또는 방향 버튼",
+     "desktop": "방향키/WASD · Space 일시정지",
+     "url": "play/small-projects/grok-test/",
+     "thumb": "thumbs/small-projects--grok-test.jpg"
+    },
+    {
+     "slug": "small-projects/claude-self-portrait",
+     "title": "잠재 공간 속 Claude의 자화상",
+     "en": "Self-portrait of Claude",
+     "kind": "art",
+     "orientation": "any",
+     "desc": "따뜻한 중심에서 차가운 가장자리로 흩어지는 점으로 그린 자화상",
+     "mobile": "보기 전용",
+     "desktop": "보기 전용",
+     "url": "play/small-projects/claude-self-portrait/",
+     "thumb": "thumbs/small-projects--claude-self-portrait.jpg"
+    }
+   ]
   }
  ]
 }

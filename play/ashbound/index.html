@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0d12">
+  <title>Ashbound — 2D Roguelite Prototype</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="game-shell" aria-label="Ashbound 게임">
+    <canvas id="game" width="1280" height="720" tabindex="0" aria-label="Ashbound 게임 화면"></canvas>
+
+    <section id="hud" class="hud hidden" aria-live="polite">
+      <div class="hud-left">
+        <div class="hp-row"><span class="hp-icon">◆</span><div class="bar"><i id="hp-fill"></i></div><strong id="hp-text">100 / 100</strong></div>
+        <div class="loadout"><span>녹슨 장검 · 3연격</span><span id="shot-status">에너지 볼트 준비</span><span id="bomb-status">재 폭탄 준비</span></div>
+      </div>
+      <div class="hud-center"><small>ROOM</small><strong id="room-text">1 / 8</strong><em id="room-type">시작 방</em></div>
+      <div class="hud-right"><span>✦ <b id="gold-text">0</b></span><span>☠ <b id="kill-text">0</b></span><span class="seed">SEED <b id="seed-text">—</b></span></div>
+      <div id="low-health" class="low-health hidden">생명력이 위험합니다</div>
+    </section>
+
+    <div id="announcement" class="announcement hidden"></div>
+
+    <section id="start-screen" class="screen">
+      <div class="brand-mark"><span></span><i></i><span></span></div>
+      <p class="eyebrow">A PROCEDURAL ACTION PROTOTYPE</p>
+      <h1>ASHBOUND</h1>
+      <p class="tagline">재가 된 성채를 가르고, 쓰러지면 다시 타올라라.</p>
+      <div class="start-panel">
+        <label for="seed-input">RUN SEED</label>
+        <div class="seed-entry"><input id="seed-input" maxlength="18" placeholder="비워 두면 무작위" autocomplete="off"><button id="start-button">불씨 깨우기</button></div>
+        <p>같은 시드는 같은 방 순서와 적 배치를 만듭니다.</p>
+      </div>
+      <div class="controls">
+        <span><kbd>A</kbd><kbd>D</kbd> 이동</span><span><kbd>W</kbd> / <kbd>Space</kbd> 점프</span><span><kbd>J</kbd> 검</span>
+        <span><kbd>K</kbd> 사격</span><span><kbd>L</kbd> / <kbd>Shift</kbd> 구르기</span><span><kbd>Q</kbd> 폭탄</span>
+        <span><kbd>Esc</kbd> 일시정지</span><span><kbd>F2</kbd> 디버그</span>
+      </div>
+      <p class="touch-hint">왼쪽 화면을 끌어 이동 · 오른쪽 위 ❚❚ 일시정지<br>오른쪽 버튼: <b>점프</b>(길게 누르면 더 높이) · <b>검</b> · <b>볼트</b> · <b>구르기</b> · <b>폭탄</b></p>
+    </section>
+
+    <section id="pause-screen" class="screen overlay hidden">
+      <p class="eyebrow">THE EMBER WAITS</p><h2>일시정지</h2>
+      <div class="pause-grid"><div><h3>현재 강화</h3><ul id="upgrade-list"><li>아직 획득한 강화가 없습니다.</li></ul></div><div><h3>조작</h3><p class="desk-only">A/D 이동 · W 점프<br>J 검 · K 사격 · Q 폭탄<br>L 회피 · R 새 런</p><p class="touch-only">왼쪽 스틱 이동 · 아래+점프 발판 내려가기<br>점프 · 검 · 볼트 · 구르기 · 폭탄 버튼</p></div></div>
+      <div class="pause-actions"><button id="resume-button">계속하기</button><button id="pause-restart-button" class="touch-only secondary">새 런 시작</button></div>
+    </section>
+
+    <section id="upgrade-screen" class="screen overlay hidden">
+      <p class="eyebrow">EMBER REMNANT</p><h2>하나의 불씨를 품으세요</h2>
+      <div id="upgrade-choices" class="upgrade-choices"></div>
+    </section>
+
+    <section id="end-screen" class="screen overlay hidden">
+      <p id="end-eyebrow" class="eyebrow">THE FLAME FADES</p><h2 id="end-title">런 종료</h2><p id="end-copy"></p>
+      <div id="run-stats" class="stats"></div>
+      <button id="restart-button">새 불씨로 다시 시작</button>
+    </section>
+  </main>
+
+  <!-- Classic scripts intentionally preserve file:// compatibility. -->
+  <script src="src/data/weapons.js"></script>
+  <script src="src/data/enemies.js"></script>
+  <script src="src/data/upgrades.js"></script>
+  <script src="src/core/SeededRandom.js"></script>
+  <script src="src/core/Input.js"></script>
+  <script src="src/core/AudioManager.js"></script>
+  <script src="src/core/Camera.js"></script>
+  <script src="src/world/Collision.js"></script>
+  <script src="src/world/roomTemplates.js"></script>
+  <script src="src/world/RoomGenerator.js"></script>
+  <script src="src/world/Room.js"></script>
+  <script src="src/systems/ParticleSystem.js"></script>
+  <script src="src/systems/UpgradeSystem.js"></script>
+  <script src="src/systems/RunManager.js"></script>
+  <script src="src/entities/Entity.js"></script>
+  <script src="src/entities/Projectile.js"></script>
+  <script src="src/entities/Enemy.js"></script>
+  <script src="src/entities/MeleeEnemy.js"></script>
+  <script src="src/entities/RangedEnemy.js"></script>
+  <script src="src/entities/ChargerEnemy.js"></script>
+  <script src="src/combat/Hitbox.js"></script>
+  <script src="src/combat/DamageSystem.js"></script>
+  <script src="src/combat/WeaponSystem.js"></script>
+  <script src="src/entities/Player.js"></script>
+  <script src="src/core/Game.js"></script>
+  <script src="src/main.js"></script>
+  <script src="src/core/TouchKit.js"></script>
+  <script src="src/core/TouchControls.js"></script>
+</body>
+</html>

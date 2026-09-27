@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="1200" height="800" viewBox="0 0 1200 800"
+     role="img" aria-labelledby="title description">
+  <title id="title">Abyssal Bloom — 네온 심해 해파리</title>
+  <desc id="description">SVG 필터로 물결, 발광, 유리 왜곡, 끈적한 기포를 표현한 애니메이션 벡터 아트</desc>
+
+  <defs>
+    <!-- 심해 배경 -->
+    <linearGradient id="ocean" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#07132f"/>
+      <stop offset="0.45" stop-color="#071537"/>
+      <stop offset="1" stop-color="#020512"/>
+    </linearGradient>
+
+    <radialGradient id="abyssAura">
+      <stop offset="0" stop-color="#1559a8" stop-opacity="0.55"/>
+      <stop offset="0.48" stop-color="#0b2861" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#020512" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="bellGlass" x1="0.18" y1="0" x2="0.82" y2="1">
+      <stop offset="0" stop-color="#edfdff" stop-opacity="0.88"/>
+      <stop offset="0.18" stop-color="#62f7ff" stop-opacity="0.52"/>
+      <stop offset="0.55" stop-color="#7e70ff" stop-opacity="0.25"/>
+      <stop offset="0.86" stop-color="#ff55d7" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#ffb7f1" stop-opacity="0.68"/>
+    </linearGradient>
+
+    <linearGradient id="bellEdge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#57f8ff"/>
+      <stop offset="0.5" stop-color="#f4ffff"/>
+      <stop offset="1" stop-color="#ff5bd8"/>
+    </linearGradient>
+
+    <linearGradient id="tentacle" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9ffff" stop-opacity="0.92"/>
+      <stop offset="0.38" stop-color="#5be7ff" stop-opacity="0.72"/>
+      <stop offset="0.72" stop-color="#9e68ff" stop-opacity="0.48"/>
+      <stop offset="1" stop-color="#ff57c8" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="tentaclePink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff0fd" stop-opacity="0.9"/>
+      <stop offset="0.3" stop-color="#ff79dd" stop-opacity="0.68"/>
+      <stop offset="0.7" stop-color="#806cff" stop-opacity="0.46"/>
+      <stop offset="1" stop-color="#4eeaff" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="oralRibbon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#efffff" stop-opacity="0.65"/>
+      <stop offset="0.35" stop-color="#5cecff" stop-opacity="0.42"/>
+      <stop offset="0.68" stop-color="#936bff" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#ff5dcf" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="organGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#49fbff"/>
+      <stop offset="0.5" stop-color="#9674ff"/>
+      <stop offset="1" stop-color="#ff4ec7"/>
+    </linearGradient>
+
+    <radialGradient id="pearl">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.24" stop-color="#9ffbff" stop-opacity="0.92"/>
+      <stop offset="0.62" stop-color="#6e67ff" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#6e67ff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 느리게 출렁이는 수면 광선 -->
+    <filter id="waterWarp" x="-25%" y="-30%" width="150%" height="170%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.004 0.016"
+                    numOctaves="2" seed="21" result="waterNoise">
+        <animate attributeName="baseFrequency"
+                 values="0.004 0.016;0.007 0.022;0.004 0.016"
+                 dur="14s" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="waterNoise" scale="42"
+                         xChannelSelector="R" yChannelSelector="B"/>
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+
+    <!-- 해파리의 유리 표면과 네온 번짐 -->
+    <filter id="glassBloom" x="-55%" y="-55%" width="210%" height="230%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.008 0.032"
+                    numOctaves="2" seed="7" result="glassNoise">
+        <animate attributeName="baseFrequency"
+                 values="0.008 0.032;0.012 0.026;0.008 0.032"
+                 dur="9s" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="glassNoise" scale="7"
+                         xChannelSelector="R" yChannelSelector="G" result="warped"/>
+      <feGaussianBlur in="warped" stdDeviation="16" result="wideGlow"/>
+      <feColorMatrix in="wideGlow" type="matrix"
+        values="0.2 0   0   0 0
+                0   1.0 0   0 0.15
+                0   0   1.4 0 0.3
+                0   0   0   0.8 0" result="cyanGlow"/>
+      <feGaussianBlur in="warped" stdDeviation="3" result="softEdge"/>
+      <feMerge>
+        <feMergeNode in="cyanGlow"/>
+        <feMergeNode in="softEdge"/>
+        <feMergeNode in="warped"/>
+      </feMerge>
+    </filter>
+
+    <!-- 촉수가 살아 움직이는 듯한 미세 변위 -->
+    <filter id="liquidWobble" x="-80%" y="-12%" width="260%" height="130%">
+      <feTurbulence type="turbulence" baseFrequency="0.011 0.025"
+                    numOctaves="2" seed="4" result="tentacleNoise">
+        <animate attributeName="baseFrequency"
+                 values="0.011 0.025;0.018 0.018;0.011 0.025"
+                 dur="7s" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="tentacleNoise" scale="18"
+                         xChannelSelector="R" yChannelSelector="B" result="wobble"/>
+      <feGaussianBlur in="wobble" stdDeviation="6" result="tentacleGlow"/>
+      <feMerge>
+        <feMergeNode in="tentacleGlow"/>
+        <feMergeNode in="wobble"/>
+      </feMerge>
+    </filter>
+
+    <!-- 가까운 기포들이 한 덩어리처럼 붙는 구이 효과 -->
+    <filter id="goo" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="bubbleBlur"/>
+      <feColorMatrix in="bubbleBlur" type="matrix"
+        values="1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 20 -8" result="gooShape"/>
+      <feGaussianBlur in="gooShape" stdDeviation="7" result="gooGlow"/>
+      <feMerge>
+        <feMergeNode in="gooGlow"/>
+        <feMergeNode in="gooShape"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="tinyGlow" x="-300%" y="-300%" width="700%" height="700%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <clipPath id="bellClip">
+      <path d="M383 320 C388 176 483 91 600 91 C717 91 812 176 817 320
+               C754 354 681 360 600 348 C519 360 446 354 383 320 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="1200" height="800" fill="url(#ocean)"/>
+  <ellipse cx="600" cy="365" rx="575" ry="430" fill="url(#abyssAura)"/>
+
+  <!-- 위에서 스며드는 빛기둥 -->
+  <g filter="url(#waterWarp)" opacity="0.42" style="mix-blend-mode:screen">
+    <path d="M65 -40 L278 -40 L496 770 L350 770 Z" fill="#3db8ff" opacity="0.12"/>
+    <path d="M307 -40 L444 -40 L555 690 L471 690 Z" fill="#7fefff" opacity="0.1"/>
+    <path d="M775 -40 L956 -40 L724 720 L620 720 Z" fill="#3a8dff" opacity="0.12"/>
+    <path d="M987 -40 L1126 -40 L825 690 L745 690 Z" fill="#a25fff" opacity="0.08"/>
+    <path d="M-40 154 C223 112 337 185 593 132 S981 105 1240 157"
+          fill="none" stroke="#7cecff" stroke-width="8" opacity="0.2"/>
+    <path d="M-40 202 C216 158 390 235 621 176 S995 167 1240 208"
+          fill="none" stroke="#675cff" stroke-width="5" opacity="0.15"/>
+  </g>
+
+  <!-- 멀리 떠다니는 미세 생물 -->
+  <g fill="#99faff" filter="url(#tinyGlow)">
+    <circle cx="122" cy="236" r="2" opacity="0.55"><animate attributeName="opacity" values=".2;.9;.2" dur="4.7s" repeatCount="indefinite"/></circle>
+    <circle cx="208" cy="490" r="1.5" opacity="0.42"><animate attributeName="opacity" values=".15;.65;.15" dur="3.2s" repeatCount="indefinite"/></circle>
+    <circle cx="313" cy="123" r="2" opacity="0.6"><animate attributeName="opacity" values=".2;.8;.2" dur="5.1s" repeatCount="indefinite"/></circle>
+    <circle cx="918" cy="153" r="2" opacity="0.5"><animate attributeName="opacity" values=".1;.8;.1" dur="4.1s" repeatCount="indefinite"/></circle>
+    <circle cx="1054" cy="384" r="1.5" opacity="0.5"><animate attributeName="opacity" values=".15;.7;.15" dur="5.4s" repeatCount="indefinite"/></circle>
+    <circle cx="959" cy="628" r="2" opacity="0.42"><animate attributeName="opacity" values=".2;.75;.2" dur="3.8s" repeatCount="indefinite"/></circle>
+    <circle cx="89" cy="673" r="1.5" opacity="0.46"><animate attributeName="opacity" values=".1;.7;.1" dur="4.4s" repeatCount="indefinite"/></circle>
+  </g>
+
+  <!-- 발광 기포: 블러 + 알파 콘트라스트로 서로 붙어 보임 -->
+  <g filter="url(#goo)" fill="#52eaff" opacity="0.72">
+    <g>
+      <circle cx="929" cy="494" r="13"/>
+      <circle cx="946" cy="471" r="9"/>
+      <circle cx="953" cy="449" r="6"/>
+      <animateTransform attributeName="transform" type="translate"
+                        values="0 40; -12 -470" dur="12s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;.8;.8;0" keyTimes="0;.12;.82;1"
+               dur="12s" repeatCount="indefinite"/>
+    </g>
+    <g opacity="0.65">
+      <circle cx="254" cy="617" r="11"/>
+      <circle cx="269" cy="598" r="7"/>
+      <circle cx="272" cy="580" r="4"/>
+      <animateTransform attributeName="transform" type="translate"
+                        values="0 70; 15 -520" dur="15s" begin="-5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;.7;.7;0" keyTimes="0;.1;.8;1"
+               dur="15s" begin="-5s" repeatCount="indefinite"/>
+    </g>
+  </g>
+
+  <!-- 해파리 전체의 느린 부유 -->
+  <g>
+    <animateTransform attributeName="transform" type="translate"
+                      values="0 7;0 -11;0 7" dur="7s" repeatCount="indefinite"/>
+
+    <!-- 몸체 주위의 은은한 생물발광 후광 -->
+    <ellipse cx="600" cy="334" rx="278" ry="232" fill="url(#pearl)" opacity="0.1"
+             filter="url(#tinyGlow)"/>
+
+    <!-- 넓고 리본처럼 접히는 구강완: 가는 촉수보다 뒤쪽 레이어 -->
+    <g filter="url(#liquidWobble)" fill="url(#oralRibbon)" opacity="0.46">
+      <path d="M469 325
+               C453 395 504 423 475 497
+               C447 567 500 620 456 718
+               C525 654 495 581 535 516
+               C571 456 518 397 544 334 Z">
+        <animate attributeName="d" dur="10s" repeatCount="indefinite"
+          values="M469 325 C453 395 504 423 475 497 C447 567 500 620 456 718 C525 654 495 581 535 516 C571 456 518 397 544 334 Z;
+                  M469 325 C524 392 452 440 501 502 C548 566 471 633 520 718 C455 653 520 575 481 516 C443 456 515 394 544 334 Z;
+                  M469 325 C453 395 504 423 475 497 C447 567 500 620 456 718 C525 654 495 581 535 516 C571 456 518 397 544 334 Z"/>
+      </path>
+      <path d="M556 341
+               C531 408 603 446 557 525
+               C526 581 599 653 569 751
+               C642 664 583 590 633 521
+               C680 455 609 404 642 342 Z" opacity="0.78">
+        <animate attributeName="d" dur="11.5s" repeatCount="indefinite"
+          values="M556 341 C531 408 603 446 557 525 C526 581 599 653 569 751 C642 664 583 590 633 521 C680 455 609 404 642 342 Z;
+                  M556 341 C625 405 549 454 607 523 C651 580 572 660 632 751 C548 670 628 586 575 516 C530 454 607 404 642 342 Z;
+                  M556 341 C531 408 603 446 557 525 C526 581 599 653 569 751 C642 664 583 590 633 521 C680 455 609 404 642 342 Z"/>
+      </path>
+      <path d="M660 335
+               C640 395 711 430 665 489
+               C624 543 706 595 684 702
+               C742 620 687 553 733 497
+               C780 439 711 386 730 324 Z" opacity="0.56">
+        <animate attributeName="d" dur="9.2s" repeatCount="indefinite"
+          values="M660 335 C640 395 711 430 665 489 C624 543 706 595 684 702 C742 620 687 553 733 497 C780 439 711 386 730 324 Z;
+                  M660 335 C728 391 650 443 706 493 C757 541 679 607 733 702 C661 622 734 550 686 498 C640 444 707 387 730 324 Z;
+                  M660 335 C640 395 711 430 665 489 C624 543 706 595 684 702 C742 620 687 553 733 497 C780 439 711 386 730 324 Z"/>
+      </path>
+    </g>
+
+    <!-- 촉수 -->
+    <g filter="url(#liquidWobble)" fill="none" stroke="url(#tentacle)" stroke-linecap="round">
+      <path stroke-width="12" opacity="0.7"
+            d="M456 331 C405 431 507 514 448 742">
+        <animate attributeName="d" dur="8.5s" repeatCount="indefinite"
+          values="M456 331 C405 431 507 514 448 742;
+                  M456 331 C520 430 406 548 477 742;
+                  M456 331 C405 431 507 514 448 742"/>
+      </path>
+      <path stroke-width="8" opacity="0.62"
+            d="M502 343 C557 446 448 549 521 725">
+        <animate attributeName="d" dur="7.2s" repeatCount="indefinite"
+          values="M502 343 C557 446 448 549 521 725;
+                  M502 343 C438 448 565 543 489 725;
+                  M502 343 C557 446 448 549 521 725"/>
+      </path>
+      <path stroke-width="15" opacity="0.78"
+            d="M552 348 C497 456 629 555 548 764">
+        <animate attributeName="d" dur="9.4s" repeatCount="indefinite"
+          values="M552 348 C497 456 629 555 548 764;
+                  M552 348 C644 463 481 562 577 764;
+                  M552 348 C497 456 629 555 548 764"/>
+      </path>
+      <path stroke-width="10" opacity="0.68"
+            d="M600 350 C676 445 527 575 608 746">
+        <animate attributeName="d" dur="6.8s" repeatCount="indefinite"
+          values="M600 350 C676 445 527 575 608 746;
+                  M600 350 C520 453 695 568 579 746;
+                  M600 350 C676 445 527 575 608 746"/>
+      </path>
+      <path stroke="url(#tentaclePink)" stroke-width="14" opacity="0.74"
+            d="M650 347 C586 455 733 528 657 770">
+        <animate attributeName="d" dur="8.1s" repeatCount="indefinite"
+          values="M650 347 C586 455 733 528 657 770;
+                  M650 347 C740 448 575 558 691 770;
+                  M650 347 C586 455 733 528 657 770"/>
+      </path>
+      <path stroke-width="8" opacity="0.58"
+            d="M703 340 C765 432 653 538 722 718">
+        <animate attributeName="d" dur="7.7s" repeatCount="indefinite"
+          values="M703 340 C765 432 653 538 722 718;
+                  M703 340 C642 438 779 532 690 718;
+                  M703 340 C765 432 653 538 722 718"/>
+      </path>
+      <path stroke="url(#tentaclePink)" stroke-width="11" opacity="0.65"
+            d="M748 329 C693 423 801 505 752 731">
+        <animate attributeName="d" dur="9s" repeatCount="indefinite"
+          values="M748 329 C693 423 801 505 752 731;
+                  M748 329 C820 427 683 531 781 731;
+                  M748 329 C693 423 801 505 752 731"/>
+      </path>
+    </g>
+
+    <!-- 갓과 촉수를 자연스럽게 이어 주는 반투명 치맛자락 -->
+    <path d="M398 311
+             C421 329 432 373 462 366
+             C493 359 491 326 522 334
+             C552 342 565 383 600 369
+             C635 383 648 342 678 334
+             C709 326 707 359 738 366
+             C768 373 779 329 802 311
+             C766 355 704 381 600 376
+             C496 381 434 355 398 311 Z"
+          fill="url(#bellGlass)" opacity="0.26" filter="url(#tinyGlow)"/>
+
+    <!-- 해파리 갓 -->
+    <g filter="url(#glassBloom)">
+      <path d="M383 320 C388 176 483 91 600 91 C717 91 812 176 817 320
+               C754 354 681 360 600 348 C519 360 446 354 383 320 Z"
+            fill="url(#bellGlass)" stroke="url(#bellEdge)" stroke-width="4"/>
+
+      <!-- 유리 안쪽의 빛살 -->
+      <g clip-path="url(#bellClip)" fill="none" stroke-linecap="round">
+        <path d="M600 103 C545 173 512 237 494 332" stroke="#8effff" stroke-width="23" opacity="0.16"/>
+        <path d="M600 103 C652 174 696 239 711 334" stroke="#ff72dd" stroke-width="18" opacity="0.15"/>
+        <path d="M600 105 C599 187 599 258 600 348" stroke="#eaffff" stroke-width="8" opacity="0.26"/>
+        <path d="M424 282 C523 246 675 244 780 286" stroke="#fff" stroke-width="5" opacity="0.17"/>
+        <ellipse cx="560" cy="172" rx="102" ry="60" stroke="#c6ffff" stroke-width="11" opacity="0.13" transform="rotate(-18 560 172)"/>
+      </g>
+
+      <!-- 갓 표면에서 점멸하는 생물발광 반점 -->
+      <g clip-path="url(#bellClip)" fill="#d7ffff" filter="url(#tinyGlow)">
+        <circle cx="458" cy="265" r="3" opacity="0.5"><animate attributeName="opacity" values=".15;.85;.15" dur="3.7s" repeatCount="indefinite"/></circle>
+        <circle cx="493" cy="211" r="2" opacity="0.4"><animate attributeName="opacity" values=".1;.7;.1" dur="4.4s" repeatCount="indefinite"/></circle>
+        <circle cx="546" cy="128" r="2.5" opacity="0.55"><animate attributeName="opacity" values=".2;.9;.2" dur="3.2s" repeatCount="indefinite"/></circle>
+        <circle cx="638" cy="151" r="2" opacity="0.45"><animate attributeName="opacity" values=".1;.8;.1" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="700" cy="204" r="3" opacity="0.38"><animate attributeName="opacity" values=".1;.7;.1" dur="3.9s" repeatCount="indefinite"/></circle>
+        <circle cx="748" cy="274" r="2" opacity="0.5"><animate attributeName="opacity" values=".2;.9;.2" dur="4.7s" repeatCount="indefinite"/></circle>
+        <circle cx="610" cy="292" r="2.5" opacity="0.42"><animate attributeName="opacity" values=".1;.75;.1" dur="3.4s" repeatCount="indefinite"/></circle>
+      </g>
+
+      <!-- 내부 기관처럼 보이는 네온 리본 -->
+      <g fill="none" stroke="url(#organGlow)" stroke-linecap="round">
+        <path d="M526 329 C507 281 540 262 563 288 C580 307 580 332 586 345"
+              stroke-width="15" opacity="0.68"/>
+        <path d="M674 329 C693 281 660 262 637 288 C620 307 620 332 614 345"
+              stroke-width="15" opacity="0.68"/>
+        <path d="M563 288 C574 246 589 229 600 229 C611 229 626 246 637 288"
+              stroke-width="8" opacity="0.58"/>
+      </g>
+
+      <!-- 갓 아래 물결치는 주름 -->
+      <path d="M386 319
+               C421 291 452 350 489 321
+               C525 292 561 354 600 322
+               C639 354 675 292 711 321
+               C748 350 779 291 814 319"
+            fill="none" stroke="url(#bellEdge)" stroke-width="9" stroke-linecap="round" opacity="0.78"/>
+
+      <ellipse cx="536" cy="155" rx="58" ry="18" fill="#f2ffff" opacity="0.19" transform="rotate(-24 536 155)"/>
+      <circle cx="517" cy="142" r="7" fill="#fff" opacity="0.82"/>
+    </g>
+  </g>
+
+  <!-- 전경의 작은 부유 입자 -->
+  <g fill="url(#pearl)" style="mix-blend-mode:screen">
+    <circle cx="177" cy="558" r="21" opacity="0.5">
+      <animate attributeName="cy" values="590;540;590" dur="8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1019" cy="245" r="14" opacity="0.42">
+      <animate attributeName="cy" values="262;218;262" dur="6s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="865" cy="685" r="18" opacity="0.38">
+      <animate attributeName="cy" values="700;656;700" dur="9s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- 작품 서명 -->
+  <g transform="translate(54 735)" fill="#c7faff">
+    <text x="0" y="0" font-family="Inter, Segoe UI, sans-serif" font-size="18"
+          font-weight="600" letter-spacing="6" opacity="0.82">ABYSSAL BLOOM</text>
+    <text x="1" y="26" font-family="Inter, Segoe UI, sans-serif" font-size="10"
+          letter-spacing="3" opacity="0.4">FILTERED IN PURE SVG</text>
+  </g>
+</svg>

@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800"
+     role="img" aria-labelledby="title description">
+  <title id="title">MOONWEAVER — 달빛을 엮는 아홉 꼬리 여우</title>
+  <desc id="description">오로라로 변하는 아홉 꼬리와 질감 있는 달을 SVG 필터로 표현한 애니메이션 벡터 아트</desc>
+
+  <defs>
+    <linearGradient id="nightSky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070920"/>
+      <stop offset="0.42" stop-color="#12113b"/>
+      <stop offset="0.75" stop-color="#101b3f"/>
+      <stop offset="1" stop-color="#02040e"/>
+    </linearGradient>
+
+    <radialGradient id="moonBase" cx="0.38" cy="0.3">
+      <stop offset="0" stop-color="#fffbe6"/>
+      <stop offset="0.45" stop-color="#dfedff"/>
+      <stop offset="0.78" stop-color="#a8bdff"/>
+      <stop offset="1" stop-color="#6a65c7"/>
+    </radialGradient>
+
+    <radialGradient id="moonHalo">
+      <stop offset="0" stop-color="#d9ecff" stop-opacity="0.34"/>
+      <stop offset="0.4" stop-color="#9c9dff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#6855dc" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="tailCyan" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#2b1d66" stop-opacity="0.05"/>
+      <stop offset="0.24" stop-color="#6066ff" stop-opacity="0.58"/>
+      <stop offset="0.56" stop-color="#45f2ff" stop-opacity="0.9"/>
+      <stop offset="0.84" stop-color="#d9ffff" stop-opacity="0.64"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="tailViolet" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3c176c" stop-opacity="0.08"/>
+      <stop offset="0.25" stop-color="#9d52ff" stop-opacity="0.66"/>
+      <stop offset="0.58" stop-color="#ff72d7" stop-opacity="0.86"/>
+      <stop offset="0.86" stop-color="#a8f8ff" stop-opacity="0.56"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="tailGold" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#5b285a" stop-opacity="0.06"/>
+      <stop offset="0.27" stop-color="#ff5fbf" stop-opacity="0.58"/>
+      <stop offset="0.58" stop-color="#ffd56a" stop-opacity="0.88"/>
+      <stop offset="0.86" stop-color="#f2ffff" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="foxFur" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eefcff"/>
+      <stop offset="0.3" stop-color="#a7d9f2"/>
+      <stop offset="0.62" stop-color="#6876b9"/>
+      <stop offset="1" stop-color="#282750"/>
+    </linearGradient>
+
+    <linearGradient id="foxShadow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#556a99"/>
+      <stop offset="0.6" stop-color="#22244d"/>
+      <stop offset="1" stop-color="#11132d"/>
+    </linearGradient>
+
+    <linearGradient id="cliff" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#19213d"/>
+      <stop offset="0.5" stop-color="#0a0d21"/>
+      <stop offset="1" stop-color="#02030a"/>
+    </linearGradient>
+
+    <linearGradient id="mist" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5b5cba" stop-opacity="0"/>
+      <stop offset="0.35" stop-color="#8a8fe7" stop-opacity="0.14"/>
+      <stop offset="0.7" stop-color="#4cdfee" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#4cdfee" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- 달의 표면 질감과 외곽 발광 -->
+    <filter id="moonTexture" x="-85%" y="-85%" width="270%" height="270%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="28" result="moonBlur"/>
+      <feFlood flood-color="#94b9ff" flood-opacity="0.65" result="moonColor"/>
+      <feComposite in="moonColor" in2="moonBlur" operator="in" result="moonGlow"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="4" seed="32" result="craterNoise"/>
+      <feColorMatrix in="craterNoise" type="matrix"
+        values="0.7 0 0 0 0.04
+                0 0.76 0 0 0.08
+                0 0 1.1 0 0.16
+                0 0 0 0.5 0" result="craterColor"/>
+      <feComposite in="craterColor" in2="SourceAlpha" operator="in" result="craters"/>
+      <feBlend in="SourceGraphic" in2="craters" mode="multiply" result="texturedMoon"/>
+      <feGaussianBlur in="texturedMoon" stdDeviation="1.2" result="softMoon"/>
+      <feMerge>
+        <feMergeNode in="moonGlow"/>
+        <feMergeNode in="softMoon"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- 오로라 꼬리를 살아 있는 천처럼 흔드는 변위 -->
+    <filter id="auroraFlow" x="-45%" y="-45%" width="190%" height="190%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.018" numOctaves="2" seed="8" result="auroraNoise">
+        <animate attributeName="baseFrequency" values="0.006 0.018;0.011 0.012;0.006 0.018" dur="11s" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="auroraNoise" scale="22"
+                         xChannelSelector="R" yChannelSelector="B" result="flowing"/>
+      <feGaussianBlur in="flowing" stdDeviation="15" result="auroraGlow"/>
+      <feColorMatrix in="auroraGlow" type="matrix"
+        values="1.1 0 0 0 0.12
+                0 1.1 0 0 0.08
+                0 0 1.35 0 0.2
+                0 0 0 0.72 0" result="coloredGlow"/>
+      <feGaussianBlur in="flowing" stdDeviation="2.5" result="softFlow"/>
+      <feMerge>
+        <feMergeNode in="coloredGlow"/>
+        <feMergeNode in="softFlow"/>
+        <feMergeNode in="flowing"/>
+      </feMerge>
+    </filter>
+
+    <!-- 여우 실루엣 가장자리에 미세한 털결 -->
+    <filter id="furGlow" x="-65%" y="-65%" width="230%" height="230%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.032 0.11" numOctaves="2" seed="15" result="furNoise"/>
+      <feDisplacementMap in="SourceGraphic" in2="furNoise" scale="3.5"
+                         xChannelSelector="R" yChannelSelector="G" result="furred"/>
+      <feGaussianBlur in="furred" stdDeviation="9" result="furAura"/>
+      <feColorMatrix in="furAura" type="matrix"
+        values="0.5 0 0 0 0.05
+                0 1.1 0 0 0.2
+                0 0 1.4 0 0.35
+                0 0 0 0.7 0" result="blueAura"/>
+      <feMerge>
+        <feMergeNode in="blueAura"/>
+        <feMergeNode in="furred"/>
+      </feMerge>
+    </filter>
+
+    <filter id="mistFlow" x="-30%" y="-120%" width="160%" height="340%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.004 0.024" numOctaves="2" seed="4" result="mistNoise">
+        <animate attributeName="baseFrequency" values="0.004 0.024;0.008 0.016;0.004 0.024" dur="18s" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="mistNoise" scale="52"
+                         xChannelSelector="R" yChannelSelector="B"/>
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+
+    <filter id="starGlow" x="-450%" y="-450%" width="1000%" height="1000%">
+      <feGaussianBlur stdDeviation="3.5" result="starBlur"/>
+      <feMerge>
+        <feMergeNode in="starBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <clipPath id="moonClip">
+      <circle cx="801" cy="259" r="158"/>
+    </clipPath>
+  </defs>
+
+  <!-- 밤하늘 -->
+  <rect width="1200" height="800" fill="url(#nightSky)"/>
+  <ellipse cx="801" cy="259" rx="355" ry="335" fill="url(#moonHalo)"/>
+
+  <!-- 희미한 별구름 -->
+  <g filter="url(#mistFlow)" opacity="0.7" style="mix-blend-mode:screen">
+    <path d="M-80 177 C231 94 407 221 650 135 C866 58 1020 132 1280 77"
+          fill="none" stroke="url(#mist)" stroke-width="74"/>
+    <path d="M-70 437 C202 347 414 484 647 409 C866 339 1017 413 1270 342"
+          fill="none" stroke="url(#mist)" stroke-width="48" opacity="0.55"/>
+  </g>
+
+  <!-- 별과 작은 별자리 -->
+  <g fill="#d7f6ff" filter="url(#starGlow)">
+    <circle cx="90" cy="98" r="2.2"><animate attributeName="opacity" values=".2;1;.2" dur="3.7s" repeatCount="indefinite"/></circle>
+    <circle cx="177" cy="189" r="1.4"><animate attributeName="opacity" values=".1;.8;.1" dur="4.8s" repeatCount="indefinite"/></circle>
+    <circle cx="277" cy="83" r="1.8"><animate attributeName="opacity" values=".2;.9;.2" dur="5.3s" repeatCount="indefinite"/></circle>
+    <circle cx="385" cy="178" r="1.5"><animate attributeName="opacity" values=".15;.8;.15" dur="3.2s" repeatCount="indefinite"/></circle>
+    <circle cx="514" cy="73" r="2.1"><animate attributeName="opacity" values=".1;.9;.1" dur="4.1s" repeatCount="indefinite"/></circle>
+    <circle cx="1082" cy="137" r="2"><animate attributeName="opacity" values=".15;1;.15" dur="5.7s" repeatCount="indefinite"/></circle>
+    <circle cx="1124" cy="330" r="1.6"><animate attributeName="opacity" values=".1;.8;.1" dur="3.9s" repeatCount="indefinite"/></circle>
+    <circle cx="1014" cy="484" r="2"><animate attributeName="opacity" values=".1;.9;.1" dur="4.6s" repeatCount="indefinite"/></circle>
+    <circle cx="735" cy="67" r="1.4"><animate attributeName="opacity" values=".2;.8;.2" dur="3.5s" repeatCount="indefinite"/></circle>
+    <circle cx="630" cy="487" r="1.5"><animate attributeName="opacity" values=".15;.9;.15" dur="5s" repeatCount="indefinite"/></circle>
+  </g>
+
+  <g stroke="#a4dfff" stroke-width="1" opacity="0.18" fill="none">
+    <path d="M83 293 L139 261 L183 302 L225 247 L274 283"/>
+    <g fill="#d7f9ff" stroke="none">
+      <circle cx="83" cy="293" r="2.4"/><circle cx="139" cy="261" r="1.8"/>
+      <circle cx="183" cy="302" r="2.2"/><circle cx="225" cy="247" r="1.8"/><circle cx="274" cy="283" r="2.5"/>
+    </g>
+  </g>
+
+  <!-- 달 -->
+  <circle cx="801" cy="259" r="158" fill="url(#moonBase)" filter="url(#moonTexture)"/>
+  <g clip-path="url(#moonClip)" fill="none" stroke="#eef7ff" opacity="0.14">
+    <ellipse cx="747" cy="210" rx="67" ry="43" stroke-width="18" transform="rotate(-17 747 210)"/>
+    <ellipse cx="868" cy="302" rx="54" ry="36" stroke-width="12" transform="rotate(21 868 302)"/>
+    <circle cx="835" cy="170" r="23" stroke-width="8"/>
+    <path d="M650 281 C728 241 855 243 948 288" stroke-width="8"/>
+  </g>
+  <g clip-path="url(#moonClip)" fill="#6f72bc" opacity="0.11">
+    <ellipse cx="742" cy="203" rx="54" ry="31" transform="rotate(-17 742 203)"/>
+    <ellipse cx="879" cy="313" rx="42" ry="24" transform="rotate(21 879 313)"/>
+    <circle cx="837" cy="169" r="16"/>
+    <circle cx="709" cy="320" r="19"/>
+    <circle cx="892" cy="217" r="11"/>
+    <circle cx="775" cy="360" r="8"/>
+  </g>
+
+  <!-- 산 능선: 오로라 꼬리보다 뒤쪽 레이어 -->
+  <path d="M0 576 L92 510 L164 551 L251 448 L324 528 L416 437 L503 526 L578 464
+           L681 548 L770 481 L851 535 L941 458 L1030 531 L1114 476 L1200 542 L1200 800 L0 800 Z"
+        fill="#070a18" opacity="0.76"/>
+  <path d="M0 624 L134 557 L229 615 L335 538 L449 608 L567 542 L681 616 L805 549
+           L926 623 L1057 552 L1200 610 L1200 800 L0 800 Z"
+        fill="#040611" opacity="0.9"/>
+
+  <!-- 달을 가로질러 펼쳐지는 아홉 개의 오로라 꼬리 -->
+  <g fill="none" stroke-linecap="round" filter="url(#auroraFlow)">
+    <path d="M368 586 C251 590 148 516 181 397" stroke="url(#tailViolet)" stroke-width="49" opacity="0.5">
+      <animate attributeName="d" values="M368 586 C251 590 148 516 181 397;M368 586 C229 541 184 468 210 374;M368 586 C251 590 148 516 181 397" dur="10s" repeatCount="indefinite"/>
+    </path>
+    <path d="M373 579 C252 524 224 390 303 267" stroke="url(#tailCyan)" stroke-width="56" opacity="0.58">
+      <animate attributeName="d" values="M373 579 C252 524 224 390 303 267;M373 579 C304 482 251 377 342 245;M373 579 C252 524 224 390 303 267" dur="12s" repeatCount="indefinite"/>
+    </path>
+    <path d="M379 576 C306 473 334 315 449 194" stroke="url(#tailGold)" stroke-width="49" opacity="0.5"/>
+    <path d="M387 573 C375 426 481 278 598 149" stroke="url(#tailViolet)" stroke-width="59" opacity="0.56">
+      <animate attributeName="d" values="M387 573 C375 426 481 278 598 149;M387 573 C436 416 510 275 631 137;M387 573 C375 426 481 278 598 149" dur="13s" repeatCount="indefinite"/>
+    </path>
+    <path d="M397 572 C451 418 630 237 783 141" stroke="url(#tailCyan)" stroke-width="64" opacity="0.62">
+      <animate attributeName="d" values="M397 572 C451 418 630 237 783 141;M397 572 C516 405 657 243 814 159;M397 572 C451 418 630 237 783 141" dur="11s" repeatCount="indefinite"/>
+    </path>
+    <path d="M407 576 C501 437 769 353 961 220" stroke="url(#tailGold)" stroke-width="56" opacity="0.54"/>
+    <path d="M416 583 C555 488 844 477 1047 348" stroke="url(#tailViolet)" stroke-width="61" opacity="0.5">
+      <animate attributeName="d" values="M416 583 C555 488 844 477 1047 348;M416 583 C601 532 858 438 1065 380;M416 583 C555 488 844 477 1047 348" dur="12.5s" repeatCount="indefinite"/>
+    </path>
+    <path d="M424 591 C584 543 855 630 1066 525" stroke="url(#tailCyan)" stroke-width="54" opacity="0.46"/>
+    <path d="M431 601 C602 603 794 690 1017 635" stroke="url(#tailGold)" stroke-width="48" opacity="0.4"/>
+  </g>
+
+  <!-- 넓은 꼬리 안쪽을 흐르는 가느다란 달빛 실 -->
+  <g fill="none" stroke-linecap="round" filter="url(#auroraFlow)" opacity="0.48">
+    <path d="M373 579 C252 524 224 390 303 267" stroke="#d9ffff" stroke-width="2.8">
+      <animate attributeName="d" values="M373 579 C252 524 224 390 303 267;M373 579 C304 482 251 377 342 245;M373 579 C252 524 224 390 303 267" dur="12s" repeatCount="indefinite"/>
+    </path>
+    <path d="M387 573 C375 426 481 278 598 149" stroke="#ffd7f1" stroke-width="2.5">
+      <animate attributeName="d" values="M387 573 C375 426 481 278 598 149;M387 573 C436 416 510 275 631 137;M387 573 C375 426 481 278 598 149" dur="13s" repeatCount="indefinite"/>
+    </path>
+    <path d="M397 572 C451 418 630 237 783 141" stroke="#eaffff" stroke-width="3.2">
+      <animate attributeName="d" values="M397 572 C451 418 630 237 783 141;M397 572 C516 405 657 243 814 159;M397 572 C451 418 630 237 783 141" dur="11s" repeatCount="indefinite"/>
+    </path>
+    <path d="M416 583 C555 488 844 477 1047 348" stroke="#ffe29d" stroke-width="2.4">
+      <animate attributeName="d" values="M416 583 C555 488 844 477 1047 348;M416 583 C601 532 858 438 1065 380;M416 583 C555 488 844 477 1047 348" dur="12.5s" repeatCount="indefinite"/>
+    </path>
+    <path d="M431 601 C602 603 794 690 1017 635" stroke="#ffdef5" stroke-width="2.2"/>
+  </g>
+
+  <!-- 여우 -->
+  <g filter="url(#furGlow)">
+    <!-- 뒤쪽 허벅지와 몸통 -->
+    <path d="M296 625
+             C276 573 289 513 330 485
+             C366 460 420 468 446 505
+             C472 543 458 601 424 627
+             C388 653 327 653 296 625 Z"
+          fill="url(#foxFur)" stroke="#bff8ff" stroke-width="2.4"/>
+
+    <!-- 가슴의 밝은 털 -->
+    <path d="M401 494 C430 500 449 526 448 559
+             C429 548 424 573 439 592
+             C410 588 403 616 419 632
+             C387 620 372 574 383 536 Z"
+          fill="#e5fbff" opacity="0.54"/>
+
+    <!-- 목과 머리, 오른쪽을 바라보는 옆얼굴 -->
+    <path d="M371 505
+             C377 469 397 443 429 432
+             L437 379 L468 422
+             C486 423 501 432 513 447
+             L548 444 L522 465
+             C529 483 518 502 496 506
+             L459 511 L434 532 L399 523 Z"
+          fill="url(#foxFur)" stroke="#d7fbff" stroke-width="2.6" stroke-linejoin="round"/>
+
+    <!-- 반대쪽 귀 -->
+    <path d="M416 437 L400 390 L444 427 Z" fill="url(#foxShadow)" stroke="#96eaff" stroke-width="2"/>
+    <path d="M437 416 L440 397 L456 424 Z" fill="#ff8dd8" opacity="0.45"/>
+
+    <!-- 주둥이와 코 -->
+    <path d="M482 464 C505 457 525 456 542 447 C535 470 516 481 489 481 Z"
+          fill="#dff8ff" opacity="0.58"/>
+    <circle cx="543" cy="447" r="5.5" fill="#10132d"/>
+
+    <!-- 눈 -->
+    <path d="M478 449 Q489 443 498 450 Q489 456 478 449 Z" fill="#07101c"/>
+    <circle cx="488" cy="449" r="2.8" fill="#ffe58b" filter="url(#starGlow)"/>
+
+    <!-- 앞다리와 뒷다리 -->
+    <path d="M397 585 C405 619 401 651 386 681 L418 681 C430 643 428 611 419 579 Z"
+          fill="url(#foxShadow)" stroke="#8acfe3" stroke-width="2"/>
+    <path d="M333 601 C339 631 333 658 314 681 L349 681 C366 648 366 620 358 596 Z"
+          fill="url(#foxShadow)" stroke="#78bbd4" stroke-width="2"/>
+
+    <!-- 발끝 -->
+    <path d="M310 680 Q333 668 355 681 Z" fill="#d7f8ff" opacity="0.72"/>
+    <path d="M382 680 Q404 667 423 681 Z" fill="#e8ffff" opacity="0.78"/>
+  </g>
+
+  <!-- 여우가 서 있는 절벽 -->
+  <path d="M0 692
+           C124 673 201 686 279 678
+           C344 671 402 678 455 673
+           C500 669 527 685 544 704
+           L500 724 L469 800 L0 800 Z"
+        fill="url(#cliff)"/>
+  <path d="M50 693 C174 682 289 690 460 676" fill="none" stroke="#53618e" stroke-width="3" opacity="0.5"/>
+
+  <!-- 절벽 가장자리의 달빛 풀 -->
+  <g stroke="#9adbea" stroke-linecap="round" opacity="0.55">
+    <path d="M171 684 Q160 655 166 631"/><path d="M180 684 Q192 650 187 625"/>
+    <path d="M229 681 Q215 653 220 637"/><path d="M271 678 Q279 648 274 631"/>
+    <path d="M453 675 Q467 644 461 625"/><path d="M470 679 Q482 657 483 641"/>
+  </g>
+
+  <!-- 전경 별가루 -->
+  <g fill="#bafaff" filter="url(#starGlow)">
+    <circle cx="572" cy="636" r="2" opacity="0.7"><animate attributeName="cy" values="646;615;646" dur="6s" repeatCount="indefinite"/></circle>
+    <circle cx="656" cy="699" r="1.6" opacity="0.58"><animate attributeName="cy" values="708;674;708" dur="7.5s" repeatCount="indefinite"/></circle>
+    <circle cx="1090" cy="602" r="2.3" opacity="0.6"><animate attributeName="opacity" values=".15;.9;.15" dur="4.5s" repeatCount="indefinite"/></circle>
+  </g>
+
+  <!-- 작품 서명 -->
+  <g transform="translate(859 724)" fill="#d7f8ff">
+    <text x="0" y="0" font-family="Inter, Segoe UI, sans-serif" font-size="18"
+          font-weight="600" letter-spacing="6" opacity="0.88">MOONWEAVER</text>
+    <text x="2" y="27" font-family="Inter, Segoe UI, sans-serif" font-size="10"
+          letter-spacing="3" opacity="0.42">NINE THREADS OF LIGHT</text>
+  </g>
+</svg>

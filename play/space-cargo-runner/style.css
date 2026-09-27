@@ -1,0 +1,704 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #05060a;
+    color: #cfe7ff;
+    font-family: "Consolas", "Menlo", "Courier New", monospace;
+    user-select: none;
+    cursor: crosshair;
+}
+
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ========== 타이틀 ========== */
+#title-screen {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(15,30,50,0.45) 0%, rgba(2,4,8,0.85) 70%);
+    pointer-events: auto; cursor: default; z-index: 10;
+}
+#title-screen.hidden { display: none; }
+.title-panel {
+    background: rgba(12,22,40,0.92);
+    border: 1px solid rgba(95,208,255,0.4);
+    border-radius: 8px;
+    padding: 40px 56px;
+    min-width: 460px; max-width: 560px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(95,208,255,0.15);
+}
+.title-panel h1 {
+    font-size: 32px; letter-spacing: 0.25em;
+    color: #5fd0ff;
+    text-shadow: 0 0 18px rgba(95,208,255,0.6);
+    margin-bottom: 8px;
+}
+.title-panel .tagline { color: #8db4d8; font-size: 13px; letter-spacing: 0.05em; margin-bottom: 32px; }
+.title-buttons { display: flex; gap: 12px; justify-content: center; }
+#start-btn {
+    cursor: pointer;
+    background: linear-gradient(180deg, #2a78b8, #1d4a78);
+    color: #ffffff;
+    border: 1px solid #5fd0ff;
+    padding: 14px 32px;
+    font-family: inherit;
+    font-size: 16px;
+    letter-spacing: 0.15em;
+    border-radius: 4px;
+    transition: all 120ms;
+    box-shadow: 0 0 16px rgba(95,208,255,0.25);
+}
+#start-btn:hover {
+    background: linear-gradient(180deg, #3a8dc8, #295a8e);
+    box-shadow: 0 0 24px rgba(95,208,255,0.45);
+    transform: translateY(-1px);
+}
+#options-btn {
+    cursor: pointer;
+    background: rgba(40,50,70,0.7);
+    color: #cfe7ff;
+    border: 1px solid rgba(95,208,255,0.35);
+    padding: 14px 24px;
+    font-family: inherit;
+    font-size: 16px;
+    letter-spacing: 0.15em;
+    border-radius: 4px;
+    transition: all 120ms;
+}
+#options-btn:hover { background: rgba(60,75,100,0.8); border-color: rgba(95,208,255,0.7); }
+.title-panel .controls { margin-top: 24px; color: #5a7898; font-size: 11px; letter-spacing: 0.05em; }
+
+/* ========== 옵션 ========== */
+#options-screen {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(15,30,50,0.6) 0%, rgba(2,4,8,0.92) 70%);
+    pointer-events: auto; cursor: default; z-index: 11;
+    overflow-y: auto;   /* 창이 낮으면 스크롤 */
+}
+#options-screen.hidden { display: none; }
+.options-panel {
+    margin: auto;       /* 가운데 정렬 + 넘칠 때 위쪽이 잘리지 않게 */
+    background: rgba(12,22,40,0.95);
+    border: 1px solid rgba(95,208,255,0.4);
+    border-radius: 8px;
+    padding: 32px 36px;
+    min-width: 560px; max-width: 660px;
+    box-shadow: 0 0 40px rgba(95,208,255,0.15);
+}
+.options-panel h2 { color: #5fd0ff; font-size: 22px; letter-spacing: 0.25em; text-align: center; margin-bottom: 4px; text-shadow: 0 0 10px rgba(95,208,255,0.4); }
+.options-sub { text-align: center; color: #6080a0; font-size: 11px; letter-spacing: 0.05em; margin-bottom: 20px; }
+.opt-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; gap: 16px;
+    border-bottom: 1px solid rgba(80,120,160,0.15);
+}
+.opt-row:last-of-type { border-bottom: none; }
+.opt-info { flex: 1; min-width: 200px; }
+.opt-label { color: #cfe7ff; font-size: 14px; margin-bottom: 4px; }
+.opt-hint { color: #6aa9d3; font-size: 11px; letter-spacing: 0.03em; }
+.level-group {
+    display: inline-flex;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(80,120,160,0.35);
+    border-radius: 4px; overflow: hidden;
+}
+.level-group button {
+    background: transparent;
+    color: #4a607a;
+    border: none; border-right: 1px solid rgba(80,120,160,0.18);
+    padding: 7px 0; font-family: inherit; font-size: 11px;
+    cursor: pointer; width: 26px;
+    transition: all 80ms;
+}
+.level-group button:last-child { border-right: none; }
+.level-group button:hover { color: #cfe7ff; background: rgba(95,208,255,0.06); }
+.level-group button.filled { background: rgba(29,74,120,0.55); color: #b6d8f0; }
+.level-group button.active {
+    background: linear-gradient(180deg, #2a78b8, #1d4a78);
+    color: #ffffff;
+    text-shadow: 0 0 4px rgba(95,208,255,0.6);
+    font-weight: bold;
+}
+/* 갓모드 디버그 행 + 슬라이드 토글 */
+.opt-row-debug {
+    margin-top: 6px;
+    padding: 14px 12px !important;
+    background: rgba(40, 20, 12, 0.25);
+    border-left: 3px solid rgba(255, 184, 74, 0.55);
+    border-bottom: 1px solid rgba(80, 120, 160, 0.15);
+    border-radius: 3px;
+}
+.opt-row-debug .opt-label {
+    color: #ffd086;
+}
+.debug-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 6px;
+    background: rgba(255, 184, 74, 0.18);
+    color: #ffb84a;
+    border: 1px solid rgba(255, 184, 74, 0.45);
+    border-radius: 3px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    vertical-align: middle;
+}
+
+.god-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(10, 18, 28, 0.7);
+    border: 1px solid rgba(80, 120, 160, 0.35);
+    border-radius: 24px;
+    padding: 6px 10px 6px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    color: #6a809a;
+    letter-spacing: 0.18em;
+    font-weight: bold;
+    transition: all 180ms;
+}
+.god-toggle:hover {
+    border-color: rgba(95, 208, 255, 0.45);
+    color: #b8d4e8;
+}
+.god-toggle-status {
+    width: 26px;
+    text-align: center;
+}
+.god-toggle-track {
+    position: relative;
+    width: 36px;
+    height: 18px;
+    background: rgba(20, 28, 40, 0.85);
+    border: 1px solid rgba(80, 120, 160, 0.4);
+    border-radius: 12px;
+    transition: all 180ms;
+}
+.god-toggle-thumb {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 14px;
+    height: 14px;
+    background: linear-gradient(180deg, #8a9cb0, #5a6f85);
+    border-radius: 50%;
+    transition: all 240ms cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+.god-toggle.active {
+    color: #ffffff;
+    border-color: rgba(95, 255, 224, 0.7);
+    background: rgba(15, 40, 50, 0.85);
+    box-shadow: 0 0 18px rgba(95, 255, 224, 0.35), inset 0 0 8px rgba(95, 255, 224, 0.1);
+    text-shadow: 0 0 6px rgba(95, 255, 224, 0.7);
+}
+.god-toggle.active .god-toggle-track {
+    background: linear-gradient(90deg, rgba(29, 74, 120, 0.7), rgba(95, 255, 224, 0.5));
+    border-color: rgba(95, 255, 224, 0.7);
+}
+.god-toggle.active .god-toggle-thumb {
+    left: 19px;
+    background: linear-gradient(180deg, #cffff5, #5fffe0);
+    box-shadow: 0 0 8px rgba(95, 255, 224, 0.9), 0 0 14px rgba(95, 255, 224, 0.5);
+}
+
+.options-foot { text-align: center; color: #5a7898; font-size: 11px; margin-top: 20px; margin-bottom: 14px; }
+#opt-close-btn {
+    display: block; margin: 0 auto;
+    cursor: pointer;
+    background: #2a2a3a;
+    color: #cfe7ff;
+    border: 1px solid #5a5a7a;
+    padding: 10px 28px;
+    font-family: inherit; font-size: 13px; letter-spacing: 0.1em;
+    border-radius: 3px; transition: background 100ms;
+}
+#opt-close-btn:hover { background: #3a3a4e; }
+
+/* ========== 정비소 상점 ========== */
+#shop-screen {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(20,40,30,0.6) 0%, rgba(2,4,8,0.92) 70%);
+    pointer-events: auto; cursor: default; z-index: 11;
+    overflow-y: auto;
+    padding: 20px;
+}
+#shop-screen.hidden { display: none; }
+.shop-panel {
+    margin: auto;       /* 가운데 정렬 + 화면보다 길면 위쪽(수리/연료)이 잘려 스크롤로도 못 보던 문제 수정 */
+    background: rgba(12,28,22,0.95);
+    border: 1px solid rgba(123,227,154,0.4);
+    border-radius: 8px;
+    padding: 28px 32px;
+    width: min(880px, 95%);
+    box-shadow: 0 0 40px rgba(123,227,154,0.15);
+}
+.shop-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(123,227,154,0.2);
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+}
+.shop-panel h2 {
+    color: #7be39a;
+    font-size: 22px;
+    letter-spacing: 0.25em;
+    text-shadow: 0 0 10px rgba(123,227,154,0.5);
+}
+.shop-gold-display {
+    color: #ffd86b;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+}
+.shop-gold-display span { font-weight: bold; }
+
+.shop-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+.shop-section {
+    background: rgba(5,14,10,0.55);
+    border: 1px solid rgba(80,120,90,0.3);
+    border-radius: 5px;
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 6px;
+}
+.shop-section h3 {
+    color: #cfe7ff;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(80,120,90,0.25);
+    padding-bottom: 6px;
+}
+.shop-section.shop-upgrades { grid-column: span 2; }
+.shop-section.shop-tier     { grid-column: span 2; }
+.shop-section.shop-weapons  { grid-column: span 2; }
+
+/* === 무기 / 포탑 섹션 === */
+.weapons-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+}
+.weapons-catalog-title {
+    color: #9bd0aa;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+}
+#shop-weapon-list { display: flex; flex-direction: column; gap: 6px; }
+.weapon-card {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    background: rgba(0,0,0,0.30);
+    border: 1px solid rgba(80,120,90,0.25);
+    padding: 10px 12px; border-radius: 4px;
+}
+.weapon-card.equipped {
+    border-color: rgba(95, 255, 224, 0.55);
+    background: rgba(95, 255, 224, 0.04);
+}
+.weapon-info { flex: 1; min-width: 0; }
+.weapon-name { color: #cfe7ff; font-weight: bold; font-size: 13px; }
+.weapon-stats { color: #8da89a; font-size: 11px; margin-top: 2px; }
+.weapon-stats span.val { color: #ffd86b; }
+.weapon-stats.desc { color: #6a907a; font-size: 10.5px; margin-top: 4px; line-height: 1.35; }
+.weapon-buy-btn {
+    cursor: pointer; min-width: 96px;
+    background: linear-gradient(180deg, #2a8b58, #1d6a3f);
+    color: #fff; border: 1px solid #7be39a;
+    padding: 6px 10px; font-family: inherit; font-size: 12px;
+    border-radius: 3px;
+    transition: background 100ms;
+}
+.weapon-buy-btn:hover:not(:disabled) { background: linear-gradient(180deg, #3aa570, #2a8b58); }
+.weapon-buy-btn:disabled {
+    background: #2a2a2e; border-color: #4a4a4e; color: #6a7a72; cursor: not-allowed;
+}
+.weapons-pending {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: rgba(255, 216, 107, 0.10);
+    border: 1px solid #ffd86b;
+    border-radius: 3px;
+    color: #ffe680;
+    font-size: 11.5px;
+    line-height: 1.45;
+}
+.weapons-pending strong { color: #ffd86b; }
+.weapons-pending.hidden { display: none; }
+
+.ship-diagram {
+    width: 100%;
+    aspect-ratio: 1.6;
+    background: radial-gradient(ellipse at center, rgba(40, 70, 60, 0.45) 0%, rgba(3, 7, 5, 0.92) 75%);
+    border: 1px solid rgba(80,120,90,0.30);
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+}
+.ship-diagram svg { width: 100%; height: 100%; display: block; }
+.turret-slot { cursor: default; }
+.turret-slot.clickable { cursor: pointer; }
+.turret-slot.clickable:hover .slot-ring { stroke: #fff; stroke-width: 2.5; }
+.turret-slot.pending-target .slot-ring {
+    stroke: #ffd86b;
+    stroke-width: 2.5;
+    animation: pulseRing 1.0s ease-in-out infinite;
+}
+@keyframes pulseRing {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+}
+
+#shop-close-btn:disabled {
+    background: #1a1a1e !important;
+    border-color: #3a3a3e !important;
+    color: #6a6a72 !important;
+    cursor: not-allowed !important;
+}
+
+.shop-line { font-size: 12px; color: #b6d8c0; }
+.shop-line strong { color: #ffffff; }
+.shop-line.subtle { color: #6a907a; font-size: 11px; }
+.shop-line.cost { color: #ffd86b; }
+.shop-line.cost strong { color: #ffe680; }
+
+.shop-action-btn {
+    margin-top: 4px;
+    cursor: pointer;
+    background: linear-gradient(180deg, #2a8b58, #1d6a3f);
+    color: #ffffff;
+    border: 1px solid #7be39a;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    border-radius: 3px;
+    transition: background 100ms;
+}
+.shop-action-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #3aa570, #2a8b58);
+}
+.shop-action-btn:disabled {
+    background: #2a2a2e;
+    border-color: #4a4a4e;
+    color: #6a7a72;
+    cursor: not-allowed;
+}
+
+/* 업그레이드 행 */
+#shop-upgrade-list {
+    display: flex; flex-direction: column; gap: 8px;
+}
+.upgrade-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(80,120,90,0.2);
+    border-radius: 4px;
+    padding: 10px 12px;
+}
+.upgrade-info { flex: 1; }
+.upgrade-name {
+    color: #cfe7ff;
+    font-size: 13px;
+    margin-bottom: 2px;
+    display: flex; gap: 8px; align-items: center;
+}
+.upgrade-icon { font-size: 14px; }
+.upgrade-label { font-weight: bold; }
+.upgrade-level {
+    margin-left: auto;
+    color: #7be39a;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+}
+.upgrade-desc { color: #8da89a; font-size: 11px; }
+.upgrade-btn {
+    cursor: pointer;
+    background: linear-gradient(180deg, #2a8b58, #1d6a3f);
+    color: #ffffff;
+    border: 1px solid #7be39a;
+    padding: 7px 14px;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    border-radius: 3px;
+    min-width: 130px;
+    transition: background 100ms;
+}
+.upgrade-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #3aa570, #2a8b58);
+}
+.upgrade-btn:disabled {
+    background: #2a2a2e;
+    border-color: #4a4a4e;
+    color: #6a7a72;
+    cursor: not-allowed;
+}
+
+/* 함선 계층 (개발 중) */
+.shop-section.shop-tier {
+    opacity: 0.85;
+}
+.dev-notice {
+    background: rgba(60,40,10,0.4);
+    border: 1px dashed rgba(255,180,80,0.4);
+    border-radius: 4px;
+    padding: 12px;
+    margin: 6px 0;
+    text-align: center;
+}
+.dev-notice .dev-title {
+    color: #ffb84a;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+}
+.dev-notice .dev-sub {
+    color: #a08060;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+}
+
+#shop-close-btn {
+    display: block; margin: 0 auto;
+    cursor: pointer;
+    background: #2a2a3a;
+    color: #cfe7ff;
+    border: 1px solid #5a5a7a;
+    padding: 10px 30px;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    border-radius: 3px;
+    transition: background 100ms;
+}
+#shop-close-btn:hover { background: #3a3a4e; }
+
+/* ========== HUD ========== */
+#hud { position: absolute; inset: 0; pointer-events: none; font-size: 14px; text-shadow: 0 0 4px rgba(0,0,0,0.8); }
+/* env(safe-area-inset-*) : 노치/홈 표시줄이 있는 휴대폰에서만 0 이 아님 (데스크톱은 그대로) */
+#hud-top-left { position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); left: calc(16px + env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 6px; min-width: 220px; }
+#hud-top-right { position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); right: calc(16px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.stat {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(10,16,28,0.55);
+    padding: 4px 10px;
+    border: 1px solid rgba(80,160,220,0.35);
+    border-radius: 4px;
+    backdrop-filter: blur(2px);
+}
+.label { font-size: 11px; letter-spacing: 0.15em; color: #6aa9d3; }
+#gold-value { color: #ffd86b; font-weight: bold; }
+#cargo-value { color: #b6f7d0; }
+.bar { width: 130px; height: 8px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.fill { height: 100%; transition: width 120ms linear; }
+.fill.hp     { background: linear-gradient(90deg, #ff5b6c, #ffa172); width: 100%; }
+.fill.fuel   { background: linear-gradient(90deg, #ffaa3a, #ffd86b); width: 100%; }
+.fill.energy { background: linear-gradient(90deg, #6f4eff, #5fd0ff); width: 100%; box-shadow: 0 0 6px rgba(95, 208, 255, 0.45); }
+.fill.energy.low { animation: energyLow 0.4s ease-in-out infinite alternate; }
+@keyframes energyLow {
+    from { background: linear-gradient(90deg, #6f4eff, #5fd0ff); }
+    to   { background: linear-gradient(90deg, #ff5b8a, #ff8aa0); }
+}
+#minimap { position: absolute; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); right: calc(16px + env(safe-area-inset-right, 0px)); border: 1px solid rgba(80,160,220,0.4); background: rgba(5,10,20,0.55); border-radius: 4px; }
+#hud-bottom { position: absolute; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); color: #6aa9d3; font-size: 12px; letter-spacing: 0.05em; background: rgba(10,16,28,0.45); padding: 6px 12px; border-radius: 4px; }
+.hint { opacity: 0.85; }
+
+/* ========== 게임 오버 ========== */
+#game-over { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(2,4,8,0.7); pointer-events: auto; z-index: 5; }
+#game-over.hidden { display: none; }
+#game-over .panel { text-align: center; background: rgba(15,22,38,0.92); padding: 32px 40px; border: 1px solid rgba(255,91,108,0.4); border-radius: 6px; }
+#game-over h1 { font-size: 28px; color: #ff6b78; letter-spacing: 0.2em; margin-bottom: 12px; }
+#game-over p { margin-bottom: 20px; }
+#game-over #final-gold { color: #ffd86b; font-weight: bold; }
+.game-over-buttons { display: flex; gap: 12px; justify-content: center; }
+#game-over button { cursor: pointer; color: #cfe7ff; border: 1px solid #3a82c4; padding: 10px 24px; font-family: inherit; font-size: 14px; letter-spacing: 0.1em; border-radius: 3px; transition: background 100ms; }
+#restart-btn { background: #1d4a78; }
+#restart-btn:hover { background: #295a8e; }
+#title-btn { background: #2a2a3a; border-color: #5a5a7a; }
+#title-btn:hover { background: #3a3a4e; }
+
+/* ========== Pause ========== */
+#pause-screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(2,4,8,0.6); backdrop-filter: blur(2px); pointer-events: auto; z-index: 6; }
+#pause-screen.hidden { display: none; }
+#pause-screen .panel { text-align: center; background: rgba(15,22,38,0.94); padding: 32px 48px; border: 1px solid rgba(95,208,255,0.45); border-radius: 6px; box-shadow: 0 0 30px rgba(95,208,255,0.18); }
+#pause-screen h1 { font-size: 32px; color: #5fd0ff; letter-spacing: 0.3em; margin-bottom: 22px; text-shadow: 0 0 14px rgba(95,208,255,0.55); }
+.pause-buttons { display: flex; gap: 12px; justify-content: center; margin-bottom: 14px; }
+.pause-buttons button { cursor: pointer; color: #cfe7ff; border: 1px solid #3a82c4; padding: 10px 26px; font-family: inherit; font-size: 14px; letter-spacing: 0.1em; border-radius: 3px; transition: background 100ms; }
+#resume-btn { background: linear-gradient(180deg, #2a78b8, #1d4a78); }
+#resume-btn:hover { background: linear-gradient(180deg, #3a8dc8, #295a8e); }
+#pause-title-btn { background: #2a2a3a; border-color: #5a5a7a; }
+#pause-title-btn:hover { background: #3a3a4e; }
+.pause-hint { color: #6080a0; font-size: 11px; letter-spacing: 0.05em; }
+
+/* ========== SOS ========== */
+#sos-prompt { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); background: rgba(60,12,12,0.85); border: 1px solid rgba(255,91,108,0.7); color: #ffd9d9; padding: 10px 22px; border-radius: 4px; font-size: 15px; letter-spacing: 0.08em; text-shadow: 0 0 6px rgba(255,91,108,0.5); animation: sos-pulse 1.4s ease-in-out infinite; pointer-events: none; white-space: nowrap; }
+#sos-prompt.hidden { display: none; }
+@keyframes sos-pulse {
+    0%, 100% { opacity: 0.7; box-shadow: 0 0 0 rgba(255,91,108,0); }
+    50%      { opacity: 1;   box-shadow: 0 0 22px rgba(255,91,108,0.45); }
+}
+/* 구조선 제안 수락/거절 버튼 (터치 모드에서만 hud.js 가 표시) */
+#sos-choice { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+#sos-choice.hidden { display: none; }
+#sos-choice button { pointer-events: auto; cursor: pointer; min-height: 44px; min-width: 104px; padding: 8px 14px; font-family: inherit; font-size: 15px; letter-spacing: 0.05em; color: #ffffff; border-radius: 6px; }
+#sos-accept-btn  { background: linear-gradient(180deg, #2a8b58, #1d6a3f); border: 1px solid #7be39a; }
+#sos-decline-btn { background: rgba(70, 22, 30, 0.95); border: 1px solid #ff8290; }
+
+/* 전체 화면 버튼: 터치 기기 + 지원 브라우저에서만 (touch-controls.js) */
+#fullscreen-btn { display: none; }
+
+/* ================================================================
+   모바일(터치) — body.touch-ui 는 touch-controls.js 가 터치 기기에서만 붙인다.
+   마우스(데스크톱) 화면은 위의 원래 스타일 그대로.
+   ================================================================ */
+body.touch-ui { cursor: default; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+body.touch-ui #game { touch-action: none; }
+body.touch-ui button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+
+/* --- 타이틀 --- */
+body.touch-ui #title-screen,
+body.touch-ui #options-screen,
+body.touch-ui #shop-screen {
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right))
+             calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+}
+body.touch-ui .title-panel { margin: auto; min-width: 0; width: min(560px, 100%); padding: 26px 20px; }
+body.touch-ui .title-panel .tagline { margin-bottom: 22px; }
+body.touch-ui .title-buttons { flex-wrap: wrap; }
+body.touch-ui.can-fullscreen #fullscreen-btn {
+    display: block; flex-basis: 100%; cursor: pointer; min-height: 44px;
+    background: transparent; color: #8db4d8; border: 1px dashed rgba(95,208,255,0.35); border-radius: 4px;
+    font-family: inherit; font-size: 13px; letter-spacing: 0.1em;
+}
+body.touch-ui .title-panel .controls { font-size: 12px; line-height: 1.55; margin-top: 18px; color: #7896b6; }
+@media (max-height: 460px) {
+    body.touch-ui .title-panel { padding: 16px 20px; }
+    body.touch-ui .title-panel h1 { font-size: 26px; }
+    body.touch-ui .title-panel .tagline { margin-bottom: 14px; }
+    body.touch-ui .title-panel .controls { margin-top: 12px; }
+}
+
+/* --- 옵션 --- */
+body.touch-ui .options-panel { min-width: 0; width: min(660px, 100%); padding: 18px 16px; }
+body.touch-ui .options-sub { font-size: 12px; margin-bottom: 8px; }
+body.touch-ui .opt-row { flex-wrap: wrap; gap: 8px 12px; padding: 10px 0; }
+body.touch-ui .opt-info { min-width: 150px; }
+body.touch-ui .opt-hint { font-size: 12px; }
+body.touch-ui .debug-tag { font-size: 11px; }
+body.touch-ui .level-group button { width: 44px; height: 44px; padding: 0; font-size: 14px; }
+body.touch-ui .god-toggle { min-height: 44px; padding: 8px 12px 8px 16px; font-size: 12px; }
+body.touch-ui .options-foot { font-size: 12px; margin-top: 14px; }
+body.touch-ui #opt-close-btn { min-height: 46px; padding: 10px 34px; font-size: 14px; }
+@media (max-width: 540px) {   /* 세로 화면: 1~10 단계 버튼을 5개씩 두 줄로 (버튼 44px 유지) */
+    body.touch-ui .level-group { display: grid; grid-template-columns: repeat(5, 44px); }
+    body.touch-ui .level-group button:nth-child(5) { border-right: none; }
+    body.touch-ui .level-group button:nth-child(-n+5) { border-bottom: 1px solid rgba(80,120,160,0.18); }
+}
+
+/* --- 정비소 상점 --- */
+body.touch-ui .shop-panel { width: 100%; max-width: 880px; padding: 0 12px 10px; }
+body.touch-ui .shop-header {   /* 스크롤해도 보유 골드가 보이게 */
+    position: sticky; top: calc(-8px - env(safe-area-inset-top)); z-index: 3;
+    background: rgba(12,28,22,0.98); padding: 14px 0 10px; margin-bottom: 10px;
+    flex-wrap: wrap; gap: 4px 14px;
+}
+body.touch-ui .shop-grid { gap: 10px; margin-bottom: 10px; }
+body.touch-ui .shop-section { padding: 10px 12px; }
+body.touch-ui .shop-line { font-size: 13px; }
+body.touch-ui .shop-line.subtle, body.touch-ui .upgrade-desc, body.touch-ui .upgrade-level,
+body.touch-ui .weapon-stats, body.touch-ui .weapon-stats.desc, body.touch-ui .weapons-catalog-title { font-size: 12px; }
+body.touch-ui .weapons-pending { font-size: 13px; }
+body.touch-ui .shop-action-btn, body.touch-ui .upgrade-btn, body.touch-ui .weapon-buy-btn { min-height: 44px; }
+body.touch-ui #shop-close-btn {   /* 스크롤 위치와 상관없이 항상 누를 수 있게 아래에 고정 */
+    position: sticky; bottom: 4px; z-index: 3; width: 100%; max-width: 420px; min-height: 46px;
+    font-size: 14px; box-shadow: 0 -4px 18px rgba(2,8,5,0.95);
+}
+@media (max-width: 600px) {   /* 세로 화면: 한 줄에 한 섹션 */
+    body.touch-ui .shop-grid, body.touch-ui .weapons-layout { grid-template-columns: 1fr; }
+    body.touch-ui .shop-section.shop-upgrades,
+    body.touch-ui .shop-section.shop-tier,
+    body.touch-ui .shop-section.shop-weapons { grid-column: auto; }
+    body.touch-ui .upgrade-row, body.touch-ui .weapon-card { flex-wrap: wrap; }
+    body.touch-ui .upgrade-info, body.touch-ui .weapon-info { flex-basis: 100%; }
+    body.touch-ui .upgrade-btn, body.touch-ui .weapon-buy-btn { width: 100%; }
+}
+
+/* --- 일시정지 / 게임 오버 --- */
+body.touch-ui #pause-screen .panel, body.touch-ui #game-over .panel { padding: 24px 22px; max-width: calc(100vw - 24px); }
+body.touch-ui .pause-buttons, body.touch-ui .game-over-buttons { flex-wrap: wrap; }
+body.touch-ui .pause-buttons button, body.touch-ui #game-over button { min-height: 46px; padding: 10px 24px; }
+body.touch-ui #game-over h1 { font-size: clamp(20px, 6.4vw, 28px); letter-spacing: 0.16em; }
+body.touch-ui .pause-hint { display: none; }   /* "ESC 키로도 재개" — 터치엔 해당 없음 */
+body.touch-ui .pause-buttons { margin-bottom: 0; }
+
+/* --- 인게임 HUD: 작게 + 가상 컨트롤과 겹치지 않게 --- */
+body.touch-ui #hud { font-size: 13px; }
+body.touch-ui #hud-top-left { top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); gap: 4px; min-width: 0; }
+body.touch-ui .stat { padding: 2px 8px; gap: 6px; }
+body.touch-ui .label { font-size: 12px; letter-spacing: 0.08em; }
+body.touch-ui .bar { width: 96px; height: 7px; }
+body.touch-ui #hud-bottom { display: none; }   /* 키보드 안내 줄 — 터치 안내는 타이틀에 */
+/* 미니맵: 오른쪽 위 일시정지 버튼 아래 (오른쪽 아래는 조준 스틱/버튼 자리) */
+body.touch-ui #minimap { top: calc(64px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); bottom: auto; width: 104px; height: 104px; }
+body.touch-ui #hud-top-right { gap: 4px; }
+body.touch-ui #sos-prompt {
+    pointer-events: auto; z-index: 2147483001;   /* 가상 컨트롤 위 (탭 = 구조신호 / 수락·거절) */
+    white-space: normal; text-align: center; width: max-content; max-width: calc(100vw - 24px);
+    font-size: 14px; padding: 10px 16px; top: calc(106px + env(safe-area-inset-top));
+}
+@media (orientation: landscape) {
+    /* 가로: HP/연료/에너지 3줄 + 골드·카고 한 줄, POS/SECTOR 는 일시정지 버튼 왼쪽 */
+    body.touch-ui #hud-top-left { display: grid; grid-template-columns: auto auto; justify-content: start; }
+    body.touch-ui #hud-top-left > .stat:nth-child(-n+3) { grid-column: 1 / -1; }
+    body.touch-ui #hud-top-right { top: calc(8px + env(safe-area-inset-top)); right: calc(70px + env(safe-area-inset-right)); }
+    /* SOS/구조선 안내는 위쪽 가운데 (화면 가운데의 함선을 가리지 않게) */
+    body.touch-ui #sos-prompt { top: calc(8px + env(safe-area-inset-top)); }
+}
+@media (orientation: portrait) {
+    body.touch-ui #hud-top-right { top: calc(174px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); }
+    body.touch-ui #sos-prompt { top: calc(236px + env(safe-area-inset-top)); }
+}
+
+/* --- 가상 컨트롤 (touch-kit) 이 게임 전용 보정 — .tk-root 접두어로 kit 기본 스타일보다 우선 --- */
+.tk-root .tk-lab, .tk-root .tk-btn span { font-size: 12px; }
+.tk-root .tk-btn.m { width: 56px; height: 56px; }
+.tk-root .tk-btn.m i { font-size: 19px; }
+.tk-root .tk-btn.sc-dim { opacity: 0.4; }
+.tk-root .tk-btn.sc-hot  { border-color: #7be39a; background: rgba(30, 90, 55, 0.6);  animation: sc-btn-hot 0.9s ease-in-out infinite alternate; }
+.tk-root .tk-btn.sc-warn { border-color: #ff8290; background: rgba(110, 24, 34, 0.6); animation: sc-btn-warn 0.9s ease-in-out infinite alternate; }
+@keyframes sc-btn-hot  { from { box-shadow: 0 0 4px rgba(123,227,154,0.3); } to { box-shadow: 0 0 20px rgba(123,227,154,0.9); } }
+@keyframes sc-btn-warn { from { box-shadow: 0 0 4px rgba(255,107,120,0.3); } to { box-shadow: 0 0 20px rgba(255,107,120,0.9); } }
+/* 갓모드 전용 버튼 줄: 가로 화면은 위쪽 가운데 */
+.tk-root .tk-btns.sc-god { left: 50%; transform: translateX(-50%); top: calc(8px + env(safe-area-inset-top)); gap: 8px; }
+.tk-root .tk-btns.sc-god .tk-btn { width: 44px; height: 44px; border-color: rgba(95, 255, 224, 0.55); }
+.tk-root .tk-btns.sc-god .tk-btn span { font-size: 16px; font-weight: 700; }
+@media (orientation: portrait), (max-width: 760px) {
+    /* 좁은 화면: 갓모드 버튼은 HUD 아래 왼쪽에 두 줄씩 */
+    .tk-root .tk-btns.sc-god { left: calc(8px + env(safe-area-inset-left)); transform: none; top: calc(142px + env(safe-area-inset-top)); flex-wrap: wrap; width: 100px; }
+}
+@media (orientation: portrait) {
+    /* 세로: 버튼 묶음은 조준 스틱 위로, 조준 스틱 대기 위치는 오른쪽 아래 구석 */
+    .tk-root .tk-btns.br { bottom: calc(180px + env(safe-area-inset-bottom)); }
+    .tk-root .tk-zone.r .tk-base:not(.on) { left: calc(100% - 90px) !important; top: calc(100% - 112px) !important; }
+}

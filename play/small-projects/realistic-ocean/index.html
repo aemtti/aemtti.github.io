@@ -1,0 +1,2092 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>OCEAN — 실시간 파도 시뮬레이션</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #06090f;
+    font-family: "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  #title {
+    position: fixed; top: 26px; left: 30px; color: #fff; pointer-events: none;
+    text-shadow: 0 1px 10px rgba(0,0,0,.45); user-select: none;
+  }
+  #title h1 { font-size: 26px; font-weight: 200; letter-spacing: 10px; }
+  #title p  { font-size: 11px; opacity: .65; letter-spacing: 2px; margin-top: 5px; }
+
+  #hint {
+    position: fixed; top: 30px; right: 34px; text-align: right; color: #fff;
+    font-size: 11px; opacity: .55; letter-spacing: 1px; pointer-events: none; user-select: none;
+    text-shadow: 0 1px 8px rgba(0,0,0,.5); line-height: 1.7;
+  }
+  #fps { font-variant-numeric: tabular-nums; }
+
+  #panel {
+    position: fixed; left: 24px; bottom: 24px; width: 250px; padding: 16px 18px 14px;
+    background: rgba(10, 16, 26, .48); border: 1px solid rgba(255,255,255,.10);
+    border-radius: 14px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    color: #dfe7ef;
+  }
+  #panel .row { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+  #panel label { font-size: 11.5px; width: 62px; flex: none; opacity: .85; letter-spacing: .5px; }
+  #panel input[type=range] {
+    flex: 1; appearance: none; -webkit-appearance: none; height: 3px; border-radius: 2px;
+    background: rgba(255,255,255,.22); outline: none; cursor: pointer;
+  }
+  #panel input[type=range]::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; box-shadow: 0 0 6px rgba(0,0,0,.4); cursor: pointer;
+  }
+  #presets { display: flex; gap: 6px; margin-bottom: 11px; }
+  #presets button {
+    flex: 1; padding: 6px 0; font-size: 11px; color: #e8eef5; letter-spacing: .5px;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+    border-radius: 8px; cursor: pointer; transition: background .15s;
+    font-family: inherit;
+  }
+  #presets button:hover { background: rgba(255,255,255,.18); }
+  #spawn { display: flex; gap: 6px; margin-top: 12px; }
+  #spawn button {
+    flex: 1; padding: 5px 0; font-size: 15px; line-height: 1;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+    border-radius: 8px; cursor: pointer; transition: background .15s;
+  }
+  #spawn button:hover { background: rgba(255,255,255,.18); }
+  #spawnHint { font-size: 10px; opacity: .5; margin-top: 6px; letter-spacing: .3px; text-align: center; }
+  #ships, #drive { display: flex; gap: 6px; margin-top: 12px; }
+  #drive { margin-top: 7px; }
+  #ships button, #drive button {
+    flex: 1; padding: 6px 0; font-size: 11.5px; color: #e8eef5; letter-spacing: .5px;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14);
+    border-radius: 8px; cursor: pointer; transition: all .15s; font-family: inherit;
+  }
+  #ships button:hover, #drive button:hover { background: rgba(255,255,255,.15); }
+  #ships button.on {
+    background: rgba(90,170,255,.28); border-color: rgba(140,200,255,.55);
+    box-shadow: inset 0 0 10px rgba(90,170,255,.25);
+  }
+  #drive button.on {
+    background: rgba(255,150,60,.30); border-color: rgba(255,190,120,.6);
+    box-shadow: inset 0 0 10px rgba(255,160,70,.28);
+  }
+  #crosshair {
+    position: fixed; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px;
+    border: 1.5px solid rgba(255,255,255,.9); border-radius: 50%;
+    display: none; pointer-events: none; box-shadow: 0 0 6px rgba(0,0,0,.5);
+  }
+  #crosshair::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px;
+    margin: -1.5px; background: #fff; border-radius: 50%;
+  }
+  #hudBar {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    padding: 9px 18px; border-radius: 12px; background: rgba(10,16,26,.55);
+    border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(10px);
+    color: #eef3f8; font-size: 12.5px; letter-spacing: .5px; display: none;
+    pointer-events: none; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  #hudMsg {
+    position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 15px; letter-spacing: .5px; opacity: 0;
+    transition: opacity .25s; pointer-events: none; text-shadow: 0 1px 8px rgba(0,0,0,.6);
+  }
+  #err {
+    position: fixed; inset: 0; display: none; place-items: center; color: #fff;
+    background: #0a0f18; font-size: 14px; text-align: center; line-height: 1.8;
+  }
+
+  /* ---------------- 휴대폰·태블릿 (터치) ---------------- */
+  html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .t-only, #panelToggle, #panelClose { display: none; }
+  #panelToggle, #panelClose {
+    min-height: 44px; padding: 0 16px; font: inherit; font-size: 13px; color: #e8eef5; letter-spacing: .5px;
+    background: rgba(10, 16, 26, .62); border: 1px solid rgba(255,255,255,.18); border-radius: 12px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); cursor: pointer;
+  }
+  @media (pointer: coarse) {
+    .d-only { display: none; } .t-only { display: inline; }
+    #panel label, #spawnHint, #title p, #hint { font-size: 12px; }
+    #presets button, #ships button, #drive button, #spawn button { min-height: 44px; font-size: 13px; }
+    #spawn button { font-size: 18px; }
+    #panel input[type=range] { height: 28px; background: transparent; }
+    #panel input[type=range]::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: rgba(255,255,255,.22); }
+    #panel input[type=range]::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -10.5px; }
+    /* 조종 HUD는 엄지 자리(아래)를 피해 위쪽에 */
+    #hudMsg { top: 42%; width: max-content; max-width: calc(100vw - 32px); text-align: center; }
+    #hudBar { bottom: auto; top: calc(66px + env(safe-area-inset-top)); white-space: normal; text-align: center;
+      width: max-content; max-width: calc(100vw - 24px); font-size: 13px; }
+  }
+  /* 좁거나 낮은 화면·터치 기기: 설정판은 버튼으로 여닫기 (열려 있는 동안 조작 버튼 숨김) */
+  @media (max-width: 760px), (max-height: 520px), (pointer: coarse) {
+    #title { top: calc(14px + env(safe-area-inset-top)); left: calc(16px + env(safe-area-inset-left)); }
+    #title h1 { font-size: 19px; letter-spacing: 6px; }
+    #title p { display: none; }
+    #panelToggle { display: block; position: fixed; z-index: 6; top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); }
+    #hint { top: calc(62px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right)); }
+    #hint .lines { display: none; }
+    #panel { display: none; z-index: 7; left: 0; right: 0; bottom: 0; width: auto; max-height: 64vh; max-height: 64dvh; overflow-y: auto;
+      border-radius: 16px 16px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom)); background: rgba(10, 16, 26, .86); }
+    #panel.open { display: block; }
+    #panelClose { display: block; position: sticky; top: -2px; z-index: 2; width: 100%; margin-bottom: 12px; background: rgba(16, 24, 38, .96); }
+  }
+  @media (max-height: 520px) and (orientation: landscape) {
+    #panel { top: 0; right: auto; width: min(330px, 48vw); max-height: none; border-radius: 0 16px 16px 0;
+      padding-left: calc(18px + env(safe-area-inset-left)); padding-top: calc(12px + env(safe-area-inset-top)); }
+  }
+</style>
+</head>
+<body>
+<canvas id="sea"></canvas>
+
+<div id="title">
+  <h1>O C E A N</h1>
+  <p>REAL-TIME GERSTNER WAVE SIMULATION · PURE WEBGL2 · NO LIBRARIES</p>
+</div>
+<div id="hint">
+  <span class="lines"><span class="d-only">관전: WASD 이동 · Space/C 승강 · 드래그 시점 · 휠 속도<br>
+  조종: W/S 기관 · A/D 타 · F 특수 · Space 포격 · Esc 관전<br></span><span class="t-only">관전: 왼쪽 스틱 이동 · ▲▼ 승강 · 드래그 시점 · 핀치 속도<br>
+  조종: 스틱 위/아래 기관 · 좌우 타 · 특수/포격 버튼 · ⤺ 관전<br></span></span>
+  <span id="fps"></span>
+</div>
+<button id="panelToggle" type="button" aria-controls="panel" aria-expanded="false">🌊 바다 설정</button>
+
+<div id="panel">
+  <button id="panelClose" type="button">✕ 닫기</button>
+  <div id="presets">
+    <button data-p="golden">골든아워</button>
+    <button data-p="noon">한낮</button>
+    <button data-p="storm">폭풍 전야</button>
+  </div>
+  <div class="row"><label>파고</label><input id="sAmp"   type="range" min="0.15" max="2.2"  step="0.01" value="1.0"></div>
+  <div class="row"><label>바람 · 파장</label><input id="sWind"  type="range" min="0.05" max="1.0"  step="0.01" value="0.55"></div>
+  <div class="row"><label>거칠기</label><input id="sChop"  type="range" min="0.0"  max="0.55" step="0.01" value="0.40"></div>
+  <div class="row"><label>태양 고도</label><input id="sSun"   type="range" min="1.5"  max="78"   step="0.1"  value="10"></div>
+  <div class="row"><label>구름</label><input id="sCloud" type="range" min="0.0"  max="1.0"  step="0.01" value="0.5"></div>
+  <div class="row"><label>흐름 속도</label><input id="sSpeed" type="range" min="0.0"  max="2.5"  step="0.01" value="1.0"></div>
+  <div class="row"><label>해상도</label><input id="sRes"   type="range" min="0.5"  max="1.0"  step="0.05" value="1.0"></div>
+  <div class="row"><label id="lObj">부유물 500</label><input id="sObj" type="range" min="100" max="1025" step="25" value="500"></div>
+  <div id="ships">
+    <button data-s="fisher">🎣 어선</button>
+    <button data-s="cargo">🚢 상선</button>
+    <button data-s="warship">⚔️ 군함</button>
+  </div>
+  <div id="drive">
+    <button data-d="fisher" title="어선 조종 (F: 그물)">🎣 조종</button>
+    <button data-d="cargo" title="상선 조종 (F: 컨테이너 살포)">🚢 조종</button>
+    <button data-d="warship" title="군함 조종 (Space: 포격)">⚔️ 조종</button>
+  </div>
+  <div id="spawn">
+    <button data-t="crate"  title="나무 상자">📦</button>
+    <button data-t="duck"   title="고무 오리">🦆</button>
+    <button data-t="ring"   title="구명링">🛟</button>
+    <button data-t="buoy"   title="항로 부표">⚓</button>
+    <button data-t="bottle" title="유리병">🍾</button>
+    <button data-t="clear"  title="전부 제거">🧹</button>
+  </div>
+  <div id="spawnHint"><span class="d-only">버튼: 앞바다에 투하 · 수면 더블클릭: 그 자리에 투하</span><span class="t-only">버튼: 앞바다에 투하 · 수면 두 번 탭: 그 자리에 투하</span></div>
+</div>
+
+<div id="crosshair"></div>
+<div id="hudBar"></div>
+<div id="hudMsg"></div>
+
+<div id="err"><div>이 브라우저는 WebGL2를 지원하지 않습니다.<br>Chrome / Edge / Firefox 최신 버전에서 열어 주세요.</div></div>
+
+<script>
+"use strict";
+const NW = 20; // Gerstner 파동 개수
+
+/* ---------------- GLSL: 공통 (노이즈 · 태양 · 하늘) ---------------- */
+const COMMON = `
+precision highp float;
+uniform vec3  uSunDir;
+uniform float uTime;
+uniform float uCloud;
+
+float hash12(vec2 p){
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f*f*(3.0-2.0*f);
+  return mix(mix(hash12(i),             hash12(i+vec2(1,0)), u.x),
+             mix(hash12(i+vec2(0,1)),   hash12(i+vec2(1,1)), u.x), u.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  mat2 r = mat2(0.8, -0.6, 0.6, 0.8);
+  for(int i = 0; i < 4; i++){ v += a * vnoise(p); p = r * p * 2.07 + 19.7; a *= 0.5; }
+  return v;
+}
+vec3 sunTint(){
+  float h = clamp(uSunDir.y, 0.0, 1.0);
+  return mix(vec3(1.0, 0.32, 0.10), vec3(1.0, 0.97, 0.90), smoothstep(0.02, 0.5, h));
+}
+vec3 skyBase(vec3 rd){
+  float h   = clamp(uSunDir.y, 0.0, 1.0);
+  float day = smoothstep(0.03, 0.5, h);
+  vec3 zen = mix(vec3(0.055, 0.10, 0.24), vec3(0.10, 0.28, 0.56), day);
+  vec3 hor = mix(vec3(0.90, 0.44, 0.15), vec3(0.56, 0.71, 0.86), day);
+  float y = max(rd.y, 0.0);
+  float t = pow(clamp(y * mix(2.6, 1.4, day), 0.0, 1.0), 0.75); // 저녁엔 수평선 근처만 따뜻하게
+  vec3 col = mix(hor, zen, t);
+  float sunAmt = max(dot(rd, uSunDir), 0.0);
+  col += sunTint() * (0.10*pow(sunAmt, 16.0) + 0.30*pow(sunAmt, 96.0));
+  col += sunTint() * 0.10 * pow(1.0 - y, 8.0) * (0.2 + 0.8*pow(sunAmt, 4.0)); // 수평선 헤이즈
+  return col;
+}
+vec3 skyFull(vec3 rd, bool hiq){
+  vec3 col = skyBase(rd);
+  float d = dot(rd, uSunDir);
+  col += sunTint() * smoothstep(0.99955, 0.99987, d) * 40.0;   // 태양 원반
+  col += sunTint() * pow(max(d, 0.0), 512.0) * 1.2;            // 후광
+  float fade = smoothstep(0.02, 0.16, rd.y);
+  if (fade > 0.001 && uCloud > 0.01) {
+    float h   = clamp(uSunDir.y, 0.0, 1.0);
+    float day = smoothstep(0.03, 0.5, h);
+    vec2 cuv = rd.xz / (rd.y + 0.10) * 0.9 + vec2(uTime*0.006, uTime*0.0023);
+    float den = hiq ? (fbm(cuv*1.3) * 0.7 + fbm(cuv*4.2) * 0.3)  // 하늘: 고품질
+                    : (fbm(cuv*1.3) * 0.7 + 0.15);               // 반사: 디테일 옥타브 생략
+    float cov = mix(0.66, 0.30, uCloud);
+    float c = smoothstep(cov, cov + 0.34, den);
+    float lit = 0.4 + 0.6 * pow(max(dot(rd, uSunDir), 0.0), 3.0);
+    vec3 shade  = mix(vec3(0.10, 0.11, 0.16), vec3(0.46, 0.49, 0.56), day);
+    vec3 bright = sunTint() * (1.25 + 0.25*day);
+    col = mix(col, mix(shade, bright, lit), c * fade * 0.92);
+  }
+  return col;
+}
+vec3 finish(vec3 col, vec2 fc){
+  col = (col * (2.51*col + 0.03)) / (col * (2.43*col + 0.59) + 0.14); // ACES
+  col = pow(clamp(col, 0.0, 1.0), vec3(1.0/2.2));
+  col += (hash12(fc) - 0.5) / 255.0;  // 밴딩 제거 디더
+  return col;
+}
+`;
+
+/* ---------------- GLSL: 하늘 패스 ---------------- */
+const SKY_VS = `#version 300 es
+layout(location=0) in vec2 aP;
+out vec2 vNdc;
+void main(){ vNdc = aP; gl_Position = vec4(aP, 0.9999, 1.0); }
+`;
+const SKY_FS = `#version 300 es
+${COMMON}
+in vec2 vNdc;
+uniform vec3  uCamFwd, uCamRight, uCamUp;
+uniform float uTanFov, uAspect;
+out vec4 fragColor;
+void main(){
+  vec3 rd = normalize(uCamFwd
+          + uCamRight * (vNdc.x * uTanFov * uAspect)
+          + uCamUp    * (vNdc.y * uTanFov));
+  vec3 col;
+  if (rd.y < 0.0) {           // 수평선 아래: 안개색으로 (바다 안개와 이어짐)
+    vec3 h = normalize(vec3(rd.x, 0.0, rd.z));
+    col = skyBase(vec3(h.x, 0.02, h.z));
+  } else {
+    col = skyFull(rd, true);
+  }
+  col *= 1.15;
+  fragColor = vec4(finish(col, gl_FragCoord.xy), 1.0);
+}
+`;
+
+/* ---------------- GLSL: 바다 버텍스 (Gerstner) ---------------- */
+const SEA_VS = `#version 300 es
+precision highp float;
+layout(location=0) in vec2 aPos;
+uniform mat4  uVP;
+uniform vec2  uCamXZ;
+uniform float uTime, uAmp, uChop;
+uniform vec4  uWaves[${NW}];   // dir.x, dir.z, k, amp
+uniform float uPhases[${NW}];
+out vec3  vPos;
+out vec3  vNrm;
+out float vCrest;
+out vec2  vUV;
+void main(){
+  vec2 xz = aPos + uCamXZ;
+  float dist = length(aPos);
+  vec3 p = vec3(xz.x, 0.0, xz.y);
+  vec3 n = vec3(0.0, 1.0, 0.0);
+  float crest = 0.0;
+  for (int i = 0; i < ${NW}; i++) {
+    vec2  d   = uWaves[i].xy;
+    float k   = uWaves[i].z;
+    float lam = 6.2831853 / k;
+    float att = 1.0 - smoothstep(18.0*lam, 40.0*lam, dist); // 원거리 짧은 파동 감쇠(앨리어싱 방지)
+    float a   = uWaves[i].w * uAmp * att;
+    if (a < 1e-5) continue;
+    float w  = sqrt(9.81 * k);          // 심해 분산 관계
+    float ph = k * dot(d, xz) - w * uTime + uPhases[i];
+    float s = sin(ph), c = cos(ph);
+    float hq = uChop * a;               // 수평 변위 (트로코이드)
+    p.y += a * s;
+    p.x += d.x * hq * c;
+    p.z += d.y * hq * c;
+    float kac = k * a * c;
+    n.x -= d.x * kac;
+    n.z -= d.y * kac;
+    float fold = uChop * k * a * s;
+    n.y   -= fold;
+    crest += fold;                       // 마루 압축량 → 거품
+  }
+  vPos = p; vNrm = n; vCrest = crest; vUV = xz;
+  gl_Position = uVP * vec4(p, 1.0);
+}
+`;
+
+/* ---------------- GLSL: 바다 프래그먼트 ---------------- */
+const SEA_FS = `#version 300 es
+${COMMON}
+in vec3  vPos;
+in vec3  vNrm;
+in float vCrest;
+in vec2  vUV;
+uniform vec3  uCamPos;
+uniform float uAmpChar;   // 특성 파고 (색 정규화용)
+out vec4 fragColor;
+
+vec2 detailGrad(vec2 p, float fade){   // 근거리 미세 잔물결 (법선만)
+  vec2 g = vec2(0.0);
+  float L = 3.2, a = 0.042 * fade, an = 1.1;
+  for (int i = 0; i < 7; i++) {
+    vec2 d = vec2(cos(an), sin(an));
+    float k = 6.2831853 / L;
+    float ph = k * dot(d, p) - sqrt(9.81*k) * uTime * 1.05 + float(i)*13.7;
+    g += d * (k * a * cos(ph));
+    L *= 0.70; a *= 0.74; an += 2.399;
+  }
+  return g;
+}
+
+void main(){
+  vec3 toCam = uCamPos - vPos;
+  float dist = length(toCam);
+  vec3 V = toCam / dist;
+
+  float dfade = exp(-dist * 0.028);
+  vec2 g = (dfade > 0.02) ? detailGrad(vUV, dfade) : vec2(0.0); // 원거리는 미세 법선 생략
+  vec3 N = normalize(vec3(vNrm.x - g.x, max(vNrm.y, 0.05), vNrm.z - g.y));
+  N = normalize(mix(vec3(0.0,1.0,0.0), N, clamp(1.0 - dist*0.00011, 0.55, 1.0)));
+  float nv = dot(N, V);
+  if (nv < 0.02) { N = normalize(N + V * (0.02 - nv)); nv = dot(N, V); }
+
+  vec3 L = uSunDir;
+  vec3 sunC = sunTint();
+  float day  = smoothstep(0.03, 0.5, clamp(uSunDir.y, 0.0, 1.0));
+  float sunI = mix(2.2, 3.2, day);
+
+  // 프레넬
+  float F = 0.02 + 0.98 * pow(1.0 - max(nv, 0.0), 5.0);
+
+  // 하늘 반사
+  vec3 R = reflect(-V, N);
+  R.y = max(R.y, 0.022);
+  vec3 refl = skyFull(normalize(R), false);
+
+  // 물 본체: 깊은 색 + 태양 투과 산란(SSS)
+  float wrap = clamp(dot(N, L) * 0.6 + 0.4, 0.0, 1.0);
+  vec3 deep = mix(vec3(0.005, 0.015, 0.028), vec3(0.008, 0.045, 0.070), day);
+  vec3 scat = mix(vec3(0.020, 0.075, 0.075), vec3(0.020, 0.240, 0.250), day);
+  float thick = clamp(vPos.y / max(uAmpChar, 0.25) * 0.5 + 0.55, 0.0, 1.2);
+  float trans = pow(max(dot(-V, L), 0.0), 3.0);
+  vec3 body = deep * (0.3 + 0.7*wrap) * (0.35 + 0.65*day) * 2.0
+            + scat * sunC * sunI * (trans * thick * 0.65 + 0.10 * thick);
+
+  // 태양 스페큘러 (거리 따라 하이라이트 넓힘 + 반짝임)
+  vec3 H = normalize(L + V);
+  float NdH = max(dot(N, H), 0.0);
+  float pw = mix(380.0, 56.0, smoothstep(10.0, 260.0, dist));
+  float spec = pow(NdH, pw) * (pw / 240.0) + pow(NdH, 48.0) * 0.06; // 좁은 로브 + 넓은 광택 경로
+  if (dfade > 0.02) {
+    float sparkle = 0.6 + 0.8 * vnoise(vUV * 6.0 + vec2(uTime*1.7, -uTime*1.3));
+    spec *= mix(1.0, sparkle, dfade * 0.8);
+  }
+  float Fh = 0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0);
+
+  vec3 col = body * (1.0 - F) + refl * F;
+  col += sunC * sunI * spec * Fh * 2.2;
+
+  // 파도 거품 (마루 압축 + 노이즈 패턴)
+  float crestSig = vCrest + max(vPos.y, 0.0) * 0.04;
+  float foamAmt = 0.0;
+  if (crestSig > 0.10) { // 마루 근처 픽셀만 거품 노이즈 계산
+    float fN = fbm(vUV * 0.45 + vec2(uTime*0.04, uTime*0.02)) * 0.65
+             + fbm(vUV * 1.8  - vec2(uTime*0.06, 0.0)) * 0.35;
+    foamAmt = smoothstep(0.14, 0.42, crestSig);
+    foamAmt *= mix(0.25, 1.0, smoothstep(0.30, 0.75, fN + vCrest*0.2)); // 포화돼도 레이스 패턴 유지
+    foamAmt *= 0.2 + 0.8 * exp(-dist * 0.003);
+  }
+  vec3 amb = skyBase(vec3(0.0, 1.0, 0.0));
+  vec3 foamCol = vec3(0.92) * (amb * 0.75 + sunC * sunI * 0.45 * wrap + vec3(0.04));
+  col = mix(col, foamCol, clamp(foamAmt, 0.0, 1.0));
+
+  // 대기 원근 (수평선 안개, 태양 방향 글로우 포함)
+  vec2 fd = normalize(vPos.xz - uCamPos.xz + vec2(1e-4, 0.0));
+  vec3 fogCol = skyBase(vec3(fd.x, 0.02, fd.y));
+  float fogF = 1.0 - exp(-pow(dist * 0.00065, 1.5));
+  col = mix(col, fogCol, clamp(fogF, 0.0, 1.0));
+
+  col *= 1.15;
+  fragColor = vec4(finish(col, gl_FragCoord.xy), 1.0);
+}
+`;
+
+/* ---------------- GLSL: 부유물 ---------------- */
+const OBJ_VS = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aP;
+layout(location=1) in vec3 aN;
+layout(location=2) in vec3 aC;
+uniform mat4 uVP, uModel;
+out vec3 vN; out vec3 vC; out vec3 vW;
+void main(){
+  vec4 w = uModel * vec4(aP, 1.0);
+  vW = w.xyz;
+  vN = mat3(uModel) * aN;
+  vC = aC;
+  gl_Position = uVP * w;
+}
+`;
+const OBJ_FS = `#version 300 es
+${COMMON}
+in vec3 vN; in vec3 vC; in vec3 vW;
+uniform vec3 uCamPos;
+uniform float uAlpha;
+uniform vec3 uTint;
+out vec4 fragColor;
+void main(){
+  vec3 N = normalize(vN);
+  vec3 L = uSunDir;
+  float day  = smoothstep(0.03, 0.5, clamp(uSunDir.y, 0.0, 1.0));
+  float sunI = mix(2.2, 3.2, day);
+  vec3 sunC = sunTint();
+  vec3 amb = skyBase(vec3(0.0, 1.0, 0.0)) * 0.6 + vec3(0.05);
+  float dif = max(dot(N, L), 0.0) * 0.75 + max(dot(N, L) * 0.5 + 0.5, 0.0) * 0.2; // 직사광 + 랩
+  vec3 col = vC * uTint * (amb + sunC * sunI * dif * 0.5);
+  vec3 V = normalize(uCamPos - vW);
+  vec3 H = normalize(L + V);
+  col += sunC * sunI * pow(max(dot(N, H), 0.0), 42.0) * 0.14;
+  float dist = length(uCamPos - vW);
+  vec2 fd = normalize(vW.xz - uCamPos.xz + vec2(1e-4, 0.0));
+  vec3 fogCol = skyBase(vec3(fd.x, 0.02, fd.y));
+  float fogF = 1.0 - exp(-pow(dist * 0.00065, 1.5));
+  col = mix(col, fogCol, clamp(fogF, 0.0, 1.0));
+  col *= 1.15;
+  fragColor = vec4(finish(col, gl_FragCoord.xy), uAlpha);
+}
+`;
+
+/* ---------------- WebGL 초기화 ---------------- */
+const canvas = document.getElementById("sea");
+const gl = canvas.getContext("webgl2", { antialias: true, powerPreference: "high-performance", alpha: false });
+if (!gl) { document.getElementById("err").style.display = "grid"; throw new Error("no webgl2"); }
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw new Error(gl.getShaderInfoLog(s) + "\n--- source ---\n" + src);
+  return s;
+}
+function program(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+const seaProg = program(SEA_VS, SEA_FS);
+const skyProg = program(SKY_VS, SKY_FS);
+const objProg = program(OBJ_VS, OBJ_FS);
+const locCache = new Map();
+function U(prog, name) {
+  let m = locCache.get(prog);
+  if (!m) { m = new Map(); locCache.set(prog, m); }
+  if (!m.has(name)) m.set(name, gl.getUniformLocation(prog, name));
+  return m.get(name);
+}
+
+/* ---------------- 지오메트리 ---------------- */
+// 하늘: 풀스크린 삼각형
+const skyVao = gl.createVertexArray();
+gl.bindVertexArray(skyVao);
+const skyBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+// 바다: 카메라 중심 지수 간격 그리드 (가까울수록 촘촘)
+const M = 160, RADIUS = 3200, EK = 5.5; // 근거리는 더 촘촘하게, 원거리 서브픽셀 삼각형은 감축
+const SIDE = 2*M + 1;
+const expMap = t => Math.sign(t) * (Math.exp(EK*Math.abs(t)) - 1) / (Math.exp(EK) - 1) * RADIUS;
+const gpos = new Float32Array(SIDE*SIDE*2);
+{
+  let o = 0;
+  for (let j = 0; j < SIDE; j++) {
+    const z = expMap(j/M - 1);
+    for (let i = 0; i < SIDE; i++) { gpos[o++] = expMap(i/M - 1); gpos[o++] = z; }
+  }
+}
+const gidx = new Uint32Array(2*M * 2*M * 6);
+{
+  let o = 0;
+  for (let j = 0; j < 2*M; j++) for (let i = 0; i < 2*M; i++) {
+    const a = j*SIDE + i, b = a+1, c = a+SIDE, d = c+1;
+    gidx[o++]=a; gidx[o++]=c; gidx[o++]=b; gidx[o++]=b; gidx[o++]=c; gidx[o++]=d;
+  }
+}
+const seaVao = gl.createVertexArray();
+gl.bindVertexArray(seaVao);
+const seaVbo = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, seaVbo);
+gl.bufferData(gl.ARRAY_BUFFER, gpos, gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+const seaIbo = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, seaIbo);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, gidx, gl.STATIC_DRAW);
+gl.bindVertexArray(null);
+
+/* ---------------- 파동 스펙트럼 ---------------- */
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const SUN_AZ = 2.4;
+let waveArr = new Float32Array(NW*4), phaseArr = new Float32Array(NW);
+let sumAmp = 1;
+function makeWaves(wind) {
+  const rng = mulberry32(20260716);
+  const windDir = SUN_AZ + 0.35;
+  const Lmax = 16 + 78 * wind, Lmin = 2.4;
+  sumAmp = 0;
+  for (let i = 0; i < NW; i++) {
+    const t = i / (NW - 1);
+    const L = Lmax * Math.pow(Lmin / Lmax, t);
+    const spread = 0.5 + 1.9 * t;                    // 짧은 파동일수록 방향 분산
+    const ang = windDir + (rng() - 0.5) * spread;
+    const amp = 0.016 * L * (0.7 + 0.6 * rng());
+    waveArr[i*4+0] = Math.cos(ang);
+    waveArr[i*4+1] = Math.sin(ang);
+    waveArr[i*4+2] = 2 * Math.PI / L;
+    waveArr[i*4+3] = amp;
+    phaseArr[i] = rng() * Math.PI * 2;
+    sumAmp += amp;
+  }
+}
+
+/* ---------------- 부유물 지오메트리 (절차 생성) ---------------- */
+function newBuilder() {
+  const v = [];
+  const rot = (p, rx, ry, rz) => {
+    let [x, y, z] = p, c, s, t;
+    if (rx) { c = Math.cos(rx); s = Math.sin(rx); t = y; y = t*c - z*s; z = t*s + z*c; }
+    if (ry) { c = Math.cos(ry); s = Math.sin(ry); t = x; x = t*c + z*s; z = -t*s + z*c; }
+    if (rz) { c = Math.cos(rz); s = Math.sin(rz); t = x; x = t*c - y*s; y = t*s + y*c; }
+    return [x, y, z];
+  };
+  const tri = (T, a, b, c, na, nb, nc, col) => {
+    for (const [p, n] of [[a, na], [b, nb], [c, nc]]) {
+      const q = rot([p[0]*T.s[0], p[1]*T.s[1], p[2]*T.s[2]], T.r[0], T.r[1], T.r[2]);
+      const m = rot(n, T.r[0], T.r[1], T.r[2]);
+      const il = 1 / (Math.hypot(m[0], m[1], m[2]) || 1);
+      v.push(q[0]+T.t[0], q[1]+T.t[1], q[2]+T.t[2], m[0]*il, m[1]*il, m[2]*il, col[0], col[1], col[2]);
+    }
+  };
+  const quad = (T, a, b, c, d, n, col) => { tri(T, a, b, c, n, n, n, col); tri(T, a, c, d, n, n, n, col); };
+  const box = (T, col) => { // 단위 큐브 ±0.5
+    const f = [
+      [[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5],[0,0,1]],
+      [[.5,-.5,-.5],[-.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],[0,0,-1]],
+      [[.5,-.5,.5],[.5,-.5,-.5],[.5,.5,-.5],[.5,.5,.5],[1,0,0]],
+      [[-.5,-.5,-.5],[-.5,-.5,.5],[-.5,.5,.5],[-.5,.5,-.5],[-1,0,0]],
+      [[-.5,.5,.5],[.5,.5,.5],[.5,.5,-.5],[-.5,.5,-.5],[0,1,0]],
+      [[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5],[0,-1,0]],
+    ];
+    for (const [a, b, c, d, n] of f) quad(T, a, b, c, d, n, col);
+  };
+  const cyl = (T, col, r1, r2, h, seg = 14) => { // Y축, 중심 원점
+    for (let i = 0; i < seg; i++) {
+      const a0 = i/seg*2*Math.PI, a1 = (i+1)/seg*2*Math.PI;
+      const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
+      const sl = (r1 - r2) / h;
+      const n0 = [c0, sl, s0], n1 = [c1, sl, s1];
+      tri(T, [c0*r1,-h/2,s0*r1], [c1*r1,-h/2,s1*r1], [c1*r2,h/2,s1*r2], n0, n1, n1, col);
+      tri(T, [c0*r1,-h/2,s0*r1], [c1*r2,h/2,s1*r2], [c0*r2,h/2,s0*r2], n0, n1, n0, col);
+      if (r2 > 0.001) tri(T, [0,h/2,0], [c1*r2,h/2,s1*r2], [c0*r2,h/2,s0*r2], [0,1,0], [0,1,0], [0,1,0], col);
+      if (r1 > 0.001) tri(T, [0,-h/2,0], [c0*r1,-h/2,s0*r1], [c1*r1,-h/2,s1*r1], [0,-1,0], [0,-1,0], [0,-1,0], col);
+    }
+  };
+  const sph = (T, col, r, lat = 9, lon = 14) => {
+    const P = (i, j) => {
+      const th = i/lat*Math.PI, ph = j/lon*2*Math.PI;
+      return [Math.sin(th)*Math.cos(ph)*r, Math.cos(th)*r, Math.sin(th)*Math.sin(ph)*r];
+    };
+    const nn = p => [p[0]/r, p[1]/r, p[2]/r];
+    for (let i = 0; i < lat; i++) for (let j = 0; j < lon; j++) {
+      const a = P(i, j), b = P(i+1, j), c = P(i+1, j+1), d = P(i, j+1);
+      tri(T, a, b, c, nn(a), nn(b), nn(c), col);
+      tri(T, a, c, d, nn(a), nn(c), nn(d), col);
+    }
+  };
+  const tor = (T, colFn, R, r, segU = 24, segV = 10) => {
+    const P = (i, j) => {
+      const u = i/segU*2*Math.PI, w = j/segV*2*Math.PI;
+      const cu = Math.cos(u), su = Math.sin(u), cw = Math.cos(w), sw = Math.sin(w);
+      return [[(R + r*cw)*cu, r*sw, (R + r*cw)*su], [cw*cu, sw, cw*su]];
+    };
+    for (let i = 0; i < segU; i++) for (let j = 0; j < segV; j++) {
+      const col = colFn(i/segU);
+      const [a, na] = P(i, j), [b, nb] = P(i+1, j), [c, nc] = P(i+1, j+1), [d, nd] = P(i, j+1);
+      tri(T, a, b, c, na, nb, nc, col);
+      tri(T, a, c, d, na, nc, nd, col);
+    }
+  };
+  const nrm = (a, b, c) => {
+    const u = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], w = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
+    return [u[1]*w[2]-u[2]*w[1], u[2]*w[0]-u[0]*w[2], u[0]*w[1]-u[1]*w[0]];
+  };
+  const wedge = (T, col, w, h, l) => { // 뱃머리: 뒤 사각면 → 앞(+Z) 수직 모서리
+    const A = [-w/2,-h/2,0], B = [w/2,-h/2,0], C = [w/2,h/2,0], D = [-w/2,h/2,0];
+    const E = [0,-h/2,l], F = [0,h/2,l];
+    quad(T, A, E, F, D, nrm(A, E, F), col);      // 좌현 사면
+    quad(T, B, C, F, E, nrm(B, C, F), col);      // 우현 사면
+    tri(T, D, F, C, [0,1,0], [0,1,0], [0,1,0], col);    // 상면
+    tri(T, A, B, E, [0,-1,0], [0,-1,0], [0,-1,0], col); // 하면
+  };
+  return { v, tri, quad, box, cyl, sph, tor, wedge };
+}
+const TR = (t = [0,0,0], r = [0,0,0], s = 1) => ({ t, r, s: Array.isArray(s) ? s : [s, s, s] });
+
+const OBJ_TYPES = {
+  crate: { sink: 0.30, tilt: 0.75, spin: 0.25, base: 0, build: b => {
+    const wood = [0.52, 0.37, 0.22], dark = [0.35, 0.24, 0.14];
+    b.box(TR([0,0,0], [0,0,0], [1.1,1.1,1.1]), wood);
+    for (const p of [-0.55, 0.55]) for (const q of [-0.55, 0.55]) {
+      b.box(TR([0,p,q], [0,0,0], [1.24,0.14,0.14]), dark);
+      b.box(TR([p,0,q], [0,0,0], [0.14,1.24,0.14]), dark);
+      b.box(TR([p,q,0], [0,0,0], [0.14,0.14,1.24]), dark);
+    }
+  }},
+  duck: { sink: 0.15, tilt: 0.85, spin: 0.4, base: 0, build: b => {
+    const yel = [0.98, 0.78, 0.10], org = [0.95, 0.45, 0.06], blk = [0.08, 0.08, 0.09];
+    b.sph(TR([0,0.05,0], [0,0,0], [1.0,0.78,1.25]), yel, 0.5);       // 몸통
+    b.sph(TR([0,0.52,0.34]), yel, 0.27);                              // 머리
+    b.cyl(TR([0,0.48,0.62], [Math.PI/2,0,0]), org, 0.10, 0.03, 0.22, 10); // 부리
+    b.sph(TR([0.11,0.60,0.52]), blk, 0.035);                          // 눈
+    b.sph(TR([-0.11,0.60,0.52]), blk, 0.035);
+    b.sph(TR([0,0.28,-0.5], [Math.PI/5,0,0], [0.5,0.3,0.8]), yel, 0.3); // 꼬리
+  }},
+  ring: { sink: 0.10, tilt: 0.95, spin: 0.3, base: 0, build: b => {
+    b.tor(TR(), u => (u % 0.25) < 0.125 ? [1.0, 0.42, 0.05] : [0.93, 0.94, 0.96], 0.62, 0.20);
+  }},
+  buoy: { sink: 0.55, tilt: 0.30, spin: 0.15, base: 0, build: b => {
+    const red = [0.72, 0.10, 0.08], wht = [0.92, 0.92, 0.94];
+    b.cyl(TR([0,-0.1,0]), red, 0.55, 0.50, 0.45);
+    b.cyl(TR([0,0.35,0]), wht, 0.50, 0.42, 0.45);
+    b.cyl(TR([0,0.95,0]), red, 0.42, 0.10, 0.75);
+    b.cyl(TR([0,1.55,0]), [0.30, 0.30, 0.33], 0.045, 0.045, 0.5, 8);
+    b.sph(TR([0,1.85,0]), [1.0, 0.85, 0.30], 0.11);                   // 등화
+  }},
+  bottle: { sink: 0.12, tilt: 0.9, spin: 0.5, base: Math.PI*0.42, build: b => { // 옆으로 눕혀 뜸
+    const gls = [0.30, 0.58, 0.42], cork = [0.76, 0.60, 0.40];
+    b.cyl(TR([0,0,0]), gls, 0.21, 0.21, 0.72);
+    b.cyl(TR([0,0.45,0]), gls, 0.21, 0.085, 0.20);
+    b.cyl(TR([0,0.64,0]), gls, 0.085, 0.085, 0.22);
+    b.cyl(TR([0,0.78,0]), cork, 0.09, 0.09, 0.10);
+  }},
+  container: { sink: 0.60, tilt: 0.55, spin: 0.15, base: 0, build: b => { // 색은 uTint로
+    b.box(TR([0,0,0], [0,0,0], [2.3, 1.9, 4.0]), [1, 1, 1]);
+    b.box(TR([0,0,2.02], [0,0,0], [2.15, 1.75, 0.06]), [0.72, 0.72, 0.72]); // 도어 패널
+  }},
+};
+function makeVao(data) {
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 36, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 36, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 36, 24);
+  gl.bindVertexArray(null);
+  return vao;
+}
+for (const key in OBJ_TYPES) {
+  const b = newBuilder();
+  OBJ_TYPES[key].build(b);
+  const data = new Float32Array(b.v);
+  OBJ_TYPES[key].vao = makeVao(data);
+  OBJ_TYPES[key].count = data.length / 9;
+}
+const splashMesh = (() => { // 물보라 링 (납작한 고리)
+  const b = newBuilder(), seg = 26;
+  for (let i = 0; i < seg; i++) {
+    const a0 = i/seg*2*Math.PI, a1 = (i+1)/seg*2*Math.PI;
+    const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
+    b.quad(TR(), [c0*0.72,0,s0*0.72], [c1*0.72,0,s1*0.72], [c1,0,s1], [c0,0,s0], [0,1,0], [0.95, 0.97, 1.0]);
+  }
+  const data = new Float32Array(b.v);
+  return { vao: makeVao(data), count: data.length / 9 };
+})();
+
+/* ---------------- 선박 지오메트리 (절차 생성, +Z가 선수) ---------------- */
+const SHIP_TYPES = {
+  fisher: { fleet: 2, speed: 3.4, len: 12, beam: 3.6, sink: 0.25, minLam: 6, resp: 2.2, wakeR: 1.6, hp: 500, turn: 0.30, build: b => {
+    const navy = [0.13, 0.18, 0.30], red = [0.55, 0.14, 0.10], wht = [0.92, 0.93, 0.91];
+    const deck = [0.45, 0.40, 0.33], glas = [0.10, 0.14, 0.19], tire = [0.06, 0.06, 0.07];
+    const net  = [0.18, 0.40, 0.34], gant = [0.60, 0.62, 0.63], org = [1.0, 0.45, 0.05];
+    // 선체: 남색 + 붉은 흘수 하부 + 흰 러브레일 (사진 1·2)
+    b.box(TR([0, -0.45, -0.6], [0,0,0], [3.3, 0.9, 10.6]), red);
+    b.wedge(TR([0, -0.45, 4.7]), red, 3.3, 0.9, 1.6);
+    b.box(TR([0, 0.35, -0.6], [0,0,0], [3.5, 0.95, 10.8]), navy);
+    b.wedge(TR([0, 0.35, 4.8]), navy, 3.5, 0.95, 1.9);
+    b.box(TR([0, 0.86, -0.6], [0,0,0], [3.62, 0.12, 10.9]), wht);
+    b.box(TR([0, 0.98, 4.35], [0,0,0], [3.0, 0.5, 1.3]), navy);               // 선수 불워크 상승부
+    b.wedge(TR([0, 0.98, 5.0]), navy, 3.0, 0.5, 1.6);
+    b.box(TR([1.7, 1.12, -0.9], [0,0,0], [0.12, 0.42, 9.9]), navy);           // 좌우 불워크
+    b.box(TR([-1.7, 1.12, -0.9], [0,0,0], [0.12, 0.42, 9.9]), navy);
+    b.box(TR([0, 1.12, -5.9], [0,0,0], [3.5, 0.42, 0.12]), navy);             // 트랜섬
+    b.box(TR([0, 0.9, -0.6], [0,0,0], [3.3, 0.1, 10.5]), deck);
+    // 조타실: 흰색 + 창 밴드 + 레이더 마스트 (사진 2)
+    b.box(TR([0, 1.6, 1.5], [0,0,0], [2.6, 1.3, 2.6]), wht);
+    b.box(TR([0, 1.92, 2.82], [0,0,0], [2.3, 0.52, 0.08]), glas);
+    b.box(TR([1.32, 1.92, 1.7], [0,0,0], [0.08, 0.52, 1.9]), glas);
+    b.box(TR([-1.32, 1.92, 1.7], [0,0,0], [0.08, 0.52, 1.9]), glas);
+    b.box(TR([0, 2.33, 1.5], [0,0,0], [2.85, 0.16, 2.9]), wht);
+    b.cyl(TR([0, 2.65, 1.2]), wht, 0.05, 0.045, 0.5, 6);
+    b.box(TR([0, 2.98, 1.2], [0,0,0], [0.9, 0.10, 0.2]), [0.85, 0.86, 0.87]); // 레이더
+    b.cyl(TR([0.9, 2.9, 0.5]), gant, 0.02, 0.02, 1.1, 5);                     // 안테나
+    b.cyl(TR([0.55, 2.6, 0.35]), [0.15, 0.15, 0.17], 0.09, 0.08, 0.9, 8);     // 배기구
+    b.tor(TR([1.38, 1.75, 1.0], [0, 0, Math.PI/2]), () => org, 0.26, 0.07, 12, 6); // 구명링
+    // 선수 마스트 + 데릭 (사진 2)
+    b.cyl(TR([0, 2.3, 3.7]), wht, 0.06, 0.05, 2.6, 6);
+    b.box(TR([0, 3.2, 3.7], [0,0,0], [1.5, 0.08, 0.08]), wht);
+    b.cyl(TR([0, 2.7, 3.1], [-0.85, 0, 0]), gant, 0.04, 0.035, 1.9, 5);       // 후방 경사 데릭 붐
+    // 그물 드럼 + 어구 더미 (사진 1의 갑판 잡동사니)
+    b.cyl(TR([0, 1.35, -1.7], [0, 0, Math.PI/2]), net, 0.34, 0.34, 2.1, 10);
+    b.cyl(TR([1.15, 1.35, -1.7], [0, 0, Math.PI/2]), [0.3, 0.3, 0.33], 0.5, 0.5, 0.1, 10);
+    b.cyl(TR([-1.15, 1.35, -1.7], [0, 0, Math.PI/2]), [0.3, 0.3, 0.33], 0.5, 0.5, 0.1, 10);
+    b.box(TR([0.85, 1.15, -3.1], [0, 0.4, 0], [1.2, 0.5, 1.0]), net);
+    b.box(TR([-0.75, 1.08, -2.7], [0, -0.7, 0], [0.9, 0.36, 0.8]), net);
+    b.sph(TR([0.5, 1.3, -2.9]), org, 0.16);
+    b.box(TR([-1.0, 1.12, 0.2], [0,0,0], [0.55, 0.45, 0.55]), [0.52, 0.4, 0.26]);
+    // 선미 A자형 갠트리 — 그물 훅 로컬 좌표 [0, 3.2, -5.3]
+    b.cyl(TR([1.1, 2.15, -5.05], [0.1, 0, 0.30]), gant, 0.07, 0.06, 2.7, 6);
+    b.cyl(TR([-1.1, 2.15, -5.05], [0.1, 0, -0.30]), gant, 0.07, 0.06, 2.7, 6);
+    b.box(TR([0, 3.42, -5.3], [0,0,0], [1.6, 0.13, 0.13]), gant);
+    b.box(TR([0, 3.26, -5.3], [0,0,0], [0.18, 0.24, 0.18]), [0.2, 0.2, 0.22]); // 훅 블록
+    // 타이어 펜더 (사진 1·3)
+    for (const sx of [1.78, -1.78]) for (const tz of [-3.6, -1.2, 1.0])
+      b.tor(TR([sx, 0.62, tz], [0, 0, Math.PI/2]), () => tire, 0.24, 0.10, 10, 6);
+  }},
+  cargo: { fleet: 1, speed: 5.5, len: 42, beam: 8, sink: 0.5, minLam: 24, resp: 0.8, wakeR: 3.5, hp: 1500, turn: 0.10, build: b => {
+    const hull = [0.16, 0.19, 0.24], boot = [0.50, 0.13, 0.10], wht = [0.90, 0.91, 0.90];
+    b.box(TR([0, 1.2, -2], [0,0,0], [8, 2.6, 34]), hull);                      // 건현
+    b.box(TR([0, -0.4, -2], [0,0,0], [7.6, 1.6, 33]), boot);                   // 흘수선 아래
+    b.wedge(TR([0, 1.2, 15]), hull, 8, 2.6, 6);
+    b.wedge(TR([0, -0.4, 14.5]), boot, 7.6, 1.6, 5);
+    b.box(TR([0, 2.62, -2], [0,0,0], [7.8, 0.25, 33.5]), [0.30, 0.33, 0.36]);  // 갑판
+    b.box(TR([0, 5.2, -14], [0,0,0], [7, 5.2, 3.4]), wht);                     // 선교
+    b.box(TR([0, 8.2, -14], [0,0,0], [7.8, 0.7, 3.8]), wht);                   // 브릿지윙
+    b.box(TR([0, 8.15, -12.05], [0,0,0], [6.5, 0.55, 0.1]), [0.10, 0.15, 0.20]); // 창
+    b.box(TR([0, 9.5, -15], [0,0,0], [1.6, 1.8, 1.2]), [0.72, 0.20, 0.15]);    // 연돌
+    const cc = [[0.75,0.20,0.15],[0.15,0.35,0.60],[0.20,0.55,0.30],[0.85,0.50,0.10],[0.50,0.55,0.60],[0.15,0.50,0.55]];
+    for (let bay = 0; bay < 6; bay++) for (let row = -1; row <= 1; row++) {   // 컨테이너 더미
+      const stacks = 2 + ((bay * 3 + row + 5) % 2);
+      for (let st = 0; st < stacks; st++)
+        b.box(TR([row * 2.5, 3.9 + st * 2.0, 9 - bay * 4.3], [0,0,0], [2.3, 1.9, 4.0]), cc[(bay + row * 2 + st * 3 + 7) % 6]);
+    }
+  }},
+  warship: { fleet: 1, speed: 8.5, len: 38, beam: 5.4, sink: 0.45, minLam: 14, resp: 1.2, wakeR: 2.6, hp: 2600, turn: 0.22, build: b => {
+    const gray = [0.44, 0.47, 0.51], dark = [0.30, 0.32, 0.36];
+    b.box(TR([0, 0.9, -2], [0,0,0], [5.4, 2.0, 28]), gray);                    // 선체
+    b.box(TR([0, -0.5, -2], [0,0,0], [5.0, 1.4, 27]), [0.15, 0.16, 0.20]);
+    b.wedge(TR([0, 0.9, 12]), gray, 5.4, 2.0, 7);                              // 날카로운 함수
+    b.wedge(TR([0, -0.5, 11.5]), [0.15, 0.16, 0.20], 5.0, 1.4, 5.5);
+    b.box(TR([0, 1.98, -2], [0,0,0], [5.2, 0.2, 28.5]), [0.36, 0.39, 0.42]);   // 갑판
+    b.box(TR([0, 3.1, 0], [0,0,0], [4.4, 2.2, 9]), gray);                      // 함교 구조물
+    b.box(TR([0, 4.9, 1.5], [0,0,0], [3.4, 1.6, 4.5]), gray);
+    b.box(TR([0, 4.95, 3.8], [0,0,0], [3.0, 0.9, 0.1]), [0.08, 0.10, 0.14]);   // 함교 창
+    b.cyl(TR([0, 6.9, 0.5]), dark, 0.09, 0.06, 2.6, 8);                        // 마스트
+    b.box(TR([0, 7.6, 0.5], [0, 0.6, 0], [1.5, 0.18, 0.18]), dark);            // 레이더
+    b.box(TR([0, 4.3, -3.6], [Math.PI*0.06, 0, 0], [2.0, 1.8, 1.6]), dark);    // 경사 연돌
+    for (const tz of [8.5, -11]) b.cyl(TR([0, 2.2, tz]), gray, 1.35, 1.3, 0.45, 12); // 포탑 바벳
+  }},
+};
+for (const key in SHIP_TYPES) {
+  const b = newBuilder();
+  SHIP_TYPES[key].build(b);
+  const data = new Float32Array(b.v);
+  SHIP_TYPES[key].vao = makeVao(data);
+  SHIP_TYPES[key].count = data.length / 9;
+}
+const turretMesh = (() => { // 회전 포탑 (+Z 포신)
+  const b = newBuilder();
+  const gray = [0.40, 0.43, 0.47], dark = [0.30, 0.32, 0.36];
+  b.box(TR([0, 0.5, -0.2], [0,0,0], [2.2, 1.0, 2.8]), gray);
+  b.wedge(TR([0, 0.5, 1.2]), gray, 2.2, 1.0, 0.9);
+  b.cyl(TR([0.35, 0.62, 2.6], [Math.PI/2 - 0.06, 0, 0]), dark, 0.10, 0.075, 2.6, 8);
+  b.cyl(TR([-0.35, 0.62, 2.6], [Math.PI/2 - 0.06, 0, 0]), dark, 0.10, 0.075, 2.6, 8);
+  const d = new Float32Array(b.v);
+  return { vao: makeVao(d), count: d.length / 9 };
+})();
+const shellMesh = (() => { // 포탄 예광
+  const b = newBuilder();
+  b.sph(TR([0,0,0], [0,0,0], [0.55, 2.6, 0.55]), [1.0, 0.85, 0.55], 0.3, 6, 8);
+  const d = new Float32Array(b.v);
+  return { vao: makeVao(d), count: d.length / 9 };
+})();
+const columnMesh = (() => { // 포탄 물기둥
+  const b = newBuilder();
+  b.cyl(TR([0, 0.5, 0]), [0.93, 0.96, 1.0], 1.0, 0.22, 1.0, 12);
+  const d = new Float32Array(b.v);
+  return { vao: makeVao(d), count: d.length / 9 };
+})();
+const netBagMesh = (() => { // 그물 자루: 눈물방울 격자 (원점 = 매듭 상단, 아래로 늘어짐)
+  const b = newBuilder();
+  const col = [0.18, 0.38, 0.33];
+  const LV = [[0.14, 0], [0.42, -0.35], [0.56, -0.75], [0.50, -1.05], [0.30, -1.3], [0.06, -1.5]]; // [반지름, y]
+  const P = (a, l) => [Math.cos(a) * LV[l][0], LV[l][1], Math.sin(a) * LV[l][0]];
+  const NR = 8;
+  for (let i = 0; i < NR; i++) { // 세로 리본
+    const a = i / NR * 2 * Math.PI, w = 0.05;
+    for (let l = 0; l < LV.length - 1; l++) {
+      b.quad(TR(), P(a - w, l), P(a + w, l), P(a + w, l + 1), P(a - w, l + 1),
+             [Math.cos(a), 0.25, Math.sin(a)], col);
+    }
+  }
+  for (let l = 1; l < LV.length - 1; l++) { // 가로 링
+    const seg = 14, hw = 0.045, r = LV[l][0], y = LV[l][1];
+    for (let i = 0; i < seg; i++) {
+      const a0 = i / seg * 2 * Math.PI, a1 = (i + 1) / seg * 2 * Math.PI;
+      b.quad(TR(), [Math.cos(a0) * r, y - hw, Math.sin(a0) * r], [Math.cos(a1) * r, y - hw, Math.sin(a1) * r],
+                   [Math.cos(a1) * r, y + hw, Math.sin(a1) * r], [Math.cos(a0) * r, y + hw, Math.sin(a0) * r],
+                   [Math.cos((a0 + a1) / 2), 0, Math.sin((a0 + a1) / 2)], col);
+    }
+  }
+  const d = new Float32Array(b.v);
+  return { vao: makeVao(d), count: d.length / 9 };
+})();
+const ropeMesh = (() => { // 단위 로프 (y 0..1, 반지름 1 → mScale3로 변형)
+  const b = newBuilder();
+  b.cyl(TR([0, 0.5, 0]), [0.42, 0.38, 0.30], 1, 1, 1, 6);
+  const d = new Float32Array(b.v);
+  return { vao: makeVao(d), count: d.length / 9 };
+})();
+
+/* ---------------- 선박 통행 시스템 ---------------- */
+const ships = [], wakes = [], shells = [], columns = [];
+const shipToggles = { fisher: false, cargo: false, warship: false };
+const spawnCool = { fisher: 0, cargo: 0, warship: 0 };
+const TELE_SPEEDS = [-0.4, 0, 0.25, 0.5, 0.75, 1.0];
+const SHIP_NAMES = { fisher: '어선', cargo: '상선', warship: '군함' };
+const SHIP_EMOJI = { fisher: '🎣', cargo: '🚢', warship: '⚔️' };
+function angTo(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
+
+function spawnShip(type) {
+  const ang = Math.random() * Math.PI * 2;
+  const R = 380 + Math.random() * 60;
+  const x = camNow.eye[0] + Math.sin(ang) * R;
+  const z = camNow.eye[2] + Math.cos(ang) * R;
+  const tx = camNow.eye[0] + (Math.random() - 0.5) * 160; // 카메라 근처를 지나는 침로
+  const tz = camNow.eye[2] + (Math.random() - 0.5) * 160;
+  ships.push({ type, x, z, heading: Math.atan2(tx - x, tz - z),
+               seed: Math.random() * 100, wakeT: 0, sy: 0, sPitch: 0, sRoll: 0,
+               hp: SHIP_TYPES[type].hp, reload: 0, tYaw: 0, tYawR: Math.PI, hostile: null,
+               sinking: false, sinkT: 0, rollDir: 1, speed: SHIP_TYPES[type].speed,
+               player: false, teleIdx: 3, rudder: 0, netState: null, netT: 0 });
+}
+
+function updateShips(dt) {
+  const spd = params.speed();
+  for (const t in SHIP_TYPES) {
+    spawnCool[t] -= dt;
+    if (shipToggles[t] && spawnCool[t] <= 0 &&
+        ships.filter(s => s.type === t && !s.player).length < SHIP_TYPES[t].fleet) {
+      spawnShip(t);
+      spawnCool[t] = 5;
+    }
+  }
+  for (let i = ships.length - 1; i >= 0; i--) {
+    const s = ships[i], T = SHIP_TYPES[s.type];
+    s.reload = Math.max(0, s.reload - dt);
+
+    if (s.sinking) {
+      s.sinkT += dt;
+      s.speed = Math.max(0, s.speed - dt * 1.5);
+      if (Math.floor(s.sinkT / 1.3) !== Math.floor((s.sinkT - dt) / 1.3))
+        splashes.push({ x: s.x + (Math.random() - 0.5) * T.len * 0.5,
+                        z: s.z + (Math.random() - 0.5) * T.len * 0.5, age: 0, power: 1.3 });
+      if (s === player && s.sinkT > 5) { hudSay('함선 상실... 관전 모드로 전환'); release(); }
+      if (s.sinkT > 15) { ships.splice(i, 1); continue; }
+    } else if (s.player) {
+      // ── 플레이어 조종 (WoWS식 기관/타) ──
+      const tv = TELE_SPEEDS[s.teleIdx] * T.speed * 1.35;
+      s.speed += (tv - s.speed) * Math.min(1, dt / 4);
+      const rIn = (keys['KeyA'] ? -1 : 0) + (keys['KeyD'] ? 1 : 0);
+      s.rudder += (rIn - s.rudder) * Math.min(1, dt * 1.3);
+      const vf = Math.max(-1, Math.min(1, s.speed / T.speed));
+      s.heading += s.rudder * T.turn * vf * dt;
+    } else {
+      // ── AI 통행 ── (교전 중이면 이탈하지 않음)
+      const off = !shipToggles[s.type] && !s.hostile;
+      if (off) {
+        const away = Math.atan2(s.x - camNow.eye[0], s.z - camNow.eye[2]);
+        s.heading += angTo(away - s.heading) * Math.min(1, dt * 0.5);
+      } else {
+        s.heading += Math.sin(simT * 0.11 + s.seed) * 0.03 * dt;
+      }
+      s.speed = T.speed * (off ? 1.8 : 1);
+      const dCam = Math.hypot(s.x - camNow.eye[0], s.z - camNow.eye[2]);
+      if (dCam > (off ? 320 : 520)) { ships.splice(i, 1); continue; }
+    }
+
+    // ── 어선 그물 상태 머신: 트롤링 → 인양 → 보관 ──
+    if (s.type === 'fisher' && s.netState && !s.sinking) {
+      const nfx = Math.sin(s.heading), nfz = Math.cos(s.heading);
+      if (s.netState === 'cast') {
+        s.netX = s.x - nfx * 13.5; // 그물이 선미 뒤에서 끌려옴 (트롤링)
+        s.netZ = s.z - nfz * 13.5;
+        s.netT -= dt;
+        if (Math.floor(s.netT / 1.1) !== Math.floor((s.netT - dt) / 1.1))
+          splashes.push({ x: s.netX, z: s.netZ, age: 0, power: 0.45 });
+        if (s.netT <= 0) {
+          const pool = ['duck', 'duck', 'duck', 'crate', 'crate', 'ring', 'bottle', 'bottle', 'buoy'];
+          const tints = [[0.85, 0.30, 0.25], [0.30, 0.50, 0.85], [0.40, 0.75, 0.45], [0.95, 0.65, 0.25]];
+          const n = 2 + (Math.random() * 3 | 0);
+          s.netCatch = [];
+          for (let k2 = 0; k2 < n; k2++) {
+            if (Math.random() < 0.12) s.netCatch.push({ type: 'container', tint: tints[(Math.random() * 4) | 0] }); // 상선이 흘린 것 ㅋㅋ
+            else s.netCatch.push({ type: pool[(Math.random() * pool.length) | 0], tint: null });
+          }
+          s.netFromX = s.netX; s.netFromZ = s.netZ;
+          s.netState = 'haul';
+          s.netT = 1.8;
+          splashes.push({ x: s.netX, z: s.netZ, age: 0, power: 1.3 });
+          if (s === player) hudSay('🎣 만선! 끌어올리는 중...');
+        }
+      } else if (s.netState === 'haul') {
+        s.netT -= dt;
+        if (Math.floor(s.netT / 0.45) !== Math.floor((s.netT - dt) / 0.45)) // 물 뚝뚝
+          splashes.push({ x: s.netFromX, z: s.netFromZ, age: 0, power: 0.5 });
+        if (s.netT <= 0) {
+          s.netState = 'hold';
+          if (s === player) hudSay('🧺 어획물 ' + s.netCatch.length + '개 보관 — 원할 때 [F] 살포');
+        }
+      }
+    }
+
+    // ── 군함 AI 반격 사격 ──
+    if (!s.sinking && !s.player && s.type === 'warship' && s.hostile) {
+      const tgt = s.hostile;
+      if (!ships.includes(tgt) || tgt.sinking) s.hostile = null;
+      else {
+        const d = Math.hypot(tgt.x - s.x, tgt.z - s.z);
+        if (d < 700 && s.reload <= 0) {
+          const tof = d / 100; // 예측 사격
+          fireSalvo(s, [tgt.x + Math.sin(tgt.heading) * tgt.speed * tof,
+                        tgt.z + Math.cos(tgt.heading) * tgt.speed * tof], false);
+        }
+      }
+    }
+
+    // ── 이동 + 파도 타기 ──
+    const v = s.speed;
+    const fwx = Math.sin(s.heading), fwz = Math.cos(s.heading);
+    s.x += fwx * v * spd * dt;
+    s.z += fwz * v * spd * dt;
+    const hl = T.len * 0.38, hb = T.beam * 0.5;
+    const rgx = Math.cos(s.heading), rgz = -Math.sin(s.heading);
+    const c  = gerstnerPoint(s.x, s.z, simT, T.minLam);
+    const bw = gerstnerPoint(s.x + fwx*hl, s.z + fwz*hl, simT, T.minLam);
+    const st = gerstnerPoint(s.x - fwx*hl, s.z - fwz*hl, simT, T.minLam);
+    const pR = gerstnerPoint(s.x + rgx*hb, s.z + rgz*hb, simT, T.minLam);
+    const pL = gerstnerPoint(s.x - rgx*hb, s.z - rgz*hb, simT, T.minLam);
+    const k = Math.min(1, dt * T.resp);
+    s.sy     += (c.y - s.sy) * k;
+    s.sPitch += (Math.atan2(bw.y - st.y, hl * 2) - s.sPitch) * k;
+    const heel = s.player ? -s.rudder * Math.abs(s.speed / T.speed) * 0.05 : 0; // 선회 경사
+    s.sRoll  += (Math.atan2(pR.y - pL.y, hb * 2) + heel - s.sRoll) * k;
+
+    // ── 포탑 지향 ──
+    if (s.type === 'warship') {
+      const aiming = s.player || !!s.hostile;
+      let goal = 0, goalR = Math.PI;
+      if (aiming && !s.sinking) {
+        const tx2 = s.player ? aimPt[0] : s.hostile.x;
+        const tz2 = s.player ? aimPt[1] : s.hostile.z;
+        goal = goalR = angTo(Math.atan2(tx2 - s.x, tz2 - s.z) - s.heading);
+      }
+      const step = 0.9 * dt;
+      s.tYaw  += Math.max(-step, Math.min(step, angTo(goal  - s.tYaw)));
+      s.tYawR += Math.max(-step, Math.min(step, angTo(goalR - s.tYawR)));
+    }
+
+    // ── 항적 거품 ──
+    s.wakeT -= dt;
+    if (s.wakeT <= 0 && Math.abs(v) > 0.5 && !s.sinking) {
+      wakes.push({ x: s.x - fwx * T.len * 0.45, z: s.z - fwz * T.len * 0.45, age: 0, r: T.wakeR });
+      s.wakeT = 0.35;
+    }
+  }
+  for (let i = wakes.length - 1; i >= 0; i--) {
+    wakes[i].age += dt;
+    if (wakes[i].age > 2.4) wakes.splice(i, 1);
+  }
+}
+
+/* ---------------- 함포 전투 ---------------- */
+function fireSalvo(s, aim, isPlayer) {
+  if (s.reload > 0 || s.sinking || s.type !== 'warship') return;
+  s.reload = isPlayer ? 5 : 8.5;
+  const fwx = Math.sin(s.heading), fwz = Math.cos(s.heading);
+  const rgx = Math.cos(s.heading), rgz = -Math.sin(s.heading);
+  const v0 = 118;
+  for (const tz of [8.5, -11]) {
+    const cx = s.x + fwx * tz, cz = s.z + fwz * tz;
+    for (const side of [-0.35, 0.35]) {
+      const R0 = Math.max(20, Math.hypot(aim[0] - cx, aim[1] - cz));
+      const disp = R0 * (isPlayer ? 0.035 : 0.06); // 산포
+      const ax = aim[0] + (Math.random() - 0.5) * 2 * disp;
+      const az = aim[1] + (Math.random() - 0.5) * 2 * disp;
+      const ox = cx + rgx * side, oz = cz + rgz * side;
+      const dx = ax - ox, dz = az - oz;
+      const R = Math.max(10, Math.hypot(dx, dz));
+      const s2 = 9.81 * R / (v0 * v0);
+      const th = s2 >= 1 ? Math.PI / 4 : 0.5 * Math.asin(s2); // 저각 탄도해
+      const vy = v0 * Math.sin(th);
+      const y0 = s.sy + 3.1;
+      const yT = 2.0; // 수면이 아니라 표적 선체 높이를 노림 (파도 마루에 걸리는 조기 착수 방지)
+      const tf = (vy + Math.sqrt(Math.max(0.1, vy * vy + 2 * 9.81 * (y0 - yT)))) / 9.81;
+      const vh = R / tf;
+      shells.push({ x: ox, y: y0, z: oz,
+                    vx: dx / R * vh, vy: vy, vz: dz / R * vh, from: s, age: 0 });
+    }
+  }
+}
+
+function startSinking(s) {
+  if (s.sinking) return;
+  s.sinking = true;
+  s.sinkT = 0;
+  s.hostile = null;
+  s.rollDir = Math.random() < 0.5 ? -1 : 1;
+  if (s.netCatch && s.netCatch.length) { // 침몰 시 어획물은 바다로
+    for (const it of s.netCatch)
+      spawnObject(it.type, s.x + (Math.random() - 0.5) * 8, s.z + (Math.random() - 0.5) * 8, { tint: it.tint, pop: true });
+    s.netCatch = null;
+    s.netState = null;
+  }
+  for (let j = 0; j < 4; j++)
+    splashes.push({ x: s.x + (Math.random() - 0.5) * SHIP_TYPES[s.type].len * 0.6,
+                    z: s.z + (Math.random() - 0.5) * SHIP_TYPES[s.type].len * 0.6, age: 0, power: 1.6 });
+  hudSay((s === player ? '내 ' : '') + SHIP_NAMES[s.type] + ' 격침! 🌊');
+}
+
+function updateShells(dt) {
+  for (let i = shells.length - 1; i >= 0; i--) {
+    const sh = shells[i];
+    sh.age += dt;
+    sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.z += sh.vz * dt;
+    sh.vy -= 9.81 * dt;
+    if (sh.age > 25) { shells.splice(i, 1); continue; }
+    // 함선 명중 판정 (선체 근사 박스)
+    let hit = false;
+    for (const s of ships) {
+      if (s === sh.from || s.sinking) continue;
+      const T = SHIP_TYPES[s.type];
+      const dx = sh.x - s.x, dz = sh.z - s.z;
+      if (dx * dx + dz * dz > T.len * T.len) continue;
+      const fwx = Math.sin(s.heading), fwz = Math.cos(s.heading);
+      const lz = dx * fwx + dz * fwz;
+      const lx = dx * Math.cos(s.heading) - dz * Math.sin(s.heading);
+      const relY = sh.y - s.sy;
+      if (Math.abs(lx) < T.beam / 2 + 0.8 && Math.abs(lz) < T.len / 2 + 1.5 && relY > -1.5 && relY < 9) {
+        const dmg = Math.round(150 + Math.random() * 180);
+        s.hp -= dmg;
+        splashes.push({ x: sh.x, z: sh.z, age: 0, power: 0.9 });
+        columns.push({ x: sh.x, z: sh.z, age: 0, h: 3 + Math.random() * 2 });
+        if (sh.from === player) hudSay('명중! -' + dmg + (s.hp > 0 ? '  (' + SHIP_NAMES[s.type] + ' HP ' + Math.max(0, s.hp) + ')' : ''));
+        if (s === player) hudSay('⚠️ 피격! -' + dmg);
+        if (s.type === 'warship' && !s.player) s.hostile = sh.from; // 반격 개시!
+        if (s.hp <= 0) startSinking(s);
+        hit = true;
+        break;
+      }
+    }
+    if (hit) { shells.splice(i, 1); continue; }
+    // 착수 물기둥
+    const w = gerstnerPoint(sh.x, sh.z, simT, 6);
+    if (sh.y <= w.y) {
+      splashes.push({ x: sh.x, z: sh.z, age: 0, power: 1.1 });
+      columns.push({ x: sh.x, z: sh.z, age: 0, h: 5 + Math.random() * 3 });
+      shells.splice(i, 1);
+    }
+  }
+  for (let i = columns.length - 1; i >= 0; i--) {
+    columns[i].age += dt;
+    if (columns[i].age > 1.0) columns.splice(i, 1);
+  }
+}
+
+function mTranslate(x, y, z) { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]); }
+function mRotZ(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1]); }
+function mScale3(x, y, z) { return new Float32Array([x,0,0,0, 0,y,0,0, 0,0,z,0, 0,0,0,1]); }
+function xp4(M, p) { // 행렬 × 점
+  return [M[0]*p[0] + M[4]*p[1] + M[8]*p[2] + M[12],
+          M[1]*p[0] + M[5]*p[1] + M[9]*p[2] + M[13],
+          M[2]*p[0] + M[6]*p[1] + M[10]*p[2] + M[14]];
+}
+const NET_HOOK = [0, 3.2, -5.3]; // 어선 갠트리 훅 (로컬)
+
+/* ---------------- 부유물 시스템 ---------------- */
+const objects = [], splashes = [];
+function objCap() { // 부유물 풀 상한 (슬라이더 1000 초과 = 무한)
+  const v = +document.getElementById('sObj').value;
+  return v > 1000 ? Infinity : v;
+}
+const camNow = { eye: [0, 5, 20], f: [0, 0, -1], r: [1, 0, 0], u: [0, 1, 0], asp: 1.78 };
+
+function gerstnerPoint(x, z, t, minLam = 0) { // 버텍스 셰이더와 동일한 파고/법선 (LOD 감쇠 포함)
+  const distC = Math.hypot(x - camNow.eye[0], z - camNow.eye[2]);
+  const ampS = params.amp(), chop = params.chop();
+  let X = x, Y = 0, Z = z, nx = 0, ny = 1, nz = 0;
+  for (let i = 0; i < NW; i++) {
+    const dx = waveArr[i*4], dz = waveArr[i*4+1], k = waveArr[i*4+2];
+    const lam = 6.2831853 / k;
+    if (lam < minLam) continue; // 큰 선체는 짧은 파도를 평균해 버림
+    let att = (distC - 18*lam) / (22*lam);
+    att = att <= 0 ? 1 : att >= 1 ? 0 : 1 - att*att*(3 - 2*att);
+    const a = waveArr[i*4+3] * ampS * att;
+    if (a < 1e-5) continue;
+    const ph = k*(dx*x + dz*z) - Math.sqrt(9.81*k)*t + phaseArr[i];
+    const s = Math.sin(ph), c = Math.cos(ph);
+    const hq = chop * a;
+    Y += a*s; X += dx*hq*c; Z += dz*hq*c;
+    const kac = k*a*c;
+    nx -= dx*kac; nz -= dz*kac; ny -= chop*k*a*s;
+  }
+  const il = 1 / Math.hypot(nx, ny, nz);
+  return { x: X, y: Y, z: Z, nx: nx*il, ny: ny*il, nz: nz*il };
+}
+
+function spawnObject(typeKey, x, z, opts = {}) {
+  if (objects.length >= objCap()) objects.shift();
+  const w = gerstnerPoint(x, z, simT);
+  const o = {
+    type: typeKey, x0: x, z0: z,
+    mode: 'fall', y: opts.dropY !== undefined ? opts.dropY : w.y + 16 + Math.random()*6, vy: 0,
+    yaw: Math.random()*6.28, spin: (Math.random() - 0.5) * 2 * OBJ_TYPES[typeKey].spin,
+    tumble: Math.random()*6.28, tumbleV: (Math.random() - 0.5) * 7,
+    n: [0, 1, 0], off: 0, offV: 0, w: w, tint: opts.tint || null,
+  };
+  if (opts.pop) { o.mode = 'float'; o.y = w.y; o.off = -1.2; o.offV = 4.0; o.tumbleV = 0; }
+  objects.push(o);
+  return o;
+}
+
+function updateObjects(dt) {
+  const cap = objCap(); // 상한을 실시간으로 낮추면 오래된 것부터 정리
+  while (objects.length > cap) objects.shift();
+  const drift = 0.22 * (0.6 + params.wind()) * params.amp() * params.speed(); // 스토크스 표류
+  const wind = [Math.cos(SUN_AZ + 0.35), Math.sin(SUN_AZ + 0.35)];
+  for (let i = objects.length - 1; i >= 0; i--) {
+    const o = objects[i];
+    const w = gerstnerPoint(o.x0, o.z0, simT);
+    o.w = w;
+    if (o.mode === 'fall') {
+      o.vy -= 9.81 * dt;
+      o.y += o.vy * dt;
+      o.tumble += o.tumbleV * dt;
+      if (o.y <= w.y + 0.05) {
+        o.mode = 'float';
+        o.offV = o.vy * 0.5;  // 착수 순간 물속으로 꽂혔다가 튀어오름
+        o.off = 0;
+        o.tumbleV = 0;
+        splashes.push({ x: w.x, z: w.z, age: 0, power: Math.min(1.6, -o.vy * 0.055) });
+      }
+    } else {
+      o.offV += (-32 * o.off - 6.5 * o.offV) * dt;   // 감쇠 스프링
+      o.off += o.offV * dt;
+      o.x0 += wind[0] * drift * dt;
+      o.z0 += wind[1] * drift * dt;
+      o.yaw += o.spin * dt * params.speed();
+      o.tumble *= Math.max(0, 1 - dt * 1.5);
+      const k = Math.min(1, dt * 2.5); // 파도 기울기 따라가기 (스무딩)
+      o.n[0] += (w.nx - o.n[0]) * k;
+      o.n[1] += (w.ny - o.n[1]) * k;
+      o.n[2] += (w.nz - o.n[2]) * k;
+      if (Math.hypot(w.x - camNow.eye[0], w.z - camNow.eye[2]) > 500) objects.splice(i, 1);
+    }
+  }
+  for (let i = splashes.length - 1; i >= 0; i--) {
+    splashes[i].age += dt;
+    if (splashes[i].age > 1.0) splashes.splice(i, 1);
+  }
+}
+
+function mRotX(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]); }
+function mRotY(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]); }
+function mTRS(pos, up, yaw, pitchX, scale) { // +Y를 up에 정렬 후 회전
+  let r = [up[1], -up[0], 0];
+  let rl = Math.hypot(r[0], r[1]);
+  if (rl < 1e-4) { r = [1, 0, 0]; rl = 1; } // up이 수평(±Z)에 가까울 때 퇴화 방지
+  r = [r[0]/rl, r[1]/rl, 0];
+  const f = [r[1]*up[2] - r[2]*up[1], r[2]*up[0] - r[0]*up[2], r[0]*up[1] - r[1]*up[0]];
+  const B = new Float32Array([
+    r[0]*scale,  r[1]*scale,  r[2]*scale,  0,
+    up[0]*scale, up[1]*scale, up[2]*scale, 0,
+    f[0]*scale,  f[1]*scale,  f[2]*scale,  0,
+    pos[0], pos[1], pos[2], 1,
+  ]);
+  let M = mat4mul(B, mRotY(yaw));
+  if (pitchX) M = mat4mul(M, mRotX(pitchX));
+  return M;
+}
+
+function drawFisherNets() { // 그물 로프 + 자루 + 내용물
+  for (const s of ships) {
+    if (s.type !== 'fisher' || !s.netState || !s._M) continue;
+    const hook = xp4(s._M, NET_HOOK);
+    let bagTop;
+    if (s.netState === 'cast') { // 트롤링: 선미 뒤 수면에 반쯤 잠긴 채 끌려옴
+      const w = gerstnerPoint(s.netX, s.netZ, simT);
+      bagTop = [w.x, w.y + 0.3, w.z];
+    } else if (s.netState === 'haul') { // 수면 → 훅으로 상승
+      const t = 1 - Math.max(0, s.netT) / 1.8;
+      const e = t * t * (3 - 2 * t);
+      const w = gerstnerPoint(s.netFromX, s.netFromZ, simT);
+      bagTop = [w.x + (hook[0] - w.x) * e,
+                (w.y + 0.3) + (hook[1] - 0.75 - w.y - 0.3) * e,
+                w.z + (hook[2] - w.z) * e];
+    } else { // hold: 훅에 매달려 진자 흔들림
+      const swx = Math.sin(simT * 1.1 + s.seed) * 0.10 + s.sRoll * 0.6;
+      const swz = Math.sin(simT * 0.83 + s.seed) * 0.08 - s.sPitch * 0.5;
+      bagTop = [hook[0] + swx, hook[1] - 0.75, hook[2] + swz];
+    }
+    const dx = bagTop[0] - hook[0], dy = bagTop[1] - hook[1], dz = bagTop[2] - hook[2];
+    const L = Math.hypot(dx, dy, dz) || 0.01;
+    gl.uniformMatrix4fv(U(objProg, "uModel"), false,
+      mat4mul(mTRS(hook, [dx / L, dy / L, dz / L], 0, 0, 1), mScale3(0.035, L, 0.035)));
+    gl.bindVertexArray(ropeMesh.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, ropeMesh.count);
+    gl.uniformMatrix4fv(U(objProg, "uModel"), false, mTRS(bagTop, [0, 1, 0], s.heading, 0, 1));
+    gl.bindVertexArray(netBagMesh.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, netBagMesh.count);
+    if (s.netCatch && s.netState !== 'cast') { // 어획물이 그물 안에 보임
+      for (let i = 0; i < s.netCatch.length; i++) {
+        const it = s.netCatch[i];
+        const T2 = OBJ_TYPES[it.type];
+        const p = [bagTop[0] + ((i % 2) - 0.5) * 0.34,
+                   bagTop[1] - 0.6 - Math.floor(i / 2) * 0.28,
+                   bagTop[2] + (((i * 7) % 3) - 1) * 0.15];
+        gl.uniform3fv(U(objProg, "uTint"), it.tint || [1, 1, 1]);
+        gl.uniformMatrix4fv(U(objProg, "uModel"), false,
+          mTRS(p, [0, 1, 0], i * 1.7 + s.seed, T2.base, it.type === 'container' ? 0.30 : 0.55));
+        gl.bindVertexArray(T2.vao);
+        gl.drawArrays(gl.TRIANGLES, 0, T2.count);
+      }
+      gl.uniform3fv(U(objProg, "uTint"), [1, 1, 1]);
+    }
+  }
+}
+
+function drawObjects(vp, sun) {
+  if (!objects.length && !splashes.length && !ships.length && !wakes.length) return;
+  gl.useProgram(objProg);
+  gl.uniformMatrix4fv(U(objProg, "uVP"), false, vp);
+  gl.uniform3fv(U(objProg, "uCamPos"), camNow.eye);
+  gl.uniform3fv(U(objProg, "uSunDir"), sun);
+  gl.uniform1f(U(objProg, "uAlpha"), 1.0);
+  for (const o of objects) {
+    const T = OBJ_TYPES[o.type];
+    let pos, up;
+    if (o.mode === 'fall') {
+      pos = [o.x0, o.y, o.z0];
+      up = [0, 1, 0];
+    } else {
+      const tn = [o.n[0]*T.tilt, 1 - (1 - o.n[1])*T.tilt, o.n[2]*T.tilt];
+      const il = 1 / Math.hypot(tn[0], tn[1], tn[2]);
+      up = [tn[0]*il, tn[1]*il, tn[2]*il];
+      pos = [o.w.x, o.w.y - T.sink + o.off, o.w.z];
+    }
+    gl.uniform3fv(U(objProg, "uTint"), o.tint || [1, 1, 1]);
+    gl.uniformMatrix4fv(U(objProg, "uModel"), false, mTRS(pos, up, o.yaw, o.tumble + T.base, 1));
+    gl.bindVertexArray(T.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, T.count);
+  }
+  gl.uniform3fv(U(objProg, "uTint"), [1, 1, 1]);
+  for (const s of ships) {
+    const T = SHIP_TYPES[s.type];
+    let py = s.sy - T.sink, pit = -s.sPitch, rol = s.sRoll;
+    if (s.sinking) { // 침몰 연출: 뱃머리 숙이며 잠김
+      py -= Math.pow(s.sinkT, 1.6) * 0.075;
+      pit += Math.min(0.45, s.sinkT * 0.05);
+      rol += s.rollDir * Math.min(0.5, s.sinkT * 0.035);
+    }
+    let M = mat4mul(mTranslate(s.x, py, s.z), mRotY(s.heading));
+    M = mat4mul(M, mRotX(pit));
+    M = mat4mul(M, mRotZ(rol));
+    s._M = M; // 그물 등 부착물 렌더용
+    gl.uniformMatrix4fv(U(objProg, "uModel"), false, M);
+    gl.bindVertexArray(T.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, T.count);
+    if (s.type === 'warship') { // 회전 포탑 A·X
+      gl.bindVertexArray(turretMesh.vao);
+      for (const [tz, rel] of [[8.5, s.tYaw], [-11, s.tYawR]]) {
+        let TM = mat4mul(M, mTranslate(0, 2.45, tz));
+        TM = mat4mul(TM, mRotY(rel));
+        gl.uniformMatrix4fv(U(objProg, "uModel"), false, TM);
+        gl.drawArrays(gl.TRIANGLES, 0, turretMesh.count);
+      }
+    }
+  }
+  drawFisherNets();
+  if (shells.length) { // 포탄
+    gl.bindVertexArray(shellMesh.vao);
+    for (const sh of shells) {
+      const vl = Math.hypot(sh.vx, sh.vy, sh.vz) || 1;
+      gl.uniformMatrix4fv(U(objProg, "uModel"), false,
+        mTRS([sh.x, sh.y, sh.z], [sh.vx / vl, sh.vy / vl, sh.vz / vl], 0, 0, 1));
+      gl.drawArrays(gl.TRIANGLES, 0, shellMesh.count);
+    }
+  }
+  if (splashes.length || wakes.length || columns.length) {
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
+    gl.bindVertexArray(splashMesh.vao);
+    for (const s of splashes) {
+      const w = gerstnerPoint(s.x, s.z, simT);
+      for (const [spd, del] of [[5.5, 0], [3.2, 0.12]]) { // 빠른 링 + 느린 링
+        const age = s.age - del;
+        if (age < 0) continue;
+        gl.uniform1f(U(objProg, "uAlpha"), Math.max(0, 1 - age / 0.85) * 0.9);
+        gl.uniformMatrix4fv(U(objProg, "uModel"), false,
+          mTRS([w.x, w.y + 0.06, w.z], [0, 1, 0], 0, 0, (0.5 + age * spd) * s.power));
+        gl.drawArrays(gl.TRIANGLES, 0, splashMesh.count);
+      }
+    }
+    for (const wk of wakes) { // 선박 항적
+      const w = gerstnerPoint(wk.x, wk.z, simT);
+      gl.uniform1f(U(objProg, "uAlpha"), Math.max(0, 1 - wk.age / 2.4) * 0.35);
+      gl.uniformMatrix4fv(U(objProg, "uModel"), false,
+        mTRS([w.x, w.y + 0.05, w.z], [0, 1, 0], 0, 0, wk.r + wk.age * 1.4));
+      gl.drawArrays(gl.TRIANGLES, 0, splashMesh.count);
+    }
+    if (columns.length) { // 포탄 물기둥
+      gl.bindVertexArray(columnMesh.vao);
+      for (const co of columns) {
+        const w = gerstnerPoint(co.x, co.z, simT, 6);
+        const ph = Math.min(co.age / 1.0, 1);
+        const ys = Math.max(co.h * Math.sin(ph * Math.PI), 0.05);
+        gl.uniform1f(U(objProg, "uAlpha"), 0.85 * (1 - ph * 0.7));
+        gl.uniformMatrix4fv(U(objProg, "uModel"), false,
+          mat4mul(mTranslate(co.x, w.y, co.z), mScale3(1.1 + ph * 1.5, ys, 1.1 + ph * 1.5)));
+        gl.drawArrays(gl.TRIANGLES, 0, columnMesh.count);
+      }
+    }
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+    gl.bindVertexArray(null);
+  }
+}
+
+/* ---------------- 카메라 · 행렬 ---------------- */
+function perspective(fovy, asp, n, f) {
+  const t = 1 / Math.tan(fovy / 2), d = 1 / (n - f);
+  return new Float32Array([t/asp,0,0,0, 0,t,0,0, 0,0,(f+n)*d,-1, 0,0,2*f*n*d,0]);
+}
+function mat4mul(a, b) {  // a * b (column-major)
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++)
+    o[c*4+r] = a[r]*b[c*4] + a[4+r]*b[c*4+1] + a[8+r]*b[c*4+2] + a[12+r]*b[c*4+3];
+  return o;
+}
+function lookAt(e, c, up) {
+  let zx=e[0]-c[0], zy=e[1]-c[1], zz=e[2]-c[2];
+  let zl=Math.hypot(zx,zy,zz); zx/=zl; zy/=zl; zz/=zl;
+  let xx=up[1]*zz-up[2]*zy, xy=up[2]*zx-up[0]*zz, xz=up[0]*zy-up[1]*zx;
+  let xl=Math.hypot(xx,xy,xz); xx/=xl; xy/=xl; xz/=xl;
+  const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+  return new Float32Array([
+    xx,yx,zx,0, xy,yy,zy,0, xz,yz,zz,0,
+    -(xx*e[0]+xy*e[1]+xz*e[2]), -(yx*e[0]+yy*e[1]+yz*e[2]), -(zx*e[0]+zy*e[1]+zz*e[2]), 1
+  ]);
+}
+
+/* ---------------- 카메라 상태: 관전 자유비행 / 함선 3인칭 ---------------- */
+let mode = 'spec';      // 'spec' | 'ship'
+let player = null;      // 조종 중인 선박
+const spec = { x: -17.2, y: 7, z: 18.8, yaw: SUN_AZ, pitch: -0.16, spd: 18 };
+const shipCam = { yaw: SUN_AZ, pitch: -0.18, dist: 40 };
+const aimPt = [0, 0];   // 화면 중앙 ↔ 해수면 교점 (포격 조준)
+const keys = {};
+const FOV = 62 * Math.PI / 180;
+
+/* ---------------- 입력 ---------------- */
+const params = {
+  amp:   () => +document.getElementById("sAmp").value,
+  wind:  () => +document.getElementById("sWind").value,
+  chop:  () => +document.getElementById("sChop").value,
+  sun:   () => +document.getElementById("sSun").value,
+  cloud: () => +document.getElementById("sCloud").value,
+  speed: () => +document.getElementById("sSpeed").value,
+  res:   () => +document.getElementById("sRes").value,
+};
+document.getElementById("sWind").addEventListener("input", () => makeWaves(params.wind()));
+document.getElementById("sObj").addEventListener("input", () => {
+  const c = objCap();
+  document.getElementById("lObj").textContent = "부유물 " + (c === Infinity ? "∞" : c);
+});
+makeWaves(params.wind());
+
+const PRESETS = {
+  golden: { sAmp: 1.0, sWind: 0.55, sChop: 0.42, sSun: 8.5, sCloud: 0.5,  sSpeed: 1.0 },
+  noon:   { sAmp: 0.8, sWind: 0.45, sChop: 0.32, sSun: 62,  sCloud: 0.3,  sSpeed: 1.0 },
+  storm:  { sAmp: 1.4, sWind: 0.8,  sChop: 0.50, sSun: 7,   sCloud: 0.75, sSpeed: 1.15 },
+};
+document.querySelectorAll("#presets button").forEach(b => b.addEventListener("click", () => {
+  const p = PRESETS[b.dataset.p];
+  for (const k in p) document.getElementById(k).value = p[k];
+  makeWaves(params.wind());
+}));
+
+// 선박 통행 토글
+document.querySelectorAll("#ships button").forEach(btn => btn.addEventListener("click", () => {
+  const t = btn.dataset.s;
+  shipToggles[t] = !shipToggles[t];
+  btn.classList.toggle("on", shipToggles[t]);
+}));
+
+// 부유물 소환: 버튼 → 카메라 앞바다 임의 지점
+document.querySelectorAll("#spawn button").forEach(btn => btn.addEventListener("click", () => {
+  const t = btn.dataset.t;
+  if (t === "clear") { objects.length = 0; return; }
+  const d = 14 + Math.random() * 26;
+  const ang = Math.atan2(camNow.f[0], camNow.f[2]) + (Math.random() - 0.5) * 0.9;
+  spawnObject(t, camNow.eye[0] + Math.sin(ang) * d, camNow.eye[2] + Math.cos(ang) * d);
+}));
+
+// 부유물 소환: 수면 더블클릭 → 그 자리 (레이캐스트)
+canvas.addEventListener("dblclick", e => {
+  const tanF = Math.tan(FOV / 2);
+  const ndx = (e.clientX / innerWidth) * 2 - 1;
+  const ndy = 1 - (e.clientY / innerHeight) * 2;
+  const rd = [0, 1, 2].map(i =>
+    camNow.f[i] + camNow.r[i] * ndx * tanF * camNow.asp + camNow.u[i] * ndy * tanF);
+  if (rd[1] > -0.02) return; // 하늘을 찍으면 무시
+  const t = -camNow.eye[1] / rd[1];
+  let x = camNow.eye[0] + rd[0] * t, z = camNow.eye[2] + rd[2] * t;
+  const dd = Math.hypot(x - camNow.eye[0], z - camNow.eye[2]);
+  if (dd > 220) { const f = 220 / dd; x = camNow.eye[0] + (x - camNow.eye[0]) * f; z = camNow.eye[2] + (z - camNow.eye[2]) * f; }
+  const keys = Object.keys(OBJ_TYPES);
+  spawnObject(keys[Math.floor(Math.random() * keys.length)], x, z);
+});
+
+let dragging = false, lastX = 0, lastY = 0;
+const pointers = new Map();
+let pinchD = 0;
+canvas.addEventListener("pointerdown", e => {
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pointers.size === 1) { dragging = true; lastX = e.clientX; lastY = e.clientY; }
+  if (pointers.size === 2) {
+    const p = [...pointers.values()];
+    pinchD = Math.hypot(p[0][0]-p[1][0], p[0][1]-p[1][1]);
+    dragging = false;
+  }
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", e => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pointers.size === 2) {
+    const p = [...pointers.values()];
+    const d = Math.hypot(p[0][0]-p[1][0], p[0][1]-p[1][1]);
+    const f = pinchD / Math.max(d, 1);
+    if (mode === 'ship') shipCam.dist = Math.min(160, Math.max(12, shipCam.dist * f));
+    else spec.spd = Math.min(120, Math.max(3, spec.spd / f));
+    pinchD = d;
+  } else if (dragging) {
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    if (mode === 'ship') {
+      shipCam.yaw += dx * 0.0032;
+      shipCam.pitch = Math.min(-0.04, Math.max(-1.15, shipCam.pitch - dy * 0.0028));
+    } else {
+      spec.yaw += dx * 0.0032;
+      spec.pitch = Math.min(1.35, Math.max(-1.35, spec.pitch - dy * 0.0028));
+    }
+    lastX = e.clientX; lastY = e.clientY;
+  }
+});
+const endPtr = e => {
+  pointers.delete(e.pointerId);
+  if (pointers.size === 1) {          // 핀치 → 드래그 복귀
+    const p = pointers.values().next().value;
+    dragging = true; lastX = p[0]; lastY = p[1];
+  } else if (pointers.size === 0) dragging = false;
+};
+canvas.addEventListener("pointerup", endPtr);
+canvas.addEventListener("pointercancel", endPtr);
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (mode === 'ship') shipCam.dist = Math.min(160, Math.max(12, shipCam.dist * Math.exp(e.deltaY * 0.0012)));
+  else spec.spd = Math.min(120, Math.max(3, spec.spd * Math.exp(-e.deltaY * 0.0012)));
+}, { passive: false });
+
+/* ---------------- 조종 · 전투 입력 & HUD ---------------- */
+const hudBarEl = document.getElementById('hudBar');
+const hudMsgEl = document.getElementById('hudMsg');
+const crossEl = document.getElementById('crosshair');
+let msgT = 0;
+function hudSay(t) { hudMsgEl.textContent = t; msgT = 3; }
+
+function updateHUD(dt) {
+  msgT -= dt;
+  hudMsgEl.style.opacity = msgT > 0 ? Math.min(1, msgT / 0.5) : 0;
+  if (mode !== 'ship' || !player) { hudBarEl.style.display = 'none'; crossEl.style.display = 'none'; return; }
+  hudBarEl.style.display = 'block';
+  crossEl.style.display = (player.type === 'warship' && !player.sinking) ? 'block' : 'none';
+  const T = SHIP_TYPES[player.type];
+  const tele = ['◀ 후진', '■ 정지', '▲ 1/4', '▲ 1/2', '▲ 3/4', '▲ 전속'][player.teleIdx];
+  const hpFrac = Math.max(0, player.hp) / T.hp;
+  const bars = '█'.repeat(Math.round(hpFrac * 10)).padEnd(10, '░');
+  let txt = SHIP_EMOJI[player.type] + ' ' + SHIP_NAMES[player.type] +
+    '  HP ' + bars + ' ' + Math.max(0, player.hp) +
+    '  |  기관 ' + tele +
+    '  타 ' + (player.rudder < -0.15 ? '◀' : player.rudder > 0.15 ? '▶' : '─') +
+    '  ' + Math.abs(player.speed * 1.94).toFixed(0) + 'kn';
+  if (player.type === 'warship') {
+    const ad = Math.hypot(aimPt[0] - player.x, aimPt[1] - player.z);
+    txt += '  |  조준 ' + Math.round(ad) + 'm  ' +
+      (player.reload > 0 ? '⏳ 장전 ' + player.reload.toFixed(1) + 's' : '🔥 발사 준비 [Space]');
+  } else if (player.type === 'fisher') {
+    txt += player.netState === 'cast' ? '  |  🕸️ 트롤링 ' + Math.max(0, player.netT).toFixed(1) + 's'
+         : player.netState === 'haul' ? '  |  🎣 인양 중...'
+         : player.netState === 'hold' ? '  |  🧺 어획물 ' + (player.netCatch ? player.netCatch.length : 0) + '개 · [F] 살포'
+         : '  |  [F] 그물 투척';
+  } else {
+    txt += '  |  [F] 컨테이너 살포';
+  }
+  if (player.sinking) txt = '🌊 침몰 중... ㅠㅠ';
+  hudBarEl.textContent = txt;
+}
+
+function possess(type) {
+  release();
+  let best = null, bd = 1e9;
+  for (const s of ships) {
+    if (s.type !== type || s.sinking) continue;
+    const d = Math.hypot(s.x - camNow.eye[0], s.z - camNow.eye[2]);
+    if (d < bd) { bd = d; best = s; }
+  }
+  if (!best) { // 근처에 없으면 앞바다에 새로 배치
+    const fwx = Math.sin(spec.yaw), fwz = Math.cos(spec.yaw);
+    best = { type, x: camNow.eye[0] + fwx * 90, z: camNow.eye[2] + fwz * 90, heading: spec.yaw,
+             seed: Math.random() * 100, wakeT: 0, sy: 0, sPitch: 0, sRoll: 0,
+             hp: SHIP_TYPES[type].hp, reload: 0, tYaw: 0, tYawR: Math.PI, hostile: null,
+             sinking: false, sinkT: 0, rollDir: 1, speed: SHIP_TYPES[type].speed,
+             player: false, teleIdx: 3, rudder: 0, netState: null, netT: 0 };
+    ships.push(best);
+  }
+  player = best;
+  best.player = true;
+  best.teleIdx = 3;
+  best.rudder = 0;
+  mode = 'ship';
+  shipCam.yaw = best.heading;
+  shipCam.pitch = -0.18;
+  shipCam.dist = type === 'warship' ? 55 : type === 'cargo' ? 70 : 30;
+  document.querySelectorAll('#drive button').forEach(b => b.classList.toggle('on', b.dataset.d === type));
+  hudSay(SHIP_NAMES[type] + ' 조종! W/S 기관 · A/D 타' +
+    (type === 'warship' ? ' · Space 포격' : ' · F 특수') + ' · Esc 관전');
+}
+
+function release() {
+  if (player) { player.player = false; player = null; }
+  if (mode === 'ship') { // 현 카메라 위치를 관전으로 승계
+    spec.x = camNow.eye[0]; spec.y = camNow.eye[1]; spec.z = camNow.eye[2];
+    spec.yaw = shipCam.yaw; spec.pitch = shipCam.pitch;
+  }
+  mode = 'spec';
+  document.querySelectorAll('#drive button').forEach(b => b.classList.remove('on'));
+}
+
+function useAbility() {
+  if (!player || player.sinking) return;
+  if (player.type === 'fisher') {
+    if (player.netState === 'cast' || player.netState === 'haul') { hudSay('그물 작업 중...'); return; }
+    if (player.netState === 'hold') { // 보관 중 → 원하는 순간에 살포
+      const fwx = Math.sin(player.heading), fwz = Math.cos(player.heading);
+      const bx = player.x - fwx * 7.5, bz = player.z - fwz * 7.5; // 선미 뒤 바다
+      for (const it of player.netCatch) {
+        spawnObject(it.type,
+          bx - fwx * Math.random() * 2 + (Math.random() - 0.5) * 3,
+          bz - fwz * Math.random() * 2 + (Math.random() - 0.5) * 3,
+          { tint: it.tint, dropY: player.sy + 2.8 });
+      }
+      splashes.push({ x: bx, z: bz, age: 0, power: 1.2 });
+      hudSay('🧺 그물 개방! ' + player.netCatch.length + '개 살포');
+      player.netCatch = null;
+      player.netState = null;
+      return;
+    }
+    player.netState = 'cast';
+    player.netT = 4.5;
+    player.netX = player.x - Math.sin(player.heading) * 13.5;
+    player.netZ = player.z - Math.cos(player.heading) * 13.5;
+    splashes.push({ x: player.netX, z: player.netZ, age: 0, power: 1.1 });
+    hudSay('🕸️ 그물 투척! 트롤링 중...');
+  } else if (player.type === 'cargo') {
+    const fwx = Math.sin(player.heading), fwz = Math.cos(player.heading);
+    const rgx = Math.cos(player.heading), rgz = -Math.sin(player.heading);
+    const tints = [[0.85,0.30,0.25],[0.30,0.50,0.85],[0.40,0.75,0.45],[0.95,0.65,0.25],[0.60,0.65,0.70]];
+    for (let k = 0; k < 5; k++) {
+      const side = k % 2 ? -1 : 1;
+      const lz = 9 - Math.random() * 21;
+      spawnObject('container',
+        player.x + fwx * lz + rgx * side * (6.5 + Math.random() * 3),
+        player.z + fwz * lz + rgz * side * (6.5 + Math.random() * 3),
+        { tint: tints[(Math.random() * tints.length) | 0], dropY: player.sy + 5.5 + Math.random() * 2 });
+    }
+    hudSay('📦 컨테이너 고정 해제! 화물 5개 유실');
+  }
+}
+
+document.querySelectorAll('#drive button').forEach(btn => btn.addEventListener('click', () => {
+  if (player && player.type === btn.dataset.d) release();
+  else possess(btn.dataset.d);
+}));
+
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Escape') release();
+  if (mode === 'ship' && player && !player.sinking && !e.repeat) {
+    if (e.code === 'KeyW') player.teleIdx = Math.min(5, player.teleIdx + 1);
+    if (e.code === 'KeyS') player.teleIdx = Math.max(0, player.teleIdx - 1);
+    if (e.code === 'KeyF') useAbility();
+    if (e.code === 'Space' && player.type === 'warship') {
+      if (player.reload > 0) hudSay('⏳ 장전 중... ' + player.reload.toFixed(1) + 's');
+      else fireSalvo(player, [aimPt[0], aimPt[1]], true);
+    }
+  }
+  if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyF', 'KeyC'].includes(e.code)) e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+/* ---------------- 렌더 루프 ---------------- */
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.75) * params.res();
+  const w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+}
+addEventListener("resize", resize);
+
+let simT = 0, lastT = performance.now(), rafId = 0;
+let fpsAcc = 0, fpsN = 0, fpsLast = performance.now();
+const fpsEl = document.getElementById("fps");
+
+function frame(now) {
+  if (rafId) cancelAnimationFrame(rafId); // 외부에서 중복 호출돼도 루프는 항상 1개
+  rafId = requestAnimationFrame(frame);
+  const dtReal = Math.max((now - lastT) / 1000, 1e-4);
+  lastT = now;
+  const dt = Math.min(dtReal, 0.1);       // 시뮬레이션용 캡 (FPS 측정과 분리)
+  simT += dt * params.speed();
+  resize();
+
+  // 카메라 (관전 자유비행 / 함선 3인칭)
+  const minY = sumAmp * params.amp() * 0.55 + 0.8;
+  let eye, fx, fy, fz;
+  if (mode === 'ship' && player) {
+    const po = shipCam.pitch; // 궤도 앙각 (음수 = 위에서 내려봄)
+    const cpo = Math.cos(po);
+    const bx = Math.sin(shipCam.yaw) * cpo, by = Math.sin(po), bz = Math.cos(shipCam.yaw) * cpo;
+    eye = [player.x - bx * shipCam.dist,
+           Math.max(player.sy + 2.5 - by * shipCam.dist, minY + 1.0),
+           player.z - bz * shipCam.dist];
+    // 시선은 붐보다 완만하게 → 함선은 화면 하단, 중앙 십자선은 먼 수면 (WoWS식)
+    // 카메라를 내리면 가까이, 올리면 멀리 조준됨
+    const vpitch = po * (0.25 + 0.5 * Math.min(1, Math.abs(po) / 1.15));
+    const cvp = Math.cos(vpitch);
+    fx = Math.sin(shipCam.yaw) * cvp; fy = Math.sin(vpitch); fz = Math.cos(shipCam.yaw) * cvp;
+  } else {
+    const cp = Math.cos(spec.pitch);
+    fx = Math.sin(spec.yaw) * cp; fy = Math.sin(spec.pitch); fz = Math.cos(spec.yaw) * cp;
+    const sgx = Math.cos(spec.yaw), sgz = -Math.sin(spec.yaw); // 우측 방향
+    let mx = 0, my = 0, mz = 0;
+    if (keys['KeyW']) { mx += fx; my += fy; mz += fz; }
+    if (keys['KeyS']) { mx -= fx; my -= fy; mz -= fz; }
+    if (keys['KeyD']) { mx += sgx; mz += sgz; }
+    if (keys['KeyA']) { mx -= sgx; mz -= sgz; }
+    if (keys['Space']) my += 1;
+    if (keys['KeyC']) my -= 1;
+    const ml = Math.hypot(mx, my, mz);
+    if (ml > 0.01) {
+      spec.x += mx / ml * spec.spd * dt;
+      spec.y += my / ml * spec.spd * dt;
+      spec.z += mz / ml * spec.spd * dt;
+    }
+    spec.y = Math.min(400, Math.max(minY + 0.6, spec.y));
+    eye = [spec.x, spec.y, spec.z];
+  }
+  const asp = canvas.width / canvas.height;
+  const proj = perspective(FOV, asp, 0.5, 12000);
+  const view = lookAt(eye, [eye[0] + fx, eye[1] + fy, eye[2] + fz], [0, 1, 0]);
+  const vp = mat4mul(proj, view);
+
+  let rx = -fz, ry = 0, rz = fx;                       // right = cross(f, worldUp)
+  const rl = Math.hypot(rx,ry,rz) || 1; rx/=rl; rz/=rl;
+  const ux = ry*fz - rz*fy, uy = rz*fx - rx*fz, uz = rx*fy - ry*fx; // up = cross(right, f)
+
+  // 화면 중앙 조준점 (포격용)
+  if (fy < -0.015) {
+    const tt = -eye[1] / fy;
+    aimPt[0] = eye[0] + fx * tt;
+    aimPt[1] = eye[2] + fz * tt;
+  } else {
+    aimPt[0] = eye[0] + fx * 700;
+    aimPt[1] = eye[2] + fz * 700;
+  }
+  if (mode === 'ship' && player) { // 최소 사거리: 자기 배 코앞으로는 조준 불가
+    const adx = aimPt[0] - player.x, adz = aimPt[1] - player.z;
+    const ad = Math.hypot(adx, adz);
+    if (ad < 45) {
+      const hh = Math.hypot(fx, fz) || 1;
+      aimPt[0] = player.x + fx / hh * 45;
+      aimPt[1] = player.z + fz / hh * 45;
+    }
+  }
+
+  const el = params.sun() * Math.PI / 180;
+  const sun = [Math.sin(SUN_AZ)*Math.cos(el), Math.sin(el), Math.cos(SUN_AZ)*Math.cos(el)];
+
+  gl.viewport(0, 0, canvas.width, canvas.height);
+
+  // 1) 하늘
+  gl.disable(gl.DEPTH_TEST);
+  gl.useProgram(skyProg);
+  gl.uniform3fv(U(skyProg,"uSunDir"), sun);
+  gl.uniform1f(U(skyProg,"uTime"), simT);
+  gl.uniform1f(U(skyProg,"uCloud"), params.cloud());
+  gl.uniform3f(U(skyProg,"uCamFwd"), fx, fy, fz);
+  gl.uniform3f(U(skyProg,"uCamRight"), rx, ry, rz);
+  gl.uniform3f(U(skyProg,"uCamUp"), ux, uy, uz);
+  gl.uniform1f(U(skyProg,"uTanFov"), Math.tan(FOV/2));
+  gl.uniform1f(U(skyProg,"uAspect"), asp);
+  gl.bindVertexArray(skyVao);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  // 2) 바다
+  gl.enable(gl.DEPTH_TEST);
+  gl.clear(gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(seaProg);
+  gl.uniformMatrix4fv(U(seaProg,"uVP"), false, vp);
+  gl.uniform2f(U(seaProg,"uCamXZ"), eye[0], eye[2]);
+  gl.uniform3fv(U(seaProg,"uCamPos"), eye);
+  gl.uniform1f(U(seaProg,"uTime"), simT);
+  gl.uniform1f(U(seaProg,"uAmp"), params.amp());
+  gl.uniform1f(U(seaProg,"uChop"), params.chop());
+  gl.uniform1f(U(seaProg,"uAmpChar"), sumAmp * params.amp() * 0.45);
+  gl.uniform1f(U(seaProg,"uCloud"), params.cloud());
+  gl.uniform3fv(U(seaProg,"uSunDir"), sun);
+  gl.uniform4fv(U(seaProg,"uWaves"), waveArr);
+  gl.uniform1fv(U(seaProg,"uPhases"), phaseArr);
+  gl.bindVertexArray(seaVao);
+  gl.drawElements(gl.TRIANGLES, gidx.length, gl.UNSIGNED_INT, 0);
+  gl.bindVertexArray(null);
+
+  // 3) 부유물 + 물보라
+  camNow.eye = eye;
+  camNow.f = [fx, fy, fz]; camNow.r = [rx, ry, rz]; camNow.u = [ux, uy, uz];
+  camNow.asp = asp;
+  updateObjects(dt);
+  updateShips(dt);
+  updateShells(dt);
+  drawObjects(vp, sun);
+  updateHUD(dt);
+
+  // FPS (실측 dt 기준)
+  fpsAcc += dtReal; fpsN++;
+  if (now - fpsLast > 500) {
+    fpsEl.textContent = Math.round(fpsN / fpsAcc) + " FPS · " + canvas.width + "×" + canvas.height;
+    fpsAcc = 0; fpsN = 0; fpsLast = now;
+  }
+}
+rafId = requestAnimationFrame(frame);
+</script>
+<script>
+/* touch-kit.js — on-screen touch controls for keyboard/mouse web games. No dependencies.
+ * Inline it into a single-file game (<script>…<\/script>) or load it next to the game.
+ *
+ *   const kit = TouchKit.create({
+ *     sticks: [
+ *       { id: 'move', side: 'left',  label: 'MOVE', keys: 'wasd' },            // 'wasd' | 'arrows' | {up,down,left,right} codes
+ *       { id: 'aim',  side: 'right', label: 'AIM',  onMove: (x, y, on) => {} } // analog -1..1, on=false when released
+ *     ],
+ *     buttons: [ { id: 'fire', label: 'FIRE', icon: '✦', key: 'Space' },      // key: KeyboardEvent.code to hold while pressed
+ *                { id: 'map', label: 'MAP', key: 'KeyM', place: 'top-right' } ],
+ *     landscape: true,        // ask to rotate when the phone is held upright
+ *   })
+ *   kit.show(false)           // hide in menus, kit.show(true) in gameplay (default: shown on touch devices)
+ *   kit.stick('aim')          // → { x, y, on }   kit.pressed('fire') → boolean
+ *
+ * Buttons without `key` can use onDown/onUp. Sticks with `keys` send keydown/keyup (8 directions) and still report analog x/y.
+ * Keys are dispatched as KeyboardEvents (key, code, keyCode, which) on document, so window/document listeners receive them.
+ * Everything else on the page keeps working: the kit only captures touches that start on its own zones/buttons.
+ */
+(function () {
+  'use strict'
+  if (window.TouchKit) return
+  const KEYS = { Space: [' ', 32], Enter: ['Enter', 13], Escape: ['Escape', 27], Tab: ['Tab', 9], ShiftLeft: ['Shift', 16],
+    ControlLeft: ['Control', 17], AltLeft: ['Alt', 18], ArrowLeft: ['ArrowLeft', 37], ArrowUp: ['ArrowUp', 38],
+    ArrowRight: ['ArrowRight', 39], ArrowDown: ['ArrowDown', 40], Backspace: ['Backspace', 8] }
+  const keyInfo = code => {
+    if (KEYS[code]) return KEYS[code]
+    if (/^Key[A-Z]$/.test(code)) return [code[3].toLowerCase(), code.charCodeAt(3)]
+    if (/^Digit\d$/.test(code)) return [code[5], code.charCodeAt(5)]
+    return [code, 0]
+  }
+  const held = new Map()                                   // code → count of sources holding it
+  function sendKey(type, code) {
+    const [key, kc] = keyInfo(code)
+    const ev = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true, composed: true })
+    try { Object.defineProperty(ev, 'keyCode', { get: () => kc }); Object.defineProperty(ev, 'which', { get: () => kc }) } catch (e) {}
+    const t = document.activeElement && document.activeElement !== document.body ? document.activeElement : document
+    t.dispatchEvent(ev)
+  }
+  function press(code) { const n = held.get(code) || 0; held.set(code, n + 1); if (n === 0) sendKey('keydown', code) }
+  function release(code) { const n = held.get(code) || 0; if (n <= 1) { held.delete(code); if (n === 1) sendKey('keyup', code) } else held.set(code, n - 1) }
+  function tapKey(code) { press(code); setTimeout(() => release(code), 80) }
+
+  const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
+  const CSS = `
+.tk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:600 11px/1 system-ui,-apple-system,'Segoe UI',sans-serif;
+  letter-spacing:.06em;color:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tk-root.tk-off{display:none}
+.tk-zone{position:absolute;bottom:0;top:22%;pointer-events:auto;touch-action:none}
+.tk-zone.l{left:0;width:42%}.tk-zone.r{right:0;width:42%}
+.tk-base{position:absolute;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;border:2px solid rgba(255,255,255,.28);
+  background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,.02) 70%);transition:opacity .15s;opacity:.55}
+.tk-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
+  background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.55);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.tk-base.on{opacity:.95}
+.tk-lab{position:absolute;left:0;right:0;top:50%;margin-top:-5px;text-align:center;opacity:.75;text-shadow:0 1px 2px #000;pointer-events:none}
+.tk-btns{position:absolute;display:flex;gap:12px;pointer-events:none}
+.tk-btns.br{right:calc(18px + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse;align-items:flex-end}
+.tk-btns.tr{right:calc(12px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));flex-direction:row-reverse}
+.tk-btns.tl{left:calc(12px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top))}
+.tk-btns.bl{left:calc(18px + env(safe-area-inset-left));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse}
+.tk-row{display:flex;gap:12px;flex-direction:row-reverse;align-items:flex-end}
+.tk-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
+  background:rgba(20,22,30,.42);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.tk-btn.s{width:48px;height:48px;font-size:9px}.tk-btn.l{width:84px;height:84px}
+.tk-btn i{font-style:normal;font-size:22px;line-height:1}.tk-btn.s i{font-size:17px}
+.tk-btn.on{background:rgba(255,255,255,.34);border-color:#fff;transform:scale(.94)}
+.tk-rot{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+  background:rgba(8,9,14,.94);color:#eee;font:500 16px/1.5 system-ui,sans-serif;text-align:center;pointer-events:auto;padding:24px}
+.tk-rot b{font-size:44px;display:block;animation:tkr 1.8s ease-in-out infinite}
+.tk-rot button{margin-top:6px;background:none;border:1px solid #666;color:#bbb;border-radius:20px;padding:8px 18px;font:inherit;font-size:13px}
+@keyframes tkr{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait){.tk-rot.need{display:flex}}
+`
+  function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e }
+
+  function create(opt) {
+    opt = opt || {}
+    if (!document.getElementById('tk-style')) { const st = el('style'); st.id = 'tk-style'; st.textContent = CSS; document.head.appendChild(st) }
+    const root = el('div', 'tk-root', document.body)
+    const api = { root, sticks: {}, buttons: {}, visible: false }
+
+    // ---- sticks: floating — the base appears where the thumb lands inside its half of the screen
+    for (const s of opt.sticks || []) {
+      const side = s.side === 'right' ? 'r' : 'l'
+      const zone = el('div', 'tk-zone ' + side, root)
+      if (s.zone) Object.assign(zone.style, s.zone)
+      const base = el('div', 'tk-base', zone), knob = el('div', 'tk-knob', base)
+      if (s.label) el('div', 'tk-lab', knob, s.label)
+      const R = s.radius || 52, dz = s.deadzone == null ? 0.3 : s.deadzone
+      const keys = s.keys === 'wasd' ? { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }
+        : s.keys === 'arrows' ? { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } : s.keys || null
+      const st = { x: 0, y: 0, on: false, pid: null, cx: 0, cy: 0, dirs: {} }
+      api.sticks[s.id || side] = st
+      const rest = () => {                                   // idle hint position; keeps clear of the bottom-right buttons
+        const zr = zone.getBoundingClientRect(); let x = side === 'l' ? 96 : zr.width - 96
+        if (side === 'r' && groups.br) { const gr = groups.br.getBoundingClientRect(); if (gr.width) x = Math.min(x, gr.left - zr.left - 80) }
+        base.style.left = x + 'px'; base.style.top = (zr.height - 110) + 'px'
+      }
+      const setDirs = (want) => {
+        if (!keys) return
+        for (const d of ['up', 'down', 'left', 'right']) {
+          if (want[d] && !st.dirs[d]) { st.dirs[d] = true; press(keys[d]) }
+          else if (!want[d] && st.dirs[d]) { st.dirs[d] = false; release(keys[d]) }
+        }
+      }
+      const move = (px, py) => {
+        let dx = px - st.cx, dy = py - st.cy; const d = Math.hypot(dx, dy)
+        if (d > R) { dx *= R / d; dy *= R / d }
+        knob.style.transform = `translate(${dx}px,${dy}px)`
+        st.x = dx / R; st.y = dy / R
+        const m = Math.hypot(st.x, st.y), a = Math.atan2(st.y, st.x)
+        const want = { up: false, down: false, left: false, right: false }
+        if (m > dz) { const oct = Math.round(a / (Math.PI / 4)); // 8 directions
+          want.right = [0, 1, -1].includes(oct); want.left = [4, -4, 3, -3].includes(oct); want.down = [1, 2, 3].includes(oct); want.up = [-1, -2, -3].includes(oct) }
+        setDirs(want)
+        if (s.onMove) s.onMove(st.x, st.y, true)
+      }
+      zone.addEventListener('pointerdown', e => {
+        if (st.pid !== null) return
+        e.preventDefault(); st.pid = e.pointerId; try { zone.setPointerCapture(e.pointerId) } catch (x) {}
+        const zr = zone.getBoundingClientRect(); st.cx = e.clientX; st.cy = e.clientY
+        base.style.left = (e.clientX - zr.left) + 'px'; base.style.top = (e.clientY - zr.top) + 'px'
+        base.classList.add('on'); st.on = true; move(e.clientX, e.clientY)
+        if (s.onStart) s.onStart()
+      })
+      zone.addEventListener('pointermove', e => { if (e.pointerId === st.pid) { e.preventDefault(); move(e.clientX, e.clientY) } })
+      const end = e => {
+        if (e.pointerId !== st.pid) return
+        st.pid = null; st.on = false; st.x = st.y = 0; knob.style.transform = ''; base.classList.remove('on'); setDirs({}); rest()
+        if (s.onMove) s.onMove(0, 0, false); if (s.onEnd) s.onEnd()
+      }
+      zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end)
+      st.reset = () => { if (st.pid !== null) end({ pointerId: st.pid }) }
+      requestAnimationFrame(rest); addEventListener('resize', rest)
+    }
+
+    // ---- buttons: grouped by place (default bottom-right cluster)
+    const groups = {}
+    for (const b of opt.buttons || []) {
+      const place = b.place || 'bottom-right', code = { 'bottom-right': 'br', 'top-right': 'tr', 'top-left': 'tl', 'bottom-left': 'bl' }[place] || 'br'
+      if (!groups[code]) groups[code] = el('div', 'tk-btns ' + code, root)
+      let parent = groups[code]
+      if (code === 'br' && b.row != null) { parent = groups['br' + b.row] || (groups['br' + b.row] = el('div', 'tk-row', groups.br)) }
+      const btn = el('div', 'tk-btn' + (b.size ? ' ' + b.size : ''), parent, (b.icon ? `<i>${b.icon}</i>` : '') + (b.label ? `<span>${b.label}</span>` : ''))
+      const bs = { down: false, pid: null, el: btn }
+      api.buttons[b.id || b.label] = bs
+      const down = e => {
+        e.preventDefault(); e.stopPropagation()
+        if (b.toggle) { bs.down = !bs.down; btn.classList.toggle('on', bs.down); if (b.key) (bs.down ? press : release)(b.key); (bs.down ? b.onDown : b.onUp) && (bs.down ? b.onDown : b.onUp)(); return }
+        if (bs.pid !== null) return
+        bs.pid = e.pointerId; try { btn.setPointerCapture(e.pointerId) } catch (x) {}
+        bs.down = true; btn.classList.add('on')
+        if (b.key) { if (b.tap) tapKey(b.key); else press(b.key) }
+        if (b.onDown) b.onDown()
+        if (navigator.vibrate && b.buzz !== false) try { navigator.vibrate(8) } catch (x) {}
+      }
+      const up = e => {
+        if (b.toggle || e.pointerId !== bs.pid) return
+        bs.pid = null; bs.down = false; btn.classList.remove('on')
+        if (b.key && !b.tap) release(b.key)
+        if (b.onUp) b.onUp()
+      }
+      btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up)
+      btn.addEventListener('contextmenu', e => e.preventDefault())
+    }
+
+    // ---- portrait → ask to rotate (can be dismissed)
+    let rot = null
+    if (opt.landscape) {
+      rot = el('div', 'tk-rot', document.body, `<b>⟳</b><div>${opt.rotateText || '휴대폰을 가로로 돌려 주세요'}<br><small style="opacity:.6">Rotate your phone</small></div><button type="button">그래도 세로로 하기</button>`)
+      rot.querySelector('button').addEventListener('click', () => rot.classList.remove('need'))
+    }
+
+    // ---- page hygiene for touch play: no pinch/double-tap zoom, no pull-to-refresh, no long-press menu on the game
+    if (opt.preventGestures !== false) {
+      document.documentElement.style.overscrollBehavior = 'none'
+      document.addEventListener('gesturestart', e => e.preventDefault())
+      let lastT = 0
+      document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastT < 300 && !(e.target.closest && e.target.closest('input,textarea,select,a,button'))) e.preventDefault(); lastT = now }, { passive: false })
+    }
+
+    api.show = on => {
+      api.visible = on; root.classList.toggle('tk-off', !on); if (rot) rot.classList.toggle('need', on && !!opt.landscape)
+      if (!on) { for (const s of Object.values(api.sticks)) s.reset && s.reset(); for (const [code] of held) sendKey('keyup', code); held.clear()
+        for (const b of Object.values(api.buttons)) { b.down = false; b.pid = null; b.el.classList.remove('on') } }
+    }
+    api.stick = id => api.sticks[id] || { x: 0, y: 0, on: false }
+    api.pressed = id => !!(api.buttons[id] && api.buttons[id].down)
+    api.destroy = () => { api.show(false); root.remove(); if (rot) rot.remove() }
+    const mode = opt.show || 'auto'
+    api.show(mode === 'always' || (mode === 'auto' && isTouch()))
+    if (mode === 'auto' && !api.visible) addEventListener('touchstart', function once() { removeEventListener('touchstart', once); api.show(true) }, { passive: true })
+    return api
+  }
+
+  // Helpers for games that read the mouse: fire mouse events at a point (client coords).
+  function mouse(target, type, x, y, extra) {
+    const ev = new MouseEvent(type, Object.assign({ clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1 }, extra || {}))
+    ;(target || document.elementFromPoint(x, y) || document).dispatchEvent(ev)
+  }
+  // Resume every AudioContext the game creates, on the first real touch (iOS/Android need a user gesture).
+  function unlockAudio() {
+    const ctxs = new Set(), AC = window.AudioContext || window.webkitAudioContext
+    if (AC && !AC.__tk) { const W = function (...a) { const c = new AC(...a); ctxs.add(c); return c }; W.prototype = AC.prototype; W.__tk = true; window.AudioContext = W; if (window.webkitAudioContext) window.webkitAudioContext = W }
+    const go = () => { for (const c of ctxs) if (c.state === 'suspended') c.resume().catch(() => {}) }
+    addEventListener('pointerdown', go, true); addEventListener('touchend', go, true)
+  }
+  window.TouchKit = { create, press, release, tapKey, sendKey, mouse, unlockAudio, isTouch }
+})()
+</script>
+<script>
+/* ---------------- 휴대폰·태블릿 터치 조작 (touch-kit) ----------------
+   관전: 왼쪽 스틱 = WASD 이동, ▲/▼ = Space/C 승강, 화면 드래그 = 시점, 핀치 = 속도
+   조종: 스틱 위/아래 = W/S 기관 단계, 좌우 = A/D 타, 특수(F) · 포격(Space) · ⤺ 관전(Esc)
+   설정판은 좁은 화면에서 버튼으로 여닫고, 열려 있는 동안은 조작 버튼을 숨긴다. */
+(function () {
+  "use strict";
+  if (!window.TouchKit) return;
+  const panel = document.getElementById("panel"), toggle = document.getElementById("panelToggle");
+  const setPanel = open => { panel.classList.toggle("open", open); toggle.setAttribute("aria-expanded", String(open)); toggle.style.visibility = open ? "hidden" : ""; };
+  toggle.addEventListener("click", () => setPanel(true));
+  document.getElementById("panelClose").addEventListener("click", () => setPanel(false));
+  // 조종 버튼을 누르면 설정판을 닫고 바로 조종
+  document.querySelectorAll("#drive button").forEach(b => b.addEventListener("click", () => { if (getComputedStyle(toggle).display !== "none") setPanel(false); }));
+
+  const kit = TouchKit.create({
+    show: "manual",
+    preventGestures: false,   // 수면 두 번 탭(소환)을 막지 않도록 — 확대는 viewport 설정으로 이미 막혀 있다
+    sticks: [{ id: "move", side: "left", label: "이동", keys: "wasd" }],
+    buttons: [
+      { id: "space", label: "상승", icon: "▲", key: "Space", size: "l", row: 0 },
+      { id: "down", label: "하강", icon: "▼", key: "KeyC", row: 0 },
+      { id: "ability", label: "특수", icon: "✦", key: "KeyF", tap: true, row: 0 },
+      { id: "exit", label: "관전", icon: "⤺", key: "Escape", tap: true, size: "s", row: 1 },
+    ],
+  });
+  let touched = TouchKit.isTouch();
+  addEventListener("touchstart", () => { touched = true; }, { capture: true, passive: true });
+  const B = kit.buttons, show = (b, on) => { b.el.style.display = on ? "" : "none"; };
+  const face = (b, icon, label) => { const k = icon + "|" + label; if (b.face !== k) { b.face = k; b.el.innerHTML = "<i>" + icon + "</i><span>" + label + "</span>"; } };
+  let shown = null, lastMode = "";
+  (function sync() {
+    const want = touched && !panel.classList.contains("open");
+    if (want !== shown) { shown = want; kit.show(want); }
+    const m = mode === "ship" && player ? "ship-" + player.type : "spec";
+    if (m !== lastMode) {
+      lastMode = m;
+      const ship = m !== "spec", war = m === "ship-warship";
+      face(B.space, ship ? "🔥" : "▲", ship ? "포격" : "상승");
+      show(B.space, !ship || war); show(B.down, !ship); show(B.ability, ship && !war); show(B.exit, ship);
+    }
+    requestAnimationFrame(sync);
+  })();
+})();
+</script>
+</body>
+</html>

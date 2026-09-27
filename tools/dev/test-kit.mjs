@@ -21,9 +21,16 @@ try {
   await p.touch('touchEnd', []); await p.wait(60)
   k = await p.eval('__keys()'); aim = await p.eval('__aim'); check('all released', k === '' && !aim.on, { k, aim })
   await p.shot('out/kit-land.png')
+  // 2b) menu button opens a full-screen overlay; the tap's trailing click must not close it
+  const mb = await p.eval("(()=>{const r=document.querySelectorAll('.tk-btns.tl .tk-btn')[0].getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]})()")
+  await p.tap(mb[0], mb[1]); await p.wait(500)
+  let ov = await p.eval("!!document.getElementById('ov')"); check('overlay opened by kit button survives the ghost click', ov === true, ov)
+  await p.tap(420, 200); await p.wait(300); ov = await p.eval("!!document.getElementById('ov')"); check('a later real tap still reaches the overlay', ov === false, ov)
   // 3) portrait: rotate hint visible
   await p.emulate(PRESETS.phone); await p.goto(url, 600)
   const rot = await p.eval(`getComputedStyle(document.querySelector('.tk-rot')).display`); check('portrait shows rotate hint', rot === 'flex', rot)
+  await p.eval("document.querySelector('.tk-rot button').click()"); await p.eval('kit.show(false); kit.show(true); 1')
+  const rot2 = await p.eval(`getComputedStyle(document.querySelector('.tk-rot')).display`); check('dismissed rotate hint stays hidden after show(true)', rot2 === 'none', rot2)
   await p.shot('out/kit-portrait.png')
   // 4) desktop: kit hidden
   await p.emulate(PRESETS.desktop); await p.goto(url, 600)

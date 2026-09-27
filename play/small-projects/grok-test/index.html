@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Snake Game</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1 class="title">Snake</h1>
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">점수</span>
+          <span id="score" class="stat-value">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">최고</span>
+          <span id="high-score" class="stat-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="controls-bar">
+      <label class="difficulty-label">
+        난이도
+        <select id="difficulty" aria-label="난이도 선택">
+          <option value="easy">쉬움</option>
+          <option value="normal" selected>보통</option>
+          <option value="hard">어려움</option>
+        </select>
+      </label>
+      <div class="btn-group">
+        <button type="button" id="btn-pause" class="btn" aria-label="일시정지">일시정지</button>
+        <button type="button" id="btn-restart" class="btn btn-primary" aria-label="재시작">재시작</button>
+      </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="game" width="400" height="400" aria-label="스네이크 게임 보드"></canvas>
+
+      <!-- 시작 / 일시정지 / 게임 오버 오버레이 -->
+      <div id="overlay" class="overlay">
+        <div class="overlay-card">
+          <h2 id="overlay-title">Snake</h2>
+          <p id="overlay-message">방향키 또는 WASD로 시작</p>
+          <p id="overlay-score" class="overlay-score hidden"></p>
+          <button type="button" id="btn-start" class="btn btn-primary btn-lg">시작하기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 모바일 터치 방향 버튼 -->
+    <div class="dpad" aria-label="방향 조작">
+      <button type="button" class="dpad-btn dpad-up" data-dir="up" aria-label="위">▲</button>
+      <div class="dpad-mid">
+        <button type="button" class="dpad-btn dpad-left" data-dir="left" aria-label="왼쪽">◀</button>
+        <button type="button" class="dpad-btn dpad-down" data-dir="down" aria-label="아래">▼</button>
+        <button type="button" class="dpad-btn dpad-right" data-dir="right" aria-label="오른쪽">▶</button>
+      </div>
+    </div>
+
+    <p class="hint">방향키 / WASD · 스와이프 · 터치 버튼</p>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

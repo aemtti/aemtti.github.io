@@ -1,0 +1,57 @@
+(function(AB){
+  class Game{
+    constructor(canvas){
+      this.canvas=canvas;this.ctx=canvas.getContext('2d');this.input=new AB.Input(canvas);this.audio=new AB.AudioManager();this.camera=new AB.Camera();this.particles=new AB.ParticleSystem();this.state='menu';this.debug=false;this.projectiles=[];this.bombs=[];this.lastTime=performance.now();this.accumulator=0;this.fixedStep=1/120;this.fps=60;this.hudTimer=0;this.announcementTimer=0;this.resize();window.addEventListener('resize',()=>this.resize());this.loop=this.loop.bind(this);requestAnimationFrame(this.loop)
+    }
+    resize(){const dpr=Math.min(2,window.devicePixelRatio||1),rect=this.canvas.getBoundingClientRect();this.pixelRatio=dpr;this.cssW=Math.max(1,rect.width);this.cssH=Math.max(1,rect.height);this.canvas.width=Math.round(this.cssW*dpr);this.canvas.height=Math.round(this.cssH*dpr);this.viewW=1280;this.viewH=720;this.renderScale=Math.min(this.cssW/this.viewW,this.cssH/this.viewH);this.offsetX=(this.cssW-this.viewW*this.renderScale)/2;this.offsetY=(this.cssH-this.viewH*this.renderScale)/2}
+    randomSeed(){return Math.random().toString(36).slice(2,8).toUpperCase()}
+    start(seed){
+      this.audio.unlock();this.seed=String(seed||this.randomSeed()).trim()||this.randomSeed();this.rng=new AB.SeededRandom(this.seed);this.roomSpecs=new AB.RoomGenerator(this.seed).generate();this.run=new AB.RunManager(this.seed);this.upgrades=new AB.UpgradeSystem(this.rng);this.player=new AB.Player(85,AB.Balance.world.floorY-AB.Balance.player.height);this.projectiles=[];this.bombs=[];this.deathTimer=0;this.particles.clear();this.camera.x=this.camera.y=0;this.state='playing';this.enterRoom(0);this.showOnly(null);document.getElementById('hud').classList.remove('hidden');this.updateHud();this.canvas.focus();this.announce('불씨가 깨어납니다',1)
+    }
+    restart(){this.start(this.randomSeed())}
+    enterRoom(index){this.projectiles=[];this.bombs=[];this.particles.clear();this.run.roomIndex=index;this.room=new AB.Room(this.roomSpecs[index]);this.room.enter(this);this.player.x=72;this.player.y=AB.Balance.world.floorY-this.player.h;this.player.vx=this.player.vy=0;this.player.weapon.reset();this.camera.x=0;this.updateHud();this.announce(`${index+1} · ${AB.RoomTypeNames[this.room.type]}`,1)}
+    createEnemy(type,x,y,elite=false){if(type==='ranged')return new AB.RangedEnemy(x,y,elite);if(type==='charger')return new AB.ChargerEnemy(x,y,elite);return new AB.MeleeEnemy(x,y,elite)}
+    loop(now){
+      const raw=Math.min(.1,(now-this.lastTime)/1000||0);this.lastTime=now;this.fps+=(1/Math.max(.001,raw)-this.fps)*.08;
+      if(this.state==='playing'){
+        this.accumulator=Math.min(.2,this.accumulator+raw);let first=true;while(this.state==='playing'&&this.accumulator>=this.fixedStep){this.update(this.fixedStep);this.accumulator-=this.fixedStep;if(first){this.input.endFrame();first=false}}
+      }else this.input.endFrame();
+      this.render();requestAnimationFrame(this.loop)
+    }
+    update(dt){
+      this.run.tick(dt);this.player.update(dt,this);this.room.update(dt,this);if(this.deathTimer>0){this.deathTimer-=dt;if(this.deathTimer<=0&&this.player.dead)this.finish(false)}
+      for(let i=0;i<this.room.enemies.length;i++)for(let j=i+1;j<this.room.enemies.length;j++){this.room.enemies[i].separate(this.room.enemies[j]);this.room.enemies[j].separate(this.room.enemies[i])}
+      for(const p of this.projectiles)p.update(dt,this);this.projectiles=this.projectiles.filter(p=>!p.remove);
+      this.updateBombs(dt);this.particles.update(dt);this.camera.update(dt,this.player,this.viewW,this.viewH,this.room);
+      if(!this.room.locked&&this.player.x+this.player.w>this.room.width-20){if(this.room.type==='exit')this.finish(true);else this.enterRoom(this.run.roomIndex+1)}
+      this.hudTimer-=dt;if(this.hudTimer<=0){this.hudTimer=.08;this.updateHud()}
+    }
+    updateBombs(dt){
+      for(const b of this.bombs){if(b.dead)continue;b.fuse-=dt;b.vy+=1200*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.vx*=Math.pow(.14,dt);if(b.y>AB.Balance.world.floorY-9){b.y=AB.Balance.world.floorY-9;b.vy*=-.25}if(b.x<10||b.x>this.room.width-10){b.x=Math.max(10,Math.min(this.room.width-10,b.x));b.vx*=-.2}if(b.fuse<=0)this.explodeBomb(b)}this.bombs=this.bombs.filter(b=>!b.dead)
+    }
+    explodeBomb(b){b.dead=true;this.audio.play('explosion');this.camera.shake(14,.25);this.particles.burst(b.x,b.y,'#ff7048',34,340);for(const enemy of this.room.enemies){if(enemy.dead)continue;const c=enemy.center(),dist=Math.hypot(c.x-b.x,c.y-b.y);if(dist<=b.radius){const dir=c.x>=b.x?1:-1;AB.DamageSystem.damageEnemy(this,enemy,b.damage*(1-dist/b.radius*.35),dir,AB.WeaponDefinitions.ashBomb.knockback,false)}}}
+    damagePlayer(amount,direction,knockback){
+      if(this.player.dead)return;if(this.player.isRolling&&this.player.invulnerable){this.announce('PERFECT DODGE',.75);this.particles.burst(this.player.x+this.player.w/2,this.player.y+this.player.h/2,'#69e0d2',14,210);this.camera.shake(4,.1);return}if(this.player.invulnerable)return;
+      this.player.hp=Math.max(0,this.player.hp-amount);this.player.hurtInvuln=AB.Balance.player.hurtInvuln;this.player.flash=.12;this.player.vx=direction*knockback;this.player.vy=-240;this.camera.shake(11,.22);this.particles.burst(this.player.x+this.player.w/2,this.player.y+this.player.h/2,'#ff4857',13,240);this.audio.play('hit');this.updateHud();if(this.player.hp<=0)this.killPlayer()
+    }
+    killPlayer(){if(this.player.dead)return;this.player.dead=true;this.deathTimer=.6;this.audio.play('death');this.camera.shake(18,.35)}
+    offerUpgrades(){
+      this.state='upgrade';const root=document.getElementById('upgrade-choices');root.innerHTML='';for(const def of this.upgrades.choices()){const btn=document.createElement('button');btn.className='upgrade-card';btn.style.setProperty('--accent',def.accent);btn.innerHTML=`<small>EMBER UPGRADE</small><b>${def.name}</b><p>${def.description}</p>`;btn.addEventListener('click',()=>{this.audio.unlock();this.upgrades.apply(def,this.player);this.room.rewardClaimed=true;this.state='playing';document.getElementById('upgrade-screen').classList.add('hidden');this.updateHud();this.canvas.focus()},{once:true});root.appendChild(btn)}document.getElementById('upgrade-screen').classList.remove('hidden')
+    }
+    togglePause(){if(this.state==='playing'){this.state='paused';this.populateUpgradeList();document.getElementById('pause-screen').classList.remove('hidden')}else if(this.state==='paused'){this.state='playing';document.getElementById('pause-screen').classList.add('hidden');this.lastTime=performance.now();this.canvas.focus()}}
+    populateUpgradeList(){const list=document.getElementById('upgrade-list');list.innerHTML=this.upgrades.acquired.length?this.upgrades.acquired.map(u=>`<li>${u.name}${u.stacks>1?` × ${u.stacks}`:''}</li>`).join(''):'<li>아직 획득한 강화가 없습니다.</li>'}
+    finish(victory){if(this.state==='dead'||this.state==='victory')return;this.state=victory?'victory':'dead';AB.MetaProgress.totalRuns++;AB.MetaProgress.bestRoom=Math.max(AB.MetaProgress.bestRoom,this.run.roomIndex+1);const s=this.run.snapshot(this.upgrades);document.getElementById('end-eyebrow').textContent=victory?'THE ASH GATE OPENS':'THE FLAME FADES';document.getElementById('end-title').textContent=victory?'성채를 돌파했습니다':'불씨가 꺼졌습니다';document.getElementById('end-copy').textContent=victory?'당신의 흔적이 재 위에 남았습니다.':'모든 것은 재로 돌아갑니다. 그러나 다음 불씨가 기다립니다.';document.getElementById('run-stats').innerHTML=this.statsHtml(s);document.getElementById('end-screen').classList.remove('hidden');document.getElementById('hud').classList.add('hidden')}
+    statsHtml(s){const time=`${Math.floor(s.time/60)}:${String(Math.floor(s.time%60)).padStart(2,'0')}`;return[['도달 방',`${s.room}/${this.roomSpecs.length}`],['처치',s.kills],['골드',s.gold],['시간',time],['강화',s.upgrades]].map(([a,b])=>`<div><small>${a}</small><b>${b}</b></div>`).join('')}
+    showOnly(id){for(const el of document.querySelectorAll('.screen'))el.classList.add('hidden');if(id)document.getElementById(id).classList.remove('hidden')}
+    announce(text,duration=.9){const el=document.getElementById('announcement');clearTimeout(this.announcementTimer);el.textContent=text;el.classList.remove('hidden');el.style.animation='none';void el.offsetWidth;el.style.animation=`announce ${duration}s ease-out both`;this.announcementTimer=setTimeout(()=>el.classList.add('hidden'),duration*1000)}
+    updateHud(){if(!this.player||!this.run)return;const ratio=Math.max(0,this.player.hp/this.player.maxHp);document.getElementById('hp-fill').style.width=`${ratio*100}%`;document.getElementById('hp-text').textContent=`${Math.ceil(this.player.hp)} / ${this.player.maxHp}`;document.getElementById('room-text').textContent=`${this.run.roomIndex+1} / ${this.roomSpecs.length}`;document.getElementById('room-type').textContent=AB.RoomTypeNames[this.room.type];document.getElementById('gold-text').textContent=this.run.gold;document.getElementById('kill-text').textContent=this.run.kills;document.getElementById('seed-text').textContent=this.seed;document.getElementById('shot-status').textContent=this.player.rangedCooldown>0?`에너지 볼트 ${this.player.rangedCooldown.toFixed(1)}s`:'에너지 볼트 준비';document.getElementById('bomb-status').textContent=this.player.bombCooldown>0?`재 폭탄 ${this.player.bombCooldown.toFixed(1)}s`:'재 폭탄 준비';document.getElementById('low-health').classList.toggle('hidden',ratio>.25)}
+    render(){
+      const ctx=this.ctx,dpr=this.pixelRatio;ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#050609';ctx.fillRect(0,0,this.canvas.width,this.canvas.height);ctx.setTransform(dpr*this.renderScale,0,0,dpr*this.renderScale,dpr*this.offsetX,dpr*this.offsetY);
+      if(!this.room){ctx.fillStyle='#090c12';ctx.fillRect(0,0,this.viewW,this.viewH);return}ctx.save();ctx.beginPath();ctx.rect(0,0,this.viewW,this.viewH);ctx.clip();this.camera.begin(ctx);this.room.render(ctx,this);for(const p of this.projectiles)p.render(ctx);for(const b of this.bombs)this.renderBomb(ctx,b);this.particles.render(ctx);this.player.render(ctx);if(this.debug)this.renderWorldDebug(ctx);this.camera.end(ctx);if(this.debug)this.renderDebugPanel(ctx);ctx.restore()
+    }
+    renderBomb(ctx,b){const pulse=.5+.5*Math.sin(b.fuse*28);ctx.save();ctx.fillStyle='#1c1c22';ctx.strokeStyle='#ff7148';ctx.lineWidth=3;ctx.beginPath();ctx.arc(b.x,b.y,10,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.globalAlpha=.13+pulse*.08;ctx.fillStyle='#ff6138';ctx.beginPath();ctx.arc(b.x,b.y,b.radius,0,Math.PI*2);ctx.fill();ctx.restore()}
+    renderWorldDebug(ctx){ctx.save();ctx.lineWidth=2;const box=(o,c)=>{ctx.strokeStyle=c;ctx.strokeRect(o.x,o.y,o.w,o.h)};for(const p of this.room.platforms)box(p,p.oneWay?'#72d5ff':'#59768a');box(this.player,'#61f297');for(const e of this.room.enemies){box(e,'#ff6d75');ctx.fillStyle='#fff';ctx.font='10px monospace';ctx.fillText(e.state,e.x,e.y-18)}for(const p of this.projectiles)box(p,p.team==='player'?'#69e0d2':'#d989ef');if(this.player.weapon.currentHitbox)box(this.player.weapon.currentHitbox,'#fff16a');if(this.room.locked)box(this.room.door,'#ff4c54');ctx.restore()}
+    renderDebugPanel(ctx){ctx.save();ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(12,112,240,104);ctx.fillStyle='#7ff7e9';ctx.font='12px monospace';ctx.fillText(`FPS ${this.fps.toFixed(0)}`,24,135);ctx.fillText(`PLAYER vx ${this.player.vx.toFixed(1)} vy ${this.player.vy.toFixed(1)}`,24,155);ctx.fillText(`ROOM ${this.room.id}`,24,175);ctx.fillText(`PROJECTILES ${this.projectiles.length}`,24,195);ctx.fillText(`STATE ${this.state}`,24,215);ctx.restore()}
+  }
+  AB.Game=Game;
+})(window.AB=window.AB||{});

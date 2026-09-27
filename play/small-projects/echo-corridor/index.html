@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0c09">
+  <meta name="description" content="거대 동굴벌레를 피해 달리며 반격하는 HTML5 횡스크롤 생존 액션 게임">
+  <title>잔향 통로: 제9컴퓨터실</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">09</span><span>잔향 통로 <small>LAST PERIOD</small></span></div>
+      <div class="top-actions">
+        <button id="shakeButton" type="button" aria-pressed="true">흔들림 ON</button>
+        <button id="muteButton" type="button" aria-pressed="false">소리 ON</button>
+      </div>
+    </header>
+    <section id="gameFrame" class="game-frame" aria-label="잔향 통로 게임 화면">
+      <canvas id="gameCanvas" width="960" height="540" tabindex="0" aria-label="2D 횡스크롤 생존 액션 게임"></canvas>
+      <div id="hud" class="hud" hidden>
+        <div class="hud-top">
+          <div class="boss-panel">
+            <div class="boss-row"><b>굴혈 포식자</b><span id="phaseText">PHASE 1</span></div>
+            <div class="boss-bar"><i id="bossBar"></i><em id="bossHpText">100%</em></div>
+          </div>
+          <div class="distance-box"><span>추격 거리</span><b id="distanceText">-- m</b></div>
+        </div>
+        <div class="hud-bottom">
+          <div class="metric"><span>생존</span><b id="timeText">00:00.0</b></div>
+          <div class="metric"><span>점수</span><b id="scoreText">000000</b></div>
+          <div id="comboBox" class="combo-box"><small>연속 명중</small><b id="comboText">×0</b></div>
+          <div class="ammo-panel">
+            <div><span>탄약</span><b><strong id="ammoText">10</strong> / <span id="reserveText">90</span></b></div>
+            <div id="reloadTrack" class="reload-track" hidden><i id="reloadBar"></i><em>RELOADING</em></div>
+          </div>
+        </div>
+        <div id="offscreenWarning" class="offscreen-warning" hidden><span>◀</span><b>포식자 접근</b><em id="warningDistance">0 m</em></div>
+        <div id="toast" class="toast" role="status"></div>
+        <div class="crosshair" id="crosshair" aria-hidden="true"></div>
+      </div>
+      <section id="titleScreen" class="overlay title-screen">
+        <div class="screen-noise" aria-hidden="true"></div>
+        <div class="title-card">
+          <p class="eyebrow">2009년, 마지막 야간 자율학습</p>
+          <h1>잔향 통로</h1>
+          <p class="subtitle">제9컴퓨터실에서 무언가 깨어났다.</p>
+          <p class="pitch">앞을 보면 살 수 있고, 뒤를 보면 끝낼 수 있다.</p>
+          <div class="difficulty" role="group" aria-label="난이도 선택">
+            <span>난이도</span>
+            <button type="button" data-difficulty="easy">쉬움<small>연습용</small></button>
+            <button type="button" data-difficulty="normal" class="selected">보통<small>권장</small></button>
+            <button type="button" data-difficulty="hard">어려움<small>악몽</small></button>
+          </div>
+          <div class="screen-actions">
+            <button id="startButton" class="primary" type="button">ENTER · 도주 시작</button>
+            <button id="howButton" type="button">게임 방법</button>
+          </div>
+          <div id="bestSummary" class="best-summary">최고 기록 없음</div>
+        </div>
+      </section>
+      <section id="howScreen" class="overlay" hidden>
+        <div class="modal how-card">
+          <p class="eyebrow">생존 지침 / QUICK MANUAL</p>
+          <h2>달리고, 뛰고, 뒤돌아 쏴라</h2>
+          <div class="manual-grid desk-only">
+            <article><kbd>A</kbd><kbd>D</kbd><b>이동</b><p>오른쪽으로 달려 거리를 벌리세요. 뒤로 달리면 매우 위험합니다.</p></article>
+            <article><kbd>SPACE</kbd><b>점프</b><p>책상과 상자, 끊어진 바닥을 넘습니다.</p></article>
+            <article><span class="mouse-icon">⌖</span><b>조준 · 발사</b><p>마우스로 조준하고 왼쪽 버튼으로 발사합니다. 뒤를 조준하면 속도가 크게 줄어듭니다.</p></article>
+            <article><kbd>S</kbd><kbd>R</kbd><b>재장전</b><p>재장전 중에도 달리고 점프할 수 있지만 발사는 불가능합니다.</p></article>
+            <article><kbd>P</kbd><kbd>ESC</kbd><b>일시정지</b><p>창이 비활성화되어도 자동으로 멈춥니다.</p></article>
+            <article><kbd>ENTER</kbd><b>시작 · 재시작</b><p>괴물과 접촉하거나 구멍에 빠지면 즉시 게임 오버입니다.</p></article>
+          </div>
+          <div class="manual-grid touch-only">
+            <article><span class="mouse-icon">◀▶</span><b>왼쪽 스틱 · 이동</b><p>화면 왼쪽을 끌어 달립니다. 위로 밀면 점프합니다.</p></article>
+            <article><span class="mouse-icon">▲</span><b>점프 버튼</b><p>책상과 상자, 끊어진 바닥을 넘습니다.</p></article>
+            <article><span class="mouse-icon">⌖</span><b>오른쪽 스틱 · 조준 · 발사</b><p>화면 오른쪽을 끌어 조준하고, 절반 이상 밀면 연속 발사합니다. 뒤를 조준하면 느려집니다.</p></article>
+            <article><span class="mouse-icon">↻</span><b>재장전 버튼</b><p>재장전 중에도 달리고 점프할 수 있지만 발사는 불가능합니다.</p></article>
+            <article><span class="mouse-icon">❚❚</span><b>일시정지 · 소리</b><p>오른쪽 위 버튼. 흔들림 설정은 일시정지 화면에 있습니다.</p></article>
+            <article><span class="mouse-icon">!</span><b>즉시 게임 오버</b><p>괴물과 접촉하거나 구멍에 빠지면 끝입니다.</p></article>
+          </div>
+          <div class="rule-callout"><b>핵심 선택</b><span>전력 질주</span><i>↔</i><span>느린 반격</span></div>
+          <div class="screen-actions"><button id="howStartButton" class="primary" type="button">ENTER · 이해했다</button><button id="backButton" type="button">돌아가기</button></div>
+        </div>
+      </section>
+      <section id="pauseScreen" class="overlay compact-overlay" hidden>
+        <div class="modal compact-card">
+          <p class="eyebrow">SIGNAL HOLD</p><h2>일시정지</h2>
+          <p class="desk-only"><kbd>P</kbd> 또는 <kbd>ESC</kbd>로 계속</p>
+          <p class="compact-controls desk-only">A/D 이동 · Space 점프 · 마우스 발사 · S/R 재장전</p>
+          <p class="compact-controls touch-only">왼쪽 스틱 이동(위 = 점프) · 오른쪽 스틱 조준·발사 · 점프 · 재장전</p>
+          <p class="touch-only"><button id="pauseShakeButton" class="pause-setting" type="button">흔들림 ON</button></p>
+          <button id="resumeButton" class="primary" type="button">계속 달리기</button>
+        </div>
+      </section>
+      <section id="victoryScreen" class="overlay compact-overlay result-screen victory" hidden>
+        <div class="modal compact-card"><p class="eyebrow">THREAT NEUTRALIZED</p><h2>새벽까지 살아남았다</h2><strong id="victoryScore">0</strong><p id="victoryStats"></p><button class="primary restart-button" type="button">ENTER · 다시 도전</button></div>
+      </section>
+      <section id="gameOverScreen" class="overlay compact-overlay result-screen game-over" hidden>
+        <div class="modal compact-card"><p class="eyebrow">CONNECTION LOST</p><h2>통로가 삼켰다</h2><strong id="gameOverScore">0</strong><p id="gameOverStats"></p><button class="primary restart-button" type="button">ENTER · 다시 도전</button></div>
+      </section>
+    </section>
+    <footer class="footer-help"><span><kbd>A</kbd><kbd>D</kbd> 이동</span><span><kbd>SPACE</kbd> 점프</span><span>마우스 조준/발사</span><span><kbd>S</kbd><kbd>R</kbd> 재장전</span><span><kbd>P</kbd> 일시정지</span></footer>
+  </main>
+  <script src="game.js"></script>
+  <script src="touch-kit.js"></script>
+  <script src="touch.js"></script>
+</body>
+</html>

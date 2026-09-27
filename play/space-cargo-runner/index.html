@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <title>Space Cargo Runner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <canvas id="game"></canvas>
+
+    <!-- 타이틀 -->
+    <div id="title-screen">
+        <div class="title-panel">
+            <h1>SPACE CARGO RUNNER</h1>
+            <p class="tagline">소행성대에서 적을 격추하고 카고를 상선에 판매하세요</p>
+            <div class="title-buttons">
+                <button id="start-btn">▶ 게임 시작</button>
+                <button id="options-btn">⚙ 옵션</button>
+                <!-- 터치 기기 전용 (전체 화면 지원 시에만 보임) -->
+                <button id="fullscreen-btn" type="button">⛶ 전체 화면</button>
+            </div>
+            <!-- data-touch: 터치 모드에서 바뀌는 안내 문구 (touch-controls.js) -->
+            <p class="controls" data-touch="왼쪽 스틱 이동 · 오른쪽 스틱 조준 (끝까지 밀면 사격) · BOOST 부스터 · SOS 구조신호 · DOCK 정비소 · CARGO 카고 분리 · ❚❚ 일시정지">WASD 이동 · 마우스 조준 · 좌클릭 사격 · SHIFT 부스터 · H 구조신호 · E 정비소 · X 카고 분리 · ESC 일시정지</p>
+        </div>
+    </div>
+
+    <!-- 옵션 -->
+    <div id="options-screen" class="hidden">
+        <div class="options-panel">
+            <h2>옵션</h2>
+            <p class="options-sub">월드 생성 설정 · 1단계 (희박) ~ 10단계 (조밀)</p>
+
+            <div class="opt-row">
+                <div class="opt-info">
+                    <div class="opt-label">소행성 밀도</div>
+                    <div class="opt-hint" id="hint-asteroidDensity"></div>
+                </div>
+                <div class="level-group" data-setting="asteroidDensity"></div>
+            </div>
+            <div class="opt-row">
+                <div class="opt-info">
+                    <div class="opt-label">적 스폰율</div>
+                    <div class="opt-hint" id="hint-enemyDensity"></div>
+                </div>
+                <div class="level-group" data-setting="enemyDensity"></div>
+            </div>
+            <div class="opt-row">
+                <div class="opt-info">
+                    <div class="opt-label">상선 출현 빈도</div>
+                    <div class="opt-hint" id="hint-beaconFreq"></div>
+                </div>
+                <div class="level-group" data-setting="beaconFreq"></div>
+            </div>
+            <div class="opt-row">
+                <div class="opt-info">
+                    <div class="opt-label">정비소 출현 빈도</div>
+                    <div class="opt-hint" id="hint-shipyardFreq"></div>
+                </div>
+                <div class="level-group" data-setting="shipyardFreq"></div>
+            </div>
+
+            <div class="opt-row">
+                <div class="opt-info">
+                    <div class="opt-label">🔊 효과음</div>
+                    <div class="opt-hint" id="hint-sfxEnabled">레이저, 폭발, 픽업, UI 클릭 등의 절차적 사운드</div>
+                </div>
+                <button class="god-toggle" data-setting="sfxEnabled" type="button">
+                    <span class="god-toggle-status">ON</span>
+                    <span class="god-toggle-track">
+                        <span class="god-toggle-thumb"></span>
+                    </span>
+                </button>
+            </div>
+            <div class="opt-row">
+                <div class="opt-info">
+                    <div class="opt-label">🎚 효과음 볼륨</div>
+                    <div class="opt-hint" id="hint-sfxVolume">1 = 가장 작음 / 10 = 최대</div>
+                </div>
+                <div class="level-group" data-setting="sfxVolume"></div>
+            </div>
+
+            <div class="opt-row opt-row-debug">
+                <div class="opt-info">
+                    <div class="opt-label">🛠 갓모드 <span class="debug-tag">DEBUG</span></div>
+                    <div class="opt-hint">격침불가 · 무한연료/카고 · 2배 속도 · V 미사일 · 3/4/5/6 함선변신 · +/- 업그레이드</div>
+                </div>
+                <button class="god-toggle" data-setting="godMode" type="button">
+                    <span class="god-toggle-status">OFF</span>
+                    <span class="god-toggle-track">
+                        <span class="god-toggle-thumb"></span>
+                    </span>
+                </button>
+            </div>
+
+            <p class="options-foot">설정은 자동 저장되며, 다음 새 게임부터 적용됩니다.</p>
+            <button id="opt-close-btn">← 돌아가기</button>
+        </div>
+    </div>
+
+    <!-- 정비소 상점 -->
+    <div id="shop-screen" class="hidden">
+        <div class="shop-panel">
+            <div class="shop-header">
+                <h2>REPAIR STATION</h2>
+                <span class="shop-gold-display">💰 보유 골드: <span id="shop-gold">0</span> G</span>
+            </div>
+
+            <div class="shop-grid">
+                <!-- 선체 수리 -->
+                <section class="shop-section shop-repair">
+                    <h3>🔧 선체 수리</h3>
+                    <p class="shop-line">현재: <strong id="shop-hp-current">100</strong> / <span id="shop-hp-max">100</span> HP</p>
+                    <p class="shop-line subtle">한 번에 <span id="shop-repair-amount">10</span> HP 회복 (1HP 당 1골드)</p>
+                    <p class="shop-line cost">예상 비용: <strong><span id="shop-repair-cost">0</span> G</strong></p>
+                    <button id="shop-repair-btn" class="shop-action-btn">수리하기</button>
+                </section>
+
+                <!-- 연료 보충 -->
+                <section class="shop-section shop-refuel">
+                    <h3>⛽ 연료 보충</h3>
+                    <p class="shop-line">현재: <strong id="shop-fuel-current">100</strong> / <span id="shop-fuel-max">100</span></p>
+                    <p class="shop-line subtle">한 번 누르면 만땅 충전</p>
+                    <p class="shop-line cost">비용: <strong>50 G</strong></p>
+                    <button id="shop-refuel-btn" class="shop-action-btn">만땅 충전 (50 G)</button>
+                </section>
+
+                <!-- 사양 업그레이드 -->
+                <section class="shop-section shop-upgrades">
+                    <h3>⚙ 선체 사양 업그레이드</h3>
+                    <div id="shop-upgrade-list"></div>
+                </section>
+
+                <!-- 함선 계층 향상 -->
+                <section class="shop-section shop-tier">
+                    <h3>🛸 함선 계층 향상</h3>
+                    <p class="shop-line">현재: <strong id="shop-tier-current">Frigate</strong></p>
+                    <p class="shop-line subtle" id="shop-tier-desc">포탑 1기 · HP 100</p>
+                    <p class="shop-line" id="shop-tier-next">다음: Destroyer · 포탑 2기 · HP 150</p>
+                    <button id="shop-tier-btn" class="shop-action-btn">함선 계층 향상</button>
+                </section>
+
+                <!-- 무기 / 포탑 장비 -->
+                <section class="shop-section shop-weapons">
+                    <h3>🔫 무기 / 포탑 장비</h3>
+                    <div class="weapons-layout">
+                        <div class="weapons-catalog">
+                            <h4 class="weapons-catalog-title">구매 가능 무기</h4>
+                            <div id="shop-weapon-list"></div>
+                            <p id="shop-weapon-pending" class="weapons-pending hidden">
+                                <strong>장착 대기</strong>: <span id="shop-pending-name"></span> · <span data-touch="포탑 슬롯을 탭하면 장착됩니다.">우측 포탑 슬롯을 클릭하면 장착됩니다.</span> 기존 무기는 50% 환불.
+                            </p>
+                        </div>
+                        <div class="weapons-ship">
+                            <h4 class="weapons-catalog-title" data-touch="함선 포탑 현황 (슬롯을 탭해 교체)">함선 포탑 현황 (슬롯 클릭으로 교체)</h4>
+                            <div id="shop-ship-diagram" class="ship-diagram"></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <button id="shop-close-btn">← 떠나기 (ESC)</button>
+        </div>
+    </div>
+
+    <!-- 인게임 HUD -->
+    <div id="hud">
+        <div id="hud-top-left">
+            <div class="stat"><span class="label">HP</span>
+                <div class="bar"><div id="hp-fill" class="fill hp"></div></div>
+            </div>
+            <div class="stat"><span class="label">FUEL</span>
+                <div class="bar"><div id="fuel-fill" class="fill fuel"></div></div>
+            </div>
+            <div class="stat"><span class="label">ENERGY</span>
+                <div class="bar"><div id="energy-fill" class="fill energy"></div></div>
+            </div>
+            <div class="stat"><span class="label">GOLD</span><span id="gold-value">0</span></div>
+            <div class="stat"><span class="label">CARGO</span><span id="cargo-value">0</span></div>
+        </div>
+
+        <div id="hud-top-right">
+            <div class="stat"><span class="label">POS</span><span id="pos-value">0, 0</span></div>
+            <div class="stat"><span class="label">SECTOR</span><span id="sector-value">0, 0</span></div>
+        </div>
+
+        <canvas id="minimap" width="180" height="180"></canvas>
+
+        <div id="hud-bottom">
+            <span class="hint">WASD · 마우스 조준 · 좌클릭 사격 · SHIFT 부스터 · H 구조신호 · E 정비소 · X 카고 분리 · ESC 일시정지</span>
+        </div>
+
+        <div id="sos-prompt" class="hidden">
+            <span id="sos-text">⚠ 연료 고갈 — H 키로 구조신호 송출</span>
+            <!-- 터치 전용: 구조선 제안 수락/거절 (키보드는 1 / 2) -->
+            <span id="sos-choice" class="hidden">
+                <button id="sos-accept-btn" type="button">✓ 수락</button>
+                <button id="sos-decline-btn" type="button">✕ 거절</button>
+            </span>
+        </div>
+
+        <div id="pause-screen" class="hidden">
+            <div class="panel">
+                <h1>PAUSED</h1>
+                <div class="pause-buttons">
+                    <button id="resume-btn">▶ 재개</button>
+                    <button id="pause-title-btn">타이틀로</button>
+                </div>
+                <p class="pause-hint">ESC 키로도 재개할 수 있습니다</p>
+            </div>
+        </div>
+
+        <div id="game-over" class="hidden">
+            <div class="panel">
+                <h1>SHIP DESTROYED</h1>
+                <p>총 획득 골드: <span id="final-gold">0</span></p>
+                <div class="game-over-buttons">
+                    <button id="restart-btn">다시 시작</button>
+                    <button id="title-btn">타이틀로</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 로드 순서 -->
+    <script src="js/touch-kit.js"></script>
+    <script src="js/util.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/sfx.js"></script>
+    <script src="js/entities.js"></script>
+    <script src="js/repair-station.js"></script>
+    <script src="js/world.js"></script>
+    <script src="js/hud.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/shop.js"></script>
+    <script src="js/touch-controls.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

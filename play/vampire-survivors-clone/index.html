@@ -1,0 +1,2601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#111111">
+    <title>Survivor's Dawn</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html {
+            height: 100%;
+            background: #111;
+        }
+        body {
+            background: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            /* Mobile: no scroll / zoom / text selection / long-press menu */
+            touch-action: none;
+            overscroll-behavior: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        canvas {
+            background: #1a1a2e;
+            image-rendering: pixelated;
+            touch-action: none;
+        }
+        /* Phones / tablets: the canvas fills the whole screen (resolution follows the screen) */
+        body.mobile canvas {
+            position: fixed;
+            left: 0;
+            top: 0;
+            image-rendering: auto;
+        }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<!-- safe-area probe: notch / home-bar insets for the canvas HUD -->
+<div id="safeProbe" style="position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)"></div>
+<script>
+/* touch-kit.js — on-screen touch controls for keyboard/mouse web games. No dependencies.
+ * Inline it into a single-file game (<script>…<\/script>) or load it next to the game.
+ *
+ *   const kit = TouchKit.create({
+ *     sticks: [
+ *       { id: 'move', side: 'left',  label: 'MOVE', keys: 'wasd' },            // 'wasd' | 'arrows' | {up,down,left,right} codes
+ *       { id: 'aim',  side: 'right', label: 'AIM',  onMove: (x, y, on) => {} } // analog -1..1, on=false when released
+ *     ],
+ *     buttons: [ { id: 'fire', label: 'FIRE', icon: '✦', key: 'Space' },      // key: KeyboardEvent.code to hold while pressed
+ *                { id: 'map', label: 'MAP', key: 'KeyM', place: 'top-right' } ],
+ *     landscape: true,        // ask to rotate when the phone is held upright
+ *   })
+ *   kit.show(false)           // hide in menus, kit.show(true) in gameplay (default: shown on touch devices)
+ *   kit.stick('aim')          // → { x, y, on }   kit.pressed('fire') → boolean
+ *
+ * Buttons without `key` can use onDown/onUp. Sticks with `keys` send keydown/keyup (8 directions) and still report analog x/y.
+ * Keys are dispatched as KeyboardEvents (key, code, keyCode, which) on document, so window/document listeners receive them.
+ * Everything else on the page keeps working: the kit only captures touches that start on its own zones/buttons.
+ */
+(function () {
+  'use strict'
+  if (window.TouchKit) return
+  const KEYS = { Space: [' ', 32], Enter: ['Enter', 13], Escape: ['Escape', 27], Tab: ['Tab', 9], ShiftLeft: ['Shift', 16],
+    ControlLeft: ['Control', 17], AltLeft: ['Alt', 18], ArrowLeft: ['ArrowLeft', 37], ArrowUp: ['ArrowUp', 38],
+    ArrowRight: ['ArrowRight', 39], ArrowDown: ['ArrowDown', 40], Backspace: ['Backspace', 8] }
+  const keyInfo = code => {
+    if (KEYS[code]) return KEYS[code]
+    if (/^Key[A-Z]$/.test(code)) return [code[3].toLowerCase(), code.charCodeAt(3)]
+    if (/^Digit\d$/.test(code)) return [code[5], code.charCodeAt(5)]
+    return [code, 0]
+  }
+  const held = new Map()                                   // code → count of sources holding it
+  function sendKey(type, code) {
+    const [key, kc] = keyInfo(code)
+    const ev = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true, composed: true })
+    try { Object.defineProperty(ev, 'keyCode', { get: () => kc }); Object.defineProperty(ev, 'which', { get: () => kc }) } catch (e) {}
+    const t = document.activeElement && document.activeElement !== document.body ? document.activeElement : document
+    t.dispatchEvent(ev)
+  }
+  function press(code) { const n = held.get(code) || 0; held.set(code, n + 1); if (n === 0) sendKey('keydown', code) }
+  function release(code) { const n = held.get(code) || 0; if (n <= 1) { held.delete(code); if (n === 1) sendKey('keyup', code) } else held.set(code, n - 1) }
+  function tapKey(code) { press(code); setTimeout(() => release(code), 80) }
+
+  const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
+  const CSS = `
+.tk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:600 11px/1 system-ui,-apple-system,'Segoe UI',sans-serif;
+  letter-spacing:.06em;color:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tk-root.tk-off{display:none}
+.tk-zone{position:absolute;bottom:0;top:22%;pointer-events:auto;touch-action:none}
+.tk-zone.l{left:0;width:42%}.tk-zone.r{right:0;width:42%}
+.tk-base{position:absolute;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;border:2px solid rgba(255,255,255,.28);
+  background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,.02) 70%);transition:opacity .15s;opacity:.55}
+.tk-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
+  background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.55);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.tk-base.on{opacity:.95}
+.tk-lab{position:absolute;left:0;right:0;top:50%;margin-top:-5px;text-align:center;opacity:.75;text-shadow:0 1px 2px #000;pointer-events:none}
+.tk-btns{position:absolute;display:flex;gap:12px;pointer-events:none}
+.tk-btns.br{right:calc(18px + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse;align-items:flex-end}
+.tk-btns.tr{right:calc(12px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));flex-direction:row-reverse}
+.tk-btns.tl{left:calc(12px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top))}
+.tk-btns.bl{left:calc(18px + env(safe-area-inset-left));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse}
+.tk-row{display:flex;gap:12px;flex-direction:row-reverse;align-items:flex-end}
+.tk-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
+  background:rgba(20,22,30,.42);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.tk-btn.s{width:48px;height:48px;font-size:9px}.tk-btn.l{width:84px;height:84px}
+.tk-btn i{font-style:normal;font-size:22px;line-height:1}.tk-btn.s i{font-size:17px}
+.tk-btn.on{background:rgba(255,255,255,.34);border-color:#fff;transform:scale(.94)}
+.tk-rot{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+  background:rgba(8,9,14,.94);color:#eee;font:500 16px/1.5 system-ui,sans-serif;text-align:center;pointer-events:auto;padding:24px}
+.tk-rot b{font-size:44px;display:block;animation:tkr 1.8s ease-in-out infinite}
+.tk-rot button{margin-top:6px;background:none;border:1px solid #666;color:#bbb;border-radius:20px;padding:8px 18px;font:inherit;font-size:13px}
+@keyframes tkr{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait){.tk-rot.need{display:flex}}
+`
+  function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e }
+
+  function create(opt) {
+    opt = opt || {}
+    if (!document.getElementById('tk-style')) { const st = el('style'); st.id = 'tk-style'; st.textContent = CSS; document.head.appendChild(st) }
+    const root = el('div', 'tk-root', document.body)
+    const api = { root, sticks: {}, buttons: {}, visible: false }
+
+    // ---- sticks: floating — the base appears where the thumb lands inside its half of the screen
+    for (const s of opt.sticks || []) {
+      const side = s.side === 'right' ? 'r' : 'l'
+      const zone = el('div', 'tk-zone ' + side, root)
+      if (s.zone) Object.assign(zone.style, s.zone)
+      const base = el('div', 'tk-base', zone), knob = el('div', 'tk-knob', base)
+      if (s.label) el('div', 'tk-lab', knob, s.label)
+      const R = s.radius || 52, dz = s.deadzone == null ? 0.3 : s.deadzone
+      const keys = s.keys === 'wasd' ? { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }
+        : s.keys === 'arrows' ? { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } : s.keys || null
+      const st = { x: 0, y: 0, on: false, pid: null, cx: 0, cy: 0, dirs: {} }
+      api.sticks[s.id || side] = st
+      const rest = () => {                                   // idle hint position; keeps clear of the bottom-right buttons
+        const zr = zone.getBoundingClientRect(); let x = side === 'l' ? 96 : zr.width - 96
+        if (side === 'r' && groups.br) { const gr = groups.br.getBoundingClientRect(); if (gr.width) x = Math.min(x, gr.left - zr.left - 80) }
+        base.style.left = x + 'px'; base.style.top = (zr.height - 110) + 'px'
+      }
+      const setDirs = (want) => {
+        if (!keys) return
+        for (const d of ['up', 'down', 'left', 'right']) {
+          if (want[d] && !st.dirs[d]) { st.dirs[d] = true; press(keys[d]) }
+          else if (!want[d] && st.dirs[d]) { st.dirs[d] = false; release(keys[d]) }
+        }
+      }
+      const move = (px, py) => {
+        let dx = px - st.cx, dy = py - st.cy; const d = Math.hypot(dx, dy)
+        if (d > R) { dx *= R / d; dy *= R / d }
+        knob.style.transform = `translate(${dx}px,${dy}px)`
+        st.x = dx / R; st.y = dy / R
+        const m = Math.hypot(st.x, st.y), a = Math.atan2(st.y, st.x)
+        const want = { up: false, down: false, left: false, right: false }
+        if (m > dz) { const oct = Math.round(a / (Math.PI / 4)); // 8 directions
+          want.right = [0, 1, -1].includes(oct); want.left = [4, -4, 3, -3].includes(oct); want.down = [1, 2, 3].includes(oct); want.up = [-1, -2, -3].includes(oct) }
+        setDirs(want)
+        if (s.onMove) s.onMove(st.x, st.y, true)
+      }
+      zone.addEventListener('pointerdown', e => {
+        if (st.pid !== null) return
+        e.preventDefault(); st.pid = e.pointerId; try { zone.setPointerCapture(e.pointerId) } catch (x) {}
+        const zr = zone.getBoundingClientRect(); st.cx = e.clientX; st.cy = e.clientY
+        base.style.left = (e.clientX - zr.left) + 'px'; base.style.top = (e.clientY - zr.top) + 'px'
+        base.classList.add('on'); st.on = true; move(e.clientX, e.clientY)
+        if (s.onStart) s.onStart()
+      })
+      zone.addEventListener('pointermove', e => { if (e.pointerId === st.pid) { e.preventDefault(); move(e.clientX, e.clientY) } })
+      const end = e => {
+        if (e.pointerId !== st.pid) return
+        st.pid = null; st.on = false; st.x = st.y = 0; knob.style.transform = ''; base.classList.remove('on'); setDirs({}); rest()
+        if (s.onMove) s.onMove(0, 0, false); if (s.onEnd) s.onEnd()
+      }
+      zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end)
+      st.reset = () => { if (st.pid !== null) end({ pointerId: st.pid }) }
+      requestAnimationFrame(rest); addEventListener('resize', rest)
+    }
+
+    // ---- buttons: grouped by place (default bottom-right cluster)
+    const groups = {}
+    for (const b of opt.buttons || []) {
+      const place = b.place || 'bottom-right', code = { 'bottom-right': 'br', 'top-right': 'tr', 'top-left': 'tl', 'bottom-left': 'bl' }[place] || 'br'
+      if (!groups[code]) groups[code] = el('div', 'tk-btns ' + code, root)
+      let parent = groups[code]
+      if (code === 'br' && b.row != null) { parent = groups['br' + b.row] || (groups['br' + b.row] = el('div', 'tk-row', groups.br)) }
+      const btn = el('div', 'tk-btn' + (b.size ? ' ' + b.size : ''), parent, (b.icon ? `<i>${b.icon}</i>` : '') + (b.label ? `<span>${b.label}</span>` : ''))
+      const bs = { down: false, pid: null, el: btn }
+      api.buttons[b.id || b.label] = bs
+      const down = e => {
+        e.preventDefault(); e.stopPropagation()
+        if (b.toggle) { bs.down = !bs.down; btn.classList.toggle('on', bs.down); if (b.key) (bs.down ? press : release)(b.key); (bs.down ? b.onDown : b.onUp) && (bs.down ? b.onDown : b.onUp)(); return }
+        if (bs.pid !== null) return
+        bs.pid = e.pointerId; try { btn.setPointerCapture(e.pointerId) } catch (x) {}
+        bs.down = true; btn.classList.add('on')
+        if (b.key) { if (b.tap) tapKey(b.key); else press(b.key) }
+        if (b.onDown) b.onDown()
+        if (navigator.vibrate && b.buzz !== false) try { navigator.vibrate(8) } catch (x) {}
+      }
+      const up = e => {
+        if (b.toggle || e.pointerId !== bs.pid) return
+        bs.pid = null; bs.down = false; btn.classList.remove('on')
+        if (b.key && !b.tap) release(b.key)
+        if (b.onUp) b.onUp()
+      }
+      btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up)
+      btn.addEventListener('contextmenu', e => e.preventDefault())
+    }
+
+    // ---- portrait → ask to rotate (can be dismissed)
+    let rot = null
+    if (opt.landscape) {
+      rot = el('div', 'tk-rot', document.body, `<b>⟳</b><div>${opt.rotateText || '휴대폰을 가로로 돌려 주세요'}<br><small style="opacity:.6">Rotate your phone</small></div><button type="button">그래도 세로로 하기</button>`)
+      rot.querySelector('button').addEventListener('click', () => rot.classList.remove('need'))
+    }
+
+    // ---- page hygiene for touch play: no pinch/double-tap zoom, no pull-to-refresh, no long-press menu on the game
+    if (opt.preventGestures !== false) {
+      document.documentElement.style.overscrollBehavior = 'none'
+      document.addEventListener('gesturestart', e => e.preventDefault())
+      let lastT = 0
+      document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastT < 300 && !(e.target.closest && e.target.closest('input,textarea,select,a,button'))) e.preventDefault(); lastT = now }, { passive: false })
+    }
+
+    api.show = on => {
+      api.visible = on; root.classList.toggle('tk-off', !on); if (rot) rot.classList.toggle('need', on && !!opt.landscape)
+      if (!on) { for (const s of Object.values(api.sticks)) s.reset && s.reset(); for (const [code] of held) sendKey('keyup', code); held.clear()
+        for (const b of Object.values(api.buttons)) { b.down = false; b.pid = null; b.el.classList.remove('on') } }
+    }
+    api.stick = id => api.sticks[id] || { x: 0, y: 0, on: false }
+    api.pressed = id => !!(api.buttons[id] && api.buttons[id].down)
+    api.destroy = () => { api.show(false); root.remove(); if (rot) rot.remove() }
+    const mode = opt.show || 'auto'
+    api.show(mode === 'always' || (mode === 'auto' && isTouch()))
+    if (mode === 'auto' && !api.visible) addEventListener('touchstart', function once() { removeEventListener('touchstart', once); api.show(true) }, { passive: true })
+    return api
+  }
+
+  // Helpers for games that read the mouse: fire mouse events at a point (client coords).
+  function mouse(target, type, x, y, extra) {
+    const ev = new MouseEvent(type, Object.assign({ clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1 }, extra || {}))
+    ;(target || document.elementFromPoint(x, y) || document).dispatchEvent(ev)
+  }
+  // Resume every AudioContext the game creates, on the first real touch (iOS/Android need a user gesture).
+  function unlockAudio() {
+    const ctxs = new Set(), AC = window.AudioContext || window.webkitAudioContext
+    if (AC && !AC.__tk) { const W = function (...a) { const c = new AC(...a); ctxs.add(c); return c }; W.prototype = AC.prototype; W.__tk = true; window.AudioContext = W; if (window.webkitAudioContext) window.webkitAudioContext = W }
+    const go = () => { for (const c of ctxs) if (c.state === 'suspended') c.resume().catch(() => {}) }
+    addEventListener('pointerdown', go, true); addEventListener('touchend', go, true)
+  }
+  window.TouchKit = { create, press, release, tapKey, sendKey, mouse, unlockAudio, isTouch }
+})()
+</script>
+<script>
+// =============================================================================
+// SURVIVOR'S DAWN — Phase 1-7: Complete Game
+// =============================================================================
+
+// --- Game States ---
+const GameState = {
+    TITLE: 'title',
+    PLAYING: 'playing',
+    PAUSED: 'paused',
+    GAMEOVER: 'gameover',
+};
+
+// --- Canvas Setup ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Logical frame size in game units. Desktop: always 960x640 (letterboxed, as before).
+// Phones/tablets (MOBILE_LAYOUT): the frame follows the screen's aspect ratio so the game
+// fills the screen in portrait and landscape, with a short side of 440–640 units.
+let BASE_WIDTH = 960;
+let BASE_HEIGHT = 640;
+const MOBILE_LAYOUT = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+let pixelScale = 1;                                       // canvas pixels per game unit
+let viewScale = 1;                                        // CSS pixels per game unit
+const safeArea = { top: 0, right: 0, bottom: 0, left: 0 }; // notch / home bar, in game units
+if (MOBILE_LAYOUT) document.body.classList.add('mobile');
+
+canvas.width = BASE_WIDTH;
+canvas.height = BASE_HEIGHT;
+
+function resizeCanvas() {
+    if (MOBILE_LAYOUT) { resizeMobile(); return; }
+    const windowRatio = window.innerWidth / window.innerHeight;
+    const gameRatio = BASE_WIDTH / BASE_HEIGHT;
+    let displayWidth, displayHeight;
+    if (windowRatio > gameRatio) {
+        displayHeight = window.innerHeight;
+        displayWidth = displayHeight * gameRatio;
+    } else {
+        displayWidth = window.innerWidth;
+        displayHeight = displayWidth / gameRatio;
+    }
+    canvas.style.width = displayWidth + 'px';
+    canvas.style.height = displayHeight + 'px';
+}
+
+function resizeMobile() {
+    const vw = Math.max(1, window.innerWidth), vh = Math.max(1, window.innerHeight);
+    const aspect = Math.max(vw / vh, vh / vw);
+    // Short side 440–640 units (phones ≈ 440 → UI text stays readable), long side ≤ 1000 units
+    // so the enemy spawn ring (500 units from the player) stays just off-screen.
+    let shortSide = Math.min(640, Math.max(440, Math.min(vw, vh) / 0.9));
+    if (shortSide * aspect > 1000) shortSide = 1000 / aspect;
+    viewScale = Math.min(vw, vh) / shortSide;
+    BASE_WIDTH = vw / viewScale;
+    BASE_HEIGHT = vh / viewScale;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(vw * dpr);
+    canvas.height = Math.round(vh * dpr);
+    pixelScale = canvas.width / BASE_WIDTH;
+    canvas.style.width = vw + 'px';
+    canvas.style.height = vh + 'px';
+    const probe = document.getElementById('safeProbe');
+    if (probe) {
+        const cs = getComputedStyle(probe);
+        safeArea.top = (parseFloat(cs.paddingTop) || 0) / viewScale;
+        safeArea.right = (parseFloat(cs.paddingRight) || 0) / viewScale;
+        safeArea.bottom = (parseFloat(cs.paddingBottom) || 0) / viewScale;
+        safeArea.left = (parseFloat(cs.paddingLeft) || 0) / viewScale;
+    }
+}
+
+/** Mobile: never draw UI text smaller than ~12.5 CSS px. Desktop: unchanged. */
+function uiFont(px) {
+    return MOBILE_LAYOUT ? Math.max(px, Math.ceil(12.5 / viewScale)) : px;
+}
+
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 120));
+resizeCanvas();
+
+// --- Utility Functions ---
+function dist(x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function circleCollision(x1, y1, r1, x2, y2, r2) {
+    return dist(x1, y1, x2, y2) < r1 + r2;
+}
+
+function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function lerp(a, b, t) {
+    return a + (b - a) * t;
+}
+
+// --- Input Handling ---
+const keys = {};
+
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+        e.preventDefault();
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+});
+
+// =============================================================================
+// Phase 7: Mobile Touch Support (Virtual Joystick)
+// Phones/tablets: floating touch stick (put a thumb down anywhere and drag) plus
+// PAUSE / SOUND buttons (touch-kit, inlined above). Title, pause, game-over and
+// upgrade-card screens are plain taps on the canvas.
+// =============================================================================
+
+const touchInput = {
+    active: false,
+    dx: 0, dy: 0,            // Analog direction, length <= 1
+    deadZone: 0.18,          // Fraction of the stick radius
+    seen: false,             // A touch happened on this device
+};
+
+// iOS/Android only start audio inside a user gesture: resume on the first touch.
+TouchKit.unlockAudio();
+
+const touchKit = TouchKit.create({
+    sticks: [{
+        id: 'move', side: 'left', label: 'MOVE',
+        zone: { left: '0', top: '0', width: '100%' },   // the whole screen is the stick zone
+        onMove: (x, y, on) => {
+            const len = Math.hypot(x, y);
+            touchInput.active = on;
+            if (!on || len < touchInput.deadZone) { touchInput.dx = 0; touchInput.dy = 0; return; }
+            // A light push walks slower; past ~60% of the radius is full speed.
+            const mag = Math.min(1, (len - touchInput.deadZone) / (0.6 - touchInput.deadZone));
+            touchInput.dx = x / len * mag;
+            touchInput.dy = y / len * mag;
+        },
+    }],
+    buttons: [
+        { id: 'pause', icon: '❚❚', key: 'Escape', tap: true, place: 'top-right', size: 's' },
+        { id: 'sound', icon: '🔊', key: 'KeyM', tap: true, place: 'top-right', size: 's' },
+    ],
+    show: 'manual',          // shown only during gameplay (see syncTouchKit)
+});
+touchKit.root.querySelector('.tk-btns.tr').setAttribute('aria-label', 'Pause / Sound');
+
+addEventListener('touchstart', () => { touchInput.seen = true; }, { capture: true, passive: true });
+
+let touchKitShown = null;
+/** Touch wording / touch HUD layout (phones, tablets, or any device that got a touch). */
+function touchUI() { return MOBILE_LAYOUT || touchInput.seen; }
+/** Called every frame: controls only while playing (menus/upgrade cards take taps). */
+function syncTouchKit() {
+    const want = game.state === GameState.PLAYING && !(upgradeSystem && upgradeSystem.isShowingPopup)
+        && (touchInput.seen || TouchKit.isTouch());
+    if (want !== touchKitShown) {
+        touchKitShown = want;
+        touchKit.show(want);
+        if (!want) { touchInput.active = false; touchInput.dx = 0; touchInput.dy = 0; }
+    }
+    const sb = touchKit.buttons.sound, icon = AudioSystem.isEnabled ? '🔊' : '🔇';
+    if (sb && sb.icon !== icon) { sb.icon = icon; sb.el.querySelector('i').textContent = icon; }
+}
+
+// Menus: a tap is a click (the stick zone is hidden outside gameplay).
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    touchInput.seen = true;
+    AudioSystem.init(); // Ensure audio works on mobile
+    const touch = e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    game._mouseX = (touch.clientX - rect.left) * (BASE_WIDTH / rect.width);
+    game._mouseY = (touch.clientY - rect.top) * (BASE_HEIGHT / rect.height);
+    canvas.dispatchEvent(new MouseEvent('click', {
+        clientX: touch.clientX, clientY: touch.clientY,
+    }));
+}, { passive: false });
+
+// =============================================================================
+// Phase 7: Procedural Sound Effects (Web Audio API)
+// =============================================================================
+
+const AudioSystem = (() => {
+    let audioCtx = null;
+    let masterGain = null;
+    let enabled = true;
+
+    function init() {
+        if (audioCtx) return;
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.3;
+            masterGain.connect(audioCtx.destination);
+        } catch (e) { enabled = false; }
+    }
+
+    function play(fn) {
+        if (!enabled || !audioCtx) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        fn(audioCtx, masterGain);
+    }
+
+    return {
+        init,
+        // Short hit sound
+        hit() {
+            play((ctx, dest) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(220, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+                osc.connect(gain); gain.connect(dest);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.08);
+            });
+        },
+        // Enemy death pop
+        enemyDeath() {
+            play((ctx, dest) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+                osc.connect(gain); gain.connect(dest);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.12);
+            });
+        },
+        // Player damage
+        playerHit() {
+            play((ctx, dest) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+                osc.connect(gain); gain.connect(dest);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.2);
+            });
+        },
+        // XP pickup ding
+        xpPickup() {
+            play((ctx, dest) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800 + Math.random() * 400, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.06);
+                gain.gain.setValueAtTime(0.06, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+                osc.connect(gain); gain.connect(dest);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.06);
+            });
+        },
+        // Level up fanfare
+        levelUp() {
+            play((ctx, dest) => {
+                [523.25, 659.25, 783.99].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    const t = ctx.currentTime + i * 0.1;
+                    osc.frequency.setValueAtTime(freq, t);
+                    gain.gain.setValueAtTime(0.15, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+                    osc.connect(gain); gain.connect(dest);
+                    osc.start(t); osc.stop(t + 0.25);
+                });
+            });
+        },
+        // Nova blast boom
+        novaBurst() {
+            play((ctx, dest) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(120, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+                osc.connect(gain); gain.connect(dest);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.25);
+                // Noise burst
+                const bufferSize = ctx.sampleRate * 0.1;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+                const noise = ctx.createBufferSource();
+                const noiseGain = ctx.createGain();
+                noise.buffer = buffer;
+                noiseGain.gain.setValueAtTime(0.08, ctx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+                noise.connect(noiseGain); noiseGain.connect(dest);
+                noise.start(ctx.currentTime); noise.stop(ctx.currentTime + 0.1);
+            });
+        },
+        // Forward shot fire
+        shoot() {
+            play((ctx, dest) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.06, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+                osc.connect(gain); gain.connect(dest);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.05);
+            });
+        },
+        // Boss spawn warning
+        bossWarning() {
+            play((ctx, dest) => {
+                for (let i = 0; i < 3; i++) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    const t = ctx.currentTime + i * 0.15;
+                    osc.frequency.setValueAtTime(100, t);
+                    osc.frequency.exponentialRampToValueAtTime(200, t + 0.1);
+                    gain.gain.setValueAtTime(0.2, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                    osc.connect(gain); gain.connect(dest);
+                    osc.start(t); osc.stop(t + 0.12);
+                }
+            });
+        },
+        // Boss death explosion
+        bossDeath() {
+            play((ctx, dest) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(80, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.25, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc.connect(gain); gain.connect(dest);
+                osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5);
+                // Big noise
+                const bufferSize = ctx.sampleRate * 0.3;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
+                const noise = ctx.createBufferSource();
+                const noiseGain = ctx.createGain();
+                noise.buffer = buffer;
+                noiseGain.gain.setValueAtTime(0.15, ctx.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                noise.connect(noiseGain); noiseGain.connect(dest);
+                noise.start(ctx.currentTime); noise.stop(ctx.currentTime + 0.3);
+            });
+        },
+        // Game over
+        gameOver() {
+            play((ctx, dest) => {
+                [392, 349.23, 293.66, 261.63].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    const t = ctx.currentTime + i * 0.2;
+                    osc.frequency.setValueAtTime(freq, t);
+                    gain.gain.setValueAtTime(0.15, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+                    osc.connect(gain); gain.connect(dest);
+                    osc.start(t); osc.stop(t + 0.35);
+                });
+            });
+        },
+        toggle() { enabled = !enabled; return enabled; },
+        get isEnabled() { return enabled; },
+    };
+})();
+
+// =============================================================================
+// Phase 5: Visual Effects Systems
+// =============================================================================
+
+// --- Screen Shake ---
+class ScreenShake {
+    constructor() {
+        this.intensity = 0;
+        this.duration = 0;
+        this.timer = 0;
+        this.offsetX = 0;
+        this.offsetY = 0;
+    }
+
+    /** Trigger a screen shake */
+    trigger(intensity, duration) {
+        // Only override if stronger than current shake
+        if (intensity > this.intensity * (this.timer / this.duration || 0)) {
+            this.intensity = intensity;
+            this.duration = duration;
+            this.timer = duration;
+        }
+    }
+
+    update(dt) {
+        if (this.timer > 0) {
+            this.timer -= dt;
+            const progress = this.timer / this.duration;
+            const currentIntensity = this.intensity * progress;
+            this.offsetX = (Math.random() * 2 - 1) * currentIntensity;
+            this.offsetY = (Math.random() * 2 - 1) * currentIntensity;
+        } else {
+            this.offsetX = 0;
+            this.offsetY = 0;
+        }
+    }
+}
+
+// --- Floating Damage Numbers ---
+class DamageNumber {
+    constructor(x, y, amount, color) {
+        this.x = x;
+        this.y = y;
+        this.amount = amount;
+        this.color = color || '#fff';
+        this.lifetime = 0.8;
+        this.maxLifetime = 0.8;
+        this.vy = -60; // float upward
+        this.vx = (Math.random() - 0.5) * 30; // slight horizontal drift
+        this.scale = 1.0;
+    }
+
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.vy *= 0.95; // slow down over time
+        this.lifetime -= dt;
+        // Scale up briefly then shrink
+        const progress = 1 - this.lifetime / this.maxLifetime;
+        if (progress < 0.15) {
+            this.scale = lerp(1.0, 1.4, progress / 0.15);
+        } else {
+            this.scale = lerp(1.4, 0.6, (progress - 0.15) / 0.85);
+        }
+    }
+
+    draw(ctx, camera) {
+        if (this.lifetime <= 0) return;
+        const pos = camera.worldToScreen(this.x, this.y);
+        const alpha = Math.min(1, this.lifetime / 0.3);
+
+        ctx.globalAlpha = alpha;
+        ctx.font = `bold ${Math.round(14 * this.scale)}px monospace`;
+        ctx.textAlign = 'center';
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillText(this.amount, pos.x + 1, pos.y + 1);
+
+        // Main text
+        ctx.fillStyle = this.color;
+        ctx.fillText(this.amount, pos.x, pos.y);
+
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
+    }
+}
+
+// --- Particle System ---
+class Particle {
+    constructor(x, y, vx, vy, color, radius, lifetime) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.radius = radius;
+        this.lifetime = lifetime;
+        this.maxLifetime = lifetime;
+    }
+
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.vx *= 0.96;
+        this.vy *= 0.96;
+        this.lifetime -= dt;
+    }
+
+    draw(ctx, camera) {
+        if (this.lifetime <= 0) return;
+        if (!camera.isVisible(this.x, this.y, this.radius)) return;
+        const pos = camera.worldToScreen(this.x, this.y);
+        const progress = this.lifetime / this.maxLifetime;
+
+        ctx.globalAlpha = progress;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, this.radius * progress, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
+/** Spawn a burst of particles at a position (for enemy death) */
+function spawnDeathParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 / count) * i + (Math.random() - 0.5) * 0.5;
+        const speed = 80 + Math.random() * 120;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+        const radius = 2 + Math.random() * 3;
+        const lifetime = 0.3 + Math.random() * 0.4;
+        particles.push(new Particle(x, y, vx, vy, color, radius, lifetime));
+    }
+}
+
+/** Spawn XP pickup sparkle particles */
+function spawnXPPickupParticles(x, y) {
+    for (let i = 0; i < 5; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 30 + Math.random() * 50;
+        particles.push(new Particle(
+            x, y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            '#69f0ae', 2 + Math.random() * 2, 0.3 + Math.random() * 0.2
+        ));
+    }
+}
+
+// --- Camera ---
+class Camera {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+    }
+
+    follow(target) {
+        this.x = target.x - BASE_WIDTH / 2;
+        this.y = target.y - BASE_HEIGHT / 2;
+    }
+
+    worldToScreen(wx, wy) {
+        return { x: wx - this.x + screenShake.offsetX, y: wy - this.y + screenShake.offsetY };
+    }
+
+    isVisible(wx, wy, radius) {
+        const sx = wx - this.x;
+        const sy = wy - this.y;
+        return sx + radius > -50 && sx - radius < BASE_WIDTH + 50 &&
+               sy + radius > -50 && sy - radius < BASE_HEIGHT + 50;
+    }
+}
+
+// --- Player ---
+class Player {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 16;
+        this.baseSpeed = 200;
+        this.speedBonus = 0;
+        this.color = '#4fc3f7';
+        this.bodyAngle = 0;
+
+        this.maxHp = 100;
+        this.hp = this.maxHp;
+        this.invincibleTimer = 0;
+        this.invincibleDuration = 0.5;
+
+        this.xp = 0;
+        this.level = 1;
+        this.xpToNext = 10;
+        this.pendingLevelUps = 0;
+
+        // Phase 5: XP magnet
+        this.magnetRadius = 80;
+
+        // Phase 5: hit flash overlay
+        this.hitFlashTimer = 0;
+    }
+
+    get speed() {
+        return this.baseSpeed + this.speedBonus;
+    }
+
+    update(dt) {
+        if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
+        if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+
+        let dx = 0, dy = 0;
+        // Keyboard input
+        if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+        if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
+        if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+        if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+
+        // Phase 7: Touch input (overrides keyboard if active)
+        let analog = false;
+        if (touchInput.active && (touchInput.dx !== 0 || touchInput.dy !== 0)) {
+            dx = touchInput.dx;
+            dy = touchInput.dy;
+            analog = true;   // stick vector is already length <= 1
+        }
+
+        if (!analog && dx !== 0 && dy !== 0) {
+            const len = Math.sqrt(dx * dx + dy * dy);
+            dx /= len; dy /= len;
+        }
+
+        this.x += dx * this.speed * dt;
+        this.y += dy * this.speed * dt;
+
+        if (dx !== 0 || dy !== 0) this.bodyAngle = Math.atan2(dy, dx);
+    }
+
+    takeDamage(amount) {
+        if (this.invincibleTimer > 0) return false;
+        this.hp -= amount;
+        this.invincibleTimer = this.invincibleDuration;
+        this.hitFlashTimer = 0.15;
+
+        // Phase 5: screen shake on player damage
+        screenShake.trigger(amount >= 15 ? 8 : 4, 0.2);
+
+        // Phase 5: damage number on player
+        damageNumbers.push(new DamageNumber(this.x, this.y - 20, amount, '#ff5252'));
+
+        // Phase 7: sound
+        AudioSystem.playerHit();
+
+        if (this.hp <= 0) { this.hp = 0; return true; }
+        return false;
+    }
+
+    addXP(amount) {
+        this.xp += amount;
+        let levelsGained = 0;
+        while (this.xp >= this.xpToNext) {
+            this.xp -= this.xpToNext;
+            this.level++;
+            this.xpToNext = Math.floor(10 * Math.pow(1.3, this.level - 1));
+            levelsGained++;
+        }
+        this.pendingLevelUps += levelsGained;
+        return levelsGained;
+    }
+
+    draw(ctx, camera) {
+        const pos = camera.worldToScreen(this.x, this.y);
+
+        // Invincibility blink
+        if (this.invincibleTimer > 0 && Math.floor(this.invincibleTimer * 10) % 2 === 0) {
+            ctx.globalAlpha = 0.4;
+        }
+
+        // Hit flash: red tint overlay
+        const isHitFlashing = this.hitFlashTimer > 0;
+
+        // Body
+        ctx.fillStyle = isHitFlashing ? '#ff6666' : this.color;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = isHitFlashing ? '#ff0000' : '#0277bd';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Direction indicator
+        const tipDist = this.radius + 6;
+        const tipX = pos.x + Math.cos(this.bodyAngle) * tipDist;
+        const tipY = pos.y + Math.sin(this.bodyAngle) * tipDist;
+        const ba = 2.5;
+        const bx1 = pos.x + Math.cos(this.bodyAngle - ba) * (this.radius * 0.5);
+        const by1 = pos.y + Math.sin(this.bodyAngle - ba) * (this.radius * 0.5);
+        const bx2 = pos.x + Math.cos(this.bodyAngle + ba) * (this.radius * 0.5);
+        const by2 = pos.y + Math.sin(this.bodyAngle + ba) * (this.radius * 0.5);
+        ctx.fillStyle = isHitFlashing ? '#ff9999' : '#81d4fa';
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY); ctx.lineTo(bx1, by1); ctx.lineTo(bx2, by2);
+        ctx.closePath(); ctx.fill();
+
+        // Eyes
+        const eo = 5;
+        const ea1 = this.bodyAngle - 0.4, ea2 = this.bodyAngle + 0.4;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(pos.x + Math.cos(ea1) * eo, pos.y + Math.sin(ea1) * eo, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + Math.cos(ea2) * eo, pos.y + Math.sin(ea2) * eo, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.beginPath(); ctx.arc(pos.x + Math.cos(ea1) * (eo + 1), pos.y + Math.sin(ea1) * (eo + 1), 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + Math.cos(ea2) * (eo + 1), pos.y + Math.sin(ea2) * (eo + 1), 1.5, 0, Math.PI * 2); ctx.fill();
+
+        ctx.globalAlpha = 1.0;
+
+        // Phase 5: magnet radius indicator (subtle)
+        ctx.strokeStyle = 'rgba(105, 240, 174, 0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, this.magnetRadius, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+}
+
+// =============================================================================
+// Weapons & Skills (Phase 2 + 3)
+// =============================================================================
+
+const MAX_SKILL_LEVEL = 5;
+
+const SKILL_DEFS = {
+    orbit: {
+        id: 'orbit', name: 'Arcane Orbit', icon: '🔮', color: '#ffd54f',
+        description: lvl => lvl === 0 ? 'Orbiting orb circles you, hitting enemies' : `+1 orb, +3 dmg (${12 + lvl * 3} total)`,
+    },
+    forwardShot: {
+        id: 'forwardShot', name: 'Energy Bolt', icon: '⚡', color: '#42a5f5',
+        description: lvl => lvl === 0 ? 'Fires a bolt in the direction you face' : `+4 dmg, faster (${(1.0 - lvl * 0.15).toFixed(2)}s)`,
+    },
+    areaBurst: {
+        id: 'areaBurst', name: 'Nova Blast', icon: '💥', color: '#ef5350',
+        description: lvl => lvl === 0 ? 'Periodic explosion around you' : `+25 radius, +5 dmg (${90 + lvl * 25}px)`,
+    },
+    speedBuff: {
+        id: 'speedBuff', name: 'Swift Boots', icon: '👟', color: '#66bb6a',
+        description: lvl => lvl === 0 ? '+15% movement speed' : `+15% speed (${(lvl + 1) * 15}% total)`,
+    },
+};
+
+// --- Orbiting Projectile Weapon (Phase 7: Balanced) ---
+class OrbitWeapon {
+    constructor(owner) {
+        this.owner = owner;
+        this.level = 1;
+        this.orbRadius = 8;
+        this.orbitDistance = 60;
+        this.rotationSpeed = 3;
+        this.angle = 0;
+        this.baseDamage = 12;
+        this.color = '#ffd54f';
+        this.hitCooldowns = new Map();
+    }
+
+    // Phase 7: Damage scales with level
+    get damage() { return this.baseDamage + (this.level - 1) * 3; }
+    get orbCount() { return this.level; }
+    upgrade() { if (this.level < MAX_SKILL_LEVEL) this.level++; }
+
+    update(dt) {
+        this.angle += this.rotationSpeed * dt;
+        for (const [enemy, time] of this.hitCooldowns) {
+            this.hitCooldowns.set(enemy, time - dt);
+            if (time - dt <= 0) this.hitCooldowns.delete(enemy);
+        }
+    }
+
+    getOrbPositions() {
+        const positions = [];
+        for (let i = 0; i < this.orbCount; i++) {
+            const a = this.angle + (Math.PI * 2 / this.orbCount) * i;
+            positions.push({
+                x: this.owner.x + Math.cos(a) * this.orbitDistance,
+                y: this.owner.y + Math.sin(a) * this.orbitDistance,
+            });
+        }
+        return positions;
+    }
+
+    checkHit(enemy) {
+        if (this.hitCooldowns.has(enemy)) return false;
+        for (const orb of this.getOrbPositions()) {
+            if (circleCollision(orb.x, orb.y, this.orbRadius, enemy.x, enemy.y, enemy.radius)) {
+                this.hitCooldowns.set(enemy, 0.3);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    draw(ctx, camera) {
+        for (const orb of this.getOrbPositions()) {
+            const pos = camera.worldToScreen(orb.x, orb.y);
+            ctx.fillStyle = 'rgba(255, 213, 79, 0.3)';
+            ctx.beginPath(); ctx.arc(pos.x, pos.y, this.orbRadius + 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = this.color;
+            ctx.beginPath(); ctx.arc(pos.x, pos.y, this.orbRadius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.beginPath(); ctx.arc(pos.x - 2, pos.y - 2, this.orbRadius * 0.4, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+}
+
+// --- Forward Projectile Weapon ---
+class Projectile {
+    constructor(x, y, angle, speed, damage, radius, color) {
+        this.x = x; this.y = y;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.damage = damage; this.radius = radius;
+        this.color = color; this.lifetime = 2;
+    }
+
+    update(dt) { this.x += this.vx * dt; this.y += this.vy * dt; this.lifetime -= dt; }
+
+    draw(ctx, camera) {
+        if (!camera.isVisible(this.x, this.y, this.radius)) return;
+        const pos = camera.worldToScreen(this.x, this.y);
+        ctx.fillStyle = 'rgba(66, 165, 245, 0.2)';
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, this.radius + 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, this.radius * 0.4, 0, Math.PI * 2); ctx.fill();
+    }
+}
+
+// Phase 7: Balanced ForwardShot
+class ForwardShotWeapon {
+    constructor(owner) {
+        this.owner = owner; this.level = 0;
+        this.baseCooldown = 1.0; this.cooldownTimer = 0;
+        this.baseDamage = 18; this.projectileSpeed = 380;
+        this.projectileRadius = 6; this.color = '#42a5f5';
+        this.projectiles = [];
+    }
+
+    // Phase 7: Damage scales, cooldown decreases
+    get damage() { return this.baseDamage + (this.level - 1) * 4; }
+    get cooldown() { return Math.max(0.25, this.baseCooldown - (this.level - 1) * 0.15); }
+    upgrade() { if (this.level < MAX_SKILL_LEVEL) this.level++; }
+
+    update(dt) {
+        if (this.level === 0) return;
+        this.cooldownTimer -= dt;
+        if (this.cooldownTimer <= 0) { this.cooldownTimer = this.cooldown; this.fire(); }
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            this.projectiles[i].update(dt);
+            if (this.projectiles[i].lifetime <= 0) this.projectiles.splice(i, 1);
+        }
+    }
+
+    fire() {
+        this.projectiles.push(new Projectile(
+            this.owner.x, this.owner.y, this.owner.bodyAngle,
+            this.projectileSpeed, this.damage, this.projectileRadius, this.color
+        ));
+        AudioSystem.shoot();
+    }
+
+    checkHits(enemy) {
+        let totalDmg = 0;
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            if (circleCollision(p.x, p.y, p.radius, enemy.x, enemy.y, enemy.radius)) {
+                totalDmg += p.damage;
+                this.projectiles.splice(i, 1);
+            }
+        }
+        return totalDmg;
+    }
+
+    draw(ctx, camera) { for (const p of this.projectiles) p.draw(ctx, camera); }
+}
+
+// --- Area Burst Weapon (Phase 7: Balanced) ---
+class AreaBurstWeapon {
+    constructor(owner) {
+        this.owner = owner; this.level = 0;
+        this.baseCooldown = 3.5; this.cooldownTimer = 0;
+        this.baseRadius = 90; this.baseDamage = 20;
+        this.color = '#ef5350';
+        this.burstActive = false; this.burstTimer = 0;
+        this.burstDuration = 0.3; this.burstX = 0; this.burstY = 0;
+    }
+
+    // Phase 7: Radius and damage scale with level
+    get radius() { return this.baseRadius + (this.level - 1) * 25; }
+    get damage() { return this.baseDamage + (this.level - 1) * 5; }
+    upgrade() { if (this.level < MAX_SKILL_LEVEL) this.level++; }
+
+    update(dt, enemies) {
+        if (this.level === 0) return;
+        if (this.burstActive) { this.burstTimer -= dt; if (this.burstTimer <= 0) this.burstActive = false; }
+        this.cooldownTimer -= dt;
+        if (this.cooldownTimer <= 0) { this.cooldownTimer = this.baseCooldown; this.burst(enemies); }
+    }
+
+    burst(enemies) {
+        this.burstActive = true; this.burstTimer = this.burstDuration;
+        this.burstX = this.owner.x; this.burstY = this.owner.y;
+
+        // Phase 5: screen shake on burst
+        screenShake.trigger(3, 0.15);
+        AudioSystem.novaBurst();
+
+        for (const enemy of enemies) {
+            if (dist(this.owner.x, this.owner.y, enemy.x, enemy.y) < this.radius) {
+                enemy.takeDamage(this.damage);
+                // Phase 5: damage numbers for burst
+                damageNumbers.push(new DamageNumber(enemy.x, enemy.y - enemy.radius, this.damage, '#ff8a80'));
+            }
+        }
+    }
+
+    draw(ctx, camera) {
+        if (!this.burstActive) return;
+        const pos = camera.worldToScreen(this.burstX, this.burstY);
+        const progress = 1 - (this.burstTimer / this.burstDuration);
+        const cr = this.radius * progress;
+        const alpha = 0.4 * (1 - progress);
+        ctx.strokeStyle = `rgba(239, 83, 80, ${alpha + 0.2})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, cr, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = `rgba(239, 83, 80, ${alpha * 0.5})`;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, cr, 0, Math.PI * 2); ctx.fill();
+    }
+}
+
+// --- Speed Buff Skill ---
+class SpeedBuffSkill {
+    constructor(owner) { this.owner = owner; this.level = 0; this.bonusPerLevel = 30; }
+    upgrade() { if (this.level < MAX_SKILL_LEVEL) { this.level++; this.owner.speedBonus = this.level * this.bonusPerLevel; } }
+    update(dt) {}
+    draw(ctx, camera) {}
+}
+
+// =============================================================================
+// Phase 3: Level-Up / Upgrade System
+// =============================================================================
+
+class UpgradeSystem {
+    constructor() {
+        this.isShowingPopup = false;
+        this.choices = [];
+        this.hoveredIndex = -1;
+        this.selectedIndex = 0;
+    }
+
+    generateChoices(weapons) {
+        const available = [];
+        for (const [id, weapon] of Object.entries(weapons)) {
+            if (weapon.level < MAX_SKILL_LEVEL) {
+                available.push({ skillId: id, currentLevel: weapon.level });
+            }
+        }
+        for (let i = available.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [available[i], available[j]] = [available[j], available[i]];
+        }
+        this.choices = available.slice(0, 3);
+        this.selectedIndex = 0;
+        this.hoveredIndex = -1;
+        this.isShowingPopup = true;
+    }
+
+    applyChoice(index, weapons) {
+        if (index < 0 || index >= this.choices.length) return;
+        weapons[this.choices[index].skillId].upgrade();
+        this.isShowingPopup = false;
+    }
+
+    /** Card rectangles and title positions. 960x640 (desktop): the original row layout.
+     *  Mobile frames: the row is centred in short landscape frames, a column in narrow portrait frames. */
+    layout() {
+        const n = this.choices.length;
+        if (BASE_WIDTH >= 760) {
+            const cardW = 220, cardH = 200, gap = 30;
+            const totalW = n * cardW + (n - 1) * gap;
+            const startX = (BASE_WIDTH - totalW) / 2;
+            const startY = BASE_HEIGHT >= 640 ? 185 + (BASE_HEIGHT - 640) / 2 : (BASE_HEIGHT - cardH) / 2 + 30;
+            const rects = [];
+            for (let i = 0; i < n; i++) rects.push({ x: startX + i * (cardW + gap), y: startY, w: cardW, h: cardH });
+            return { titleY: startY - 65, subY: startY - 30, rects };
+        }
+        const cardW = Math.min(400, BASE_WIDTH - 40), cardH = 190, gap = 14;
+        const totalH = n * cardH + (n - 1) * gap;
+        const startY = (BASE_HEIGHT - (65 + totalH)) / 2 + 65;
+        const startX = (BASE_WIDTH - cardW) / 2;
+        const rects = [];
+        for (let i = 0; i < n; i++) rects.push({ x: startX, y: startY + i * (cardH + gap), w: cardW, h: cardH });
+        return { titleY: startY - 65, subY: startY - 30, rects };
+    }
+
+    draw(ctx) {
+        if (!this.isShowingPopup) return;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+
+        const L = this.layout();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffd54f'; ctx.font = 'bold 32px monospace';
+        ctx.fillText('LEVEL UP!', BASE_WIDTH / 2, L.titleY);
+        ctx.fillStyle = '#aaa'; ctx.font = uiFont(14) + 'px monospace';
+        ctx.fillText(touchUI() ? 'Tap a card to choose an upgrade' : 'Choose an upgrade (1/2/3 or click)', BASE_WIDTH / 2, L.subY);
+
+        for (let i = 0; i < this.choices.length; i++) {
+            const r = L.rects[i];
+            const cx = r.x, cy = r.y, cardW = r.w, cardH = r.h;
+            const choice = this.choices[i];
+            const def = SKILL_DEFS[choice.skillId];
+            const isHovered = this.hoveredIndex === i;
+            const isSelected = this.selectedIndex === i;
+
+            ctx.fillStyle = isHovered ? 'rgba(255, 255, 255, 0.15)' : 'rgba(20, 20, 40, 0.95)';
+            ctx.fillRect(cx, cy, cardW, cardH);
+            ctx.strokeStyle = isSelected ? '#ffd54f' : isHovered ? '#888' : '#444';
+            ctx.lineWidth = isSelected ? 3 : 2;
+            ctx.strokeRect(cx, cy, cardW, cardH);
+
+            ctx.font = '36px serif'; ctx.textAlign = 'center';
+            ctx.fillText(def.icon, cx + cardW / 2, cy + 50);
+            ctx.fillStyle = def.color; ctx.font = 'bold ' + uiFont(16) + 'px monospace';
+            ctx.fillText(def.name, cx + cardW / 2, cy + 80);
+
+            ctx.fillStyle = '#888'; ctx.font = uiFont(12) + 'px monospace';
+            if (choice.currentLevel === 0) ctx.fillText('NEW!', cx + cardW / 2, cy + 100);
+            else ctx.fillText(`Lv ${choice.currentLevel} → ${choice.currentLevel + 1}`, cx + cardW / 2, cy + 100);
+
+            const descPx = uiFont(13);
+            ctx.fillStyle = '#ccc'; ctx.font = descPx + 'px monospace';
+            const desc = def.description(choice.currentLevel);
+            const words = desc.split(' '); let line = '', lineY = cy + 125;
+            for (const word of words) {
+                const testLine = line + (line ? ' ' : '') + word;
+                if (ctx.measureText(testLine).width > cardW - 20) { ctx.fillText(line, cx + cardW / 2, lineY); line = word; lineY += Math.max(16, descPx + 3); }
+                else line = testLine;
+            }
+            if (line) ctx.fillText(line, cx + cardW / 2, lineY);
+
+            ctx.fillStyle = '#666'; ctx.font = 'bold ' + uiFont(14) + 'px monospace';
+            ctx.fillText(`[${i + 1}]`, cx + cardW / 2, cy + cardH - 15);
+        }
+        ctx.textAlign = 'left';
+    }
+
+    getCardAt(sx, sy) {
+        const rects = this.layout().rects;
+        for (let i = 0; i < rects.length; i++) {
+            const r = rects[i];
+            if (sx >= r.x && sx <= r.x + r.w && sy >= r.y && sy <= r.y + r.h) return i;
+        }
+        return -1;
+    }
+}
+
+// =============================================================================
+// Phase 4: Enemy Types & Wave System
+// =============================================================================
+
+const ENEMY_TYPES = {
+    grunt: {
+        name: 'Grunt', radius: 14, speed: 60, maxHp: 30, damage: 10,
+        xpValue: 3, color: '#e53935', outlineColor: '#b71c1c',
+    },
+    dasher: {
+        name: 'Dasher', radius: 10, speed: 150, maxHp: 15, damage: 8,
+        xpValue: 4, color: '#ab47bc', outlineColor: '#7b1fa2',
+    },
+    tank: {
+        name: 'Tank', radius: 22, speed: 35, maxHp: 100, damage: 20,
+        xpValue: 8, color: '#546e7a', outlineColor: '#263238',
+    },
+    boss: {
+        name: 'Boss', radius: 40, speed: 45, maxHp: 800, damage: 30,
+        xpValue: 50, color: '#ff6f00', outlineColor: '#e65100', isBoss: true,
+    },
+};
+
+class Enemy {
+    constructor(x, y, typeDef, hpMultiplier) {
+        this.x = x; this.y = y;
+        this.type = typeDef.name;
+        this.radius = typeDef.radius;
+        this.speed = typeDef.speed;
+        this.maxHp = Math.floor(typeDef.maxHp * hpMultiplier);
+        this.hp = this.maxHp;
+        this.damage = typeDef.damage;
+        this.xpValue = typeDef.xpValue;
+        this.color = typeDef.color;
+        this.outlineColor = typeDef.outlineColor;
+        this.flashTimer = 0;
+    }
+
+    update(dt, playerX, playerY) {
+        const dx = playerX - this.x;
+        const dy = playerY - this.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 0) {
+            this.x += (dx / d) * this.speed * dt;
+            this.y += (dy / d) * this.speed * dt;
+        }
+        if (this.flashTimer > 0) this.flashTimer -= dt;
+    }
+
+    takeDamage(amount) {
+        this.hp -= amount;
+        this.flashTimer = 0.1;
+        return this.hp <= 0;
+    }
+
+    draw(ctx, camera) {
+        if (!camera.isVisible(this.x, this.y, this.radius + 5)) return;
+        const pos = camera.worldToScreen(this.x, this.y);
+        const color = this.flashTimer > 0 ? '#fff' : this.color;
+
+        if (this.type === 'Grunt') this._drawGrunt(ctx, pos, color);
+        else if (this.type === 'Dasher') this._drawDasher(ctx, pos, color);
+        else if (this.type === 'Tank') this._drawTank(ctx, pos, color);
+        else if (this.type === 'Boss') this._drawBoss(ctx, pos, color);
+
+        // HP bar (bigger for bosses)
+        if (this.hp < this.maxHp) {
+            const isBoss = this.type === 'Boss';
+            const bw = isBoss ? 80 : Math.max(this.radius * 2, 28);
+            const bh = isBoss ? 6 : 3;
+            const bx = pos.x - bw / 2;
+            const by = pos.y - this.radius - (isBoss ? 14 : 8);
+            const r = this.hp / this.maxHp;
+            ctx.fillStyle = '#333';
+            ctx.fillRect(bx, by, bw, bh);
+            ctx.fillStyle = r > 0.5 ? '#4caf50' : r > 0.25 ? '#ff9800' : '#f44336';
+            ctx.fillRect(bx, by, bw * r, bh);
+            if (isBoss) {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(bx, by, bw, bh);
+                // Boss name label
+                ctx.fillStyle = '#ff6f00';
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('BOSS', pos.x, by - 4);
+                ctx.textAlign = 'left';
+            }
+        }
+    }
+
+    _drawGrunt(ctx, pos, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, this.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = this.outlineColor; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(pos.x - 4, pos.y - 2, 3.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + 4, pos.y - 2, 3.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.beginPath(); ctx.arc(pos.x - 4, pos.y - 1, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + 4, pos.y - 1, 2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    _drawDasher(ctx, pos, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y - this.radius);
+        ctx.lineTo(pos.x + this.radius, pos.y);
+        ctx.lineTo(pos.x, pos.y + this.radius);
+        ctx.lineTo(pos.x - this.radius, pos.y);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = this.outlineColor; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(pos.x - 5, pos.y - 2, 4, 3);
+        ctx.fillRect(pos.x + 1, pos.y - 2, 4, 3);
+        ctx.fillStyle = '#111';
+        ctx.fillRect(pos.x - 4, pos.y - 1, 2, 2);
+        ctx.fillRect(pos.x + 2, pos.y - 1, 2, 2);
+        ctx.strokeStyle = 'rgba(171, 71, 188, 0.4)'; ctx.lineWidth = 1;
+        for (let i = 1; i <= 3; i++) {
+            const tx = pos.x - (i * 6);
+            ctx.beginPath(); ctx.moveTo(tx, pos.y - 3); ctx.lineTo(tx - 4, pos.y - 3); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(tx, pos.y + 3); ctx.lineTo(tx - 4, pos.y + 3); ctx.stroke();
+        }
+    }
+
+    _drawTank(ctx, pos, color) {
+        const r = this.radius;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i - Math.PI / 6;
+            const hx = pos.x + Math.cos(angle) * r;
+            const hy = pos.y + Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = this.outlineColor; ctx.lineWidth = 3; ctx.stroke();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i - Math.PI / 6;
+            const hx = pos.x + Math.cos(angle) * (r * 0.6);
+            const hy = pos.y + Math.sin(angle) * (r * 0.6);
+            if (i === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ff5252';
+        ctx.beginPath(); ctx.arc(pos.x - 5, pos.y - 3, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + 5, pos.y - 3, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.beginPath(); ctx.arc(pos.x - 5, pos.y - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + 5, pos.y - 2, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+
+    _drawBoss(ctx, pos, color) {
+        const r = this.radius;
+        // Pulsing aura
+        const pulse = 0.6 + 0.4 * Math.sin(Date.now() / 200);
+        ctx.fillStyle = `rgba(255, 111, 0, ${0.15 * pulse})`;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, r + 12, 0, Math.PI * 2); ctx.fill();
+
+        // Spiky body (8-pointed star)
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        for (let i = 0; i < 16; i++) {
+            const angle = (Math.PI * 2 / 16) * i - Math.PI / 2;
+            const dist = i % 2 === 0 ? r : r * 0.65;
+            const hx = pos.x + Math.cos(angle) * dist;
+            const hy = pos.y + Math.sin(angle) * dist;
+            if (i === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = this.outlineColor; ctx.lineWidth = 3; ctx.stroke();
+
+        // Inner face area
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, r * 0.5, 0, Math.PI * 2); ctx.fill();
+
+        // Glowing eyes (larger, menacing)
+        ctx.fillStyle = '#ff1744';
+        ctx.beginPath(); ctx.arc(pos.x - 10, pos.y - 5, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + 10, pos.y - 5, 6, 0, Math.PI * 2); ctx.fill();
+        // Eye glow
+        ctx.fillStyle = `rgba(255, 23, 68, ${0.4 * pulse})`;
+        ctx.beginPath(); ctx.arc(pos.x - 10, pos.y - 5, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + 10, pos.y - 5, 9, 0, Math.PI * 2); ctx.fill();
+        // Pupils
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(pos.x - 10, pos.y - 5, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + 10, pos.y - 5, 2.5, 0, Math.PI * 2); ctx.fill();
+
+        // Mouth
+        ctx.strokeStyle = '#ff1744'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pos.x - 12, pos.y + 8);
+        for (let i = 0; i <= 6; i++) {
+            const mx = pos.x - 12 + i * 4;
+            const my = pos.y + 8 + (i % 2 === 0 ? 0 : 5);
+            ctx.lineTo(mx, my);
+        }
+        ctx.stroke();
+    }
+}
+
+// --- XP Gem (Phase 5: magnet effect) ---
+class XPGem {
+    constructor(x, y, value) {
+        this.x = x; this.y = y;
+        this.radius = 6; this.value = value;
+        this.color = '#69f0ae';
+        this.bobTimer = Math.random() * Math.PI * 2;
+        this.lifetime = 30;
+        this.beingMagneted = false; // Phase 5
+    }
+
+    update(dt, playerX, playerY, magnetRadius) {
+        this.bobTimer += dt * 3;
+        this.lifetime -= dt;
+
+        // Phase 5: Magnet effect — accelerate toward player if within radius
+        const d = dist(this.x, this.y, playerX, playerY);
+        if (d < magnetRadius) {
+            this.beingMagneted = true;
+            const magnetStrength = 400 * (1 - d / magnetRadius); // stronger when closer
+            const dx = playerX - this.x;
+            const dy = playerY - this.y;
+            if (d > 0) {
+                this.x += (dx / d) * magnetStrength * dt;
+                this.y += (dy / d) * magnetStrength * dt;
+            }
+        } else {
+            this.beingMagneted = false;
+        }
+    }
+
+    draw(ctx, camera) {
+        if (!camera.isVisible(this.x, this.y, this.radius + 4)) return;
+        const pos = camera.worldToScreen(this.x, this.y);
+        const bob = this.beingMagneted ? 0 : Math.sin(this.bobTimer) * 2;
+
+        // Glow (brighter when being magneted)
+        const glowAlpha = this.beingMagneted ? 0.5 : 0.25;
+        ctx.fillStyle = `rgba(105, 240, 174, ${glowAlpha})`;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y + bob, this.radius + 4, 0, Math.PI * 2); ctx.fill();
+
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y + bob - this.radius);
+        ctx.lineTo(pos.x + this.radius * 0.7, pos.y + bob);
+        ctx.lineTo(pos.x, pos.y + bob + this.radius);
+        ctx.lineTo(pos.x - this.radius * 0.7, pos.y + bob);
+        ctx.closePath(); ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y + bob - this.radius + 2);
+        ctx.lineTo(pos.x + 2, pos.y + bob - 1);
+        ctx.lineTo(pos.x, pos.y + bob);
+        ctx.lineTo(pos.x - 2, pos.y + bob - 1);
+        ctx.closePath(); ctx.fill();
+    }
+}
+
+// --- Wave System & Enemy Spawner (Phase 7: Balanced + Bosses) ---
+class WaveSpawner {
+    constructor() {
+        this.spawnTimer = 0;
+        this.spawnDistance = 500;
+        this.elapsedTime = 0;
+        this.waveNumber = 0;
+        this.waveTimer = 0;
+        this.waveChangedFlag = false;
+        // Phase 7: Boss tracking
+        this.bossTimer = 0;
+        this.bossInterval = 300; // 5 minutes
+        this.bossesSpawned = 0;
+        this.bossWarningTimer = 0;
+        this.bossWarningActive = false;
+    }
+
+    get difficultyMultiplier() { return 1 + this.elapsedTime / 60; }
+    // Phase 7: Smoother HP scaling — less punishing early, steeper late
+    get hpMultiplier() { return 1 + this.waveNumber * 0.25 + Math.pow(this.waveNumber, 1.3) * 0.05; }
+    // Phase 7: Spawn interval floors later to keep pace manageable
+    get spawnInterval() { return Math.max(0.4, 1.6 - this.waveNumber * 0.1); }
+    get spawnCount() {
+        if (this.waveNumber < 2) return 1;
+        if (this.waveNumber < 4) return 2;
+        if (this.waveNumber < 6) return 3;
+        if (this.waveNumber < 9) return 4;
+        return 5;
+    }
+
+    update(dt, playerX, playerY, enemies) {
+        this.elapsedTime += dt;
+        this.waveTimer += dt;
+        this.bossTimer += dt;
+
+        const newWave = Math.floor(this.elapsedTime / 30);
+        if (newWave > this.waveNumber) {
+            this.waveNumber = newWave;
+            this.waveChangedFlag = true;
+        }
+
+        // Phase 7: Boss spawn every 5 minutes
+        if (this.bossTimer >= this.bossInterval) {
+            this.bossTimer -= this.bossInterval;
+            this.bossesSpawned++;
+            this.bossWarningActive = true;
+            this.bossWarningTimer = 3.0;
+            AudioSystem.bossWarning();
+            // Spawn boss with scaling HP (each subsequent boss is 50% stronger)
+            const bossHpScale = this.hpMultiplier * (1 + (this.bossesSpawned - 1) * 0.5);
+            const angle = Math.random() * Math.PI * 2;
+            const x = playerX + Math.cos(angle) * this.spawnDistance;
+            const y = playerY + Math.sin(angle) * this.spawnDistance;
+            enemies.push(new Enemy(x, y, ENEMY_TYPES.boss, bossHpScale));
+        }
+
+        if (this.bossWarningTimer > 0) this.bossWarningTimer -= dt;
+        if (this.bossWarningTimer <= 0) this.bossWarningActive = false;
+
+        this.spawnTimer -= dt;
+        if (this.spawnTimer <= 0) {
+            this.spawnTimer = this.spawnInterval;
+            for (let s = 0; s < this.spawnCount; s++) this.spawnEnemy(playerX, playerY, enemies);
+        }
+    }
+
+    pickEnemyType() {
+        const roll = Math.random();
+        if (this.waveNumber < 1) return ENEMY_TYPES.grunt;
+        else if (this.waveNumber < 2) return roll < 0.75 ? ENEMY_TYPES.grunt : ENEMY_TYPES.dasher;
+        else if (this.waveNumber < 3) {
+            if (roll < 0.55) return ENEMY_TYPES.grunt;
+            if (roll < 0.85) return ENEMY_TYPES.dasher;
+            return ENEMY_TYPES.tank;
+        } else if (this.waveNumber < 5) {
+            if (roll < 0.35) return ENEMY_TYPES.grunt;
+            if (roll < 0.65) return ENEMY_TYPES.dasher;
+            return ENEMY_TYPES.tank;
+        } else if (this.waveNumber < 8) {
+            if (roll < 0.2) return ENEMY_TYPES.grunt;
+            if (roll < 0.5) return ENEMY_TYPES.dasher;
+            return ENEMY_TYPES.tank;
+        } else {
+            // Late game: heavy on tanks and dashers
+            if (roll < 0.1) return ENEMY_TYPES.grunt;
+            if (roll < 0.45) return ENEMY_TYPES.dasher;
+            return ENEMY_TYPES.tank;
+        }
+    }
+
+    spawnEnemy(playerX, playerY, enemies) {
+        const angle = Math.random() * Math.PI * 2;
+        const x = playerX + Math.cos(angle) * this.spawnDistance;
+        const y = playerY + Math.sin(angle) * this.spawnDistance;
+        enemies.push(new Enemy(x, y, this.pickEnemyType(), this.hpMultiplier));
+    }
+}
+
+// --- Scrolling Grid Background ---
+function drawGrid(ctx, camera) {
+    const gridSize = 64;
+    const startX = Math.floor((camera.x - screenShake.offsetX) / gridSize) * gridSize;
+    const startY = Math.floor((camera.y - screenShake.offsetY) / gridSize) * gridSize;
+    const endX = startX + BASE_WIDTH + gridSize * 2;
+    const endY = startY + BASE_HEIGHT + gridSize * 2;
+
+    ctx.strokeStyle = '#16213e'; ctx.lineWidth = 1;
+    for (let wx = startX; wx <= endX; wx += gridSize) {
+        const s = camera.worldToScreen(wx, startY);
+        ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, BASE_HEIGHT); ctx.stroke();
+    }
+    for (let wy = startY; wy <= endY; wy += gridSize) {
+        const s = camera.worldToScreen(startX, wy);
+        ctx.beginPath(); ctx.moveTo(0, s.y); ctx.lineTo(BASE_WIDTH, s.y); ctx.stroke();
+    }
+    ctx.fillStyle = '#1a1a3e';
+    for (let wx = startX; wx <= endX; wx += gridSize) {
+        for (let wy = startY; wy <= endY; wy += gridSize) {
+            const s = camera.worldToScreen(wx, wy);
+            ctx.beginPath(); ctx.arc(s.x, s.y, 2, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+}
+
+// --- HUD (Phase 6: Polished) ---
+function drawHUD(ctx, player, weapons, spawner) {
+    // --- Top-left: HP & XP bars ---
+    const hpBarX = 20 + safeArea.left, hpBarY = 20 + safeArea.top, hpBarW = 220, hpBarH = 20;
+    const hudRight = BASE_WIDTH - 20 - safeArea.right;
+    // Touch: the PAUSE / SOUND buttons sit in the top-right corner, so time/wave move below them.
+    const hudTopRight = safeArea.top + (touchUI() ? 64 / Math.max(0.3, viewScale) : 0);
+    const hpRatio = player.hp / player.maxHp;
+
+    // HP label
+    ctx.fillStyle = '#fff'; ctx.font = 'bold ' + uiFont(10) + 'px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('HP', hpBarX, hpBarY - 4);
+
+    // HP bar background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(hpBarX, hpBarY, hpBarW, hpBarH);
+    // HP bar fill with gradient
+    const hpColor = hpRatio > 0.5 ? '#4caf50' : hpRatio > 0.25 ? '#ff9800' : '#f44336';
+    const hpGrad = ctx.createLinearGradient(hpBarX, hpBarY, hpBarX, hpBarY + hpBarH);
+    hpGrad.addColorStop(0, hpColor);
+    hpGrad.addColorStop(1, hpRatio > 0.5 ? '#388e3c' : hpRatio > 0.25 ? '#e65100' : '#c62828');
+    ctx.fillStyle = hpGrad;
+    ctx.fillRect(hpBarX, hpBarY, hpBarW * hpRatio, hpBarH);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 1;
+    ctx.strokeRect(hpBarX, hpBarY, hpBarW, hpBarH);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold ' + uiFont(12) + 'px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`${player.hp} / ${player.maxHp}`, hpBarX + hpBarW / 2, hpBarY + 14);
+
+    // XP bar
+    const xpBarY = hpBarY + hpBarH + (MOBILE_LAYOUT ? uiFont(10) + 6 : 6);
+    const xpBarH = 16;
+    const xpRatio = player.xp / player.xpToNext;
+
+    // Level badge
+    ctx.fillStyle = '#7c4dff'; ctx.font = 'bold ' + uiFont(10) + 'px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(`Lv ${player.level}`, hpBarX, xpBarY - 4);
+    ctx.fillStyle = '#888'; ctx.textAlign = 'right'; ctx.font = uiFont(10) + 'px monospace';
+    ctx.fillText(`${player.xp}/${player.xpToNext}`, hpBarX + hpBarW, xpBarY - 4);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(hpBarX, xpBarY, hpBarW, xpBarH);
+    const xpGrad = ctx.createLinearGradient(hpBarX, xpBarY, hpBarX, xpBarY + xpBarH);
+    xpGrad.addColorStop(0, '#9c7cff');
+    xpGrad.addColorStop(1, '#5c34d4');
+    ctx.fillStyle = xpGrad;
+    ctx.fillRect(hpBarX, xpBarY, hpBarW * xpRatio, xpBarH);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.strokeRect(hpBarX, xpBarY, hpBarW, xpBarH);
+
+    // --- Kill counter below bars ---
+    const killY = xpBarY + xpBarH + 18;
+    ctx.textAlign = 'left'; ctx.font = 'bold ' + uiFont(14) + 'px monospace';
+    ctx.fillStyle = '#ef5350';
+    ctx.fillText(`💀 ${game.killCount}`, hpBarX, killY);
+
+    // --- Top-right: Time & Wave ---
+    ctx.textAlign = 'right';
+    // Time with icon
+    ctx.font = 'bold 20px monospace'; ctx.fillStyle = '#fff';
+    ctx.fillText(`⏱ ${formatTime(spawner.elapsedTime)}`, hudRight, 35 + hudTopRight);
+    // Wave badge
+    const waveTxt = `Wave ${spawner.waveNumber + 1}`;
+    ctx.font = 'bold ' + uiFont(14) + 'px monospace';
+    const waveW = ctx.measureText(waveTxt).width + 16;
+    const waveX = hudRight - waveW;
+    const waveY = 44 + hudTopRight;
+    ctx.fillStyle = 'rgba(255, 152, 0, 0.2)';
+    ctx.fillRect(waveX, waveY, waveW, 22);
+    ctx.strokeStyle = 'rgba(255, 152, 0, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(waveX, waveY, waveW, 22);
+    ctx.fillStyle = '#ff9800';
+    ctx.fillText(waveTxt, hudRight, waveY + 16);
+
+    // --- Bottom-left: Equipped skills ---
+    const iconSize = 40, iconGap = 6;
+    const iconY = BASE_HEIGHT - iconSize - 15 - safeArea.bottom;
+    let iconX = 20 + safeArea.left;
+    ctx.textAlign = 'center';
+    for (const [id, weapon] of Object.entries(weapons)) {
+        if (weapon.level === 0) continue;
+        const def = SKILL_DEFS[id];
+
+        // Icon background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.fillRect(iconX, iconY, iconSize, iconSize);
+        ctx.strokeStyle = def.color; ctx.lineWidth = 2;
+        ctx.strokeRect(iconX, iconY, iconSize, iconSize);
+
+        // Skill emoji
+        ctx.font = '22px serif';
+        ctx.fillText(def.icon, iconX + iconSize / 2, iconY + 26);
+
+        // Level dots
+        ctx.fillStyle = def.color;
+        const dotSpacing = iconSize / (MAX_SKILL_LEVEL + 1);
+        for (let l = 0; l < weapon.level; l++) {
+            ctx.beginPath();
+            ctx.arc(iconX + dotSpacing * (l + 1), iconY + iconSize - 5, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Unfilled dots
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        for (let l = weapon.level; l < MAX_SKILL_LEVEL; l++) {
+            ctx.beginPath();
+            ctx.arc(iconX + dotSpacing * (l + 1), iconY + iconSize - 5, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        iconX += iconSize + iconGap;
+    }
+
+    // --- Bottom-right: Pause hint + Sound status (touch: on-screen buttons instead) ---
+    if (touchUI()) { ctx.textAlign = 'left'; return; }
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#333'; ctx.font = '10px monospace';
+    ctx.fillText('ESC to pause', BASE_WIDTH - 80, BASE_HEIGHT - 18);
+    ctx.fillStyle = AudioSystem.isEnabled ? '#2e7d32' : '#c62828';
+    ctx.fillText(AudioSystem.isEnabled ? '🔊 M' : '🔇 M', BASE_WIDTH - 20, BASE_HEIGHT - 18);
+
+    ctx.textAlign = 'left';
+}
+
+// =============================================================================
+// Phase 6: Title Screen, Pause Screen, Enhanced Game Over
+// =============================================================================
+
+// --- Title Screen ---
+function drawTitleScreen(ctx, dt) {
+    game.titleAnimTimer += dt;
+
+    // Dark background
+    ctx.fillStyle = '#0d0d1a';
+    ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+
+    // Animated grid background (subtle)
+    const gridSize = 64;
+    const gridOffset = (game.titleAnimTimer * 15) % gridSize;
+    ctx.strokeStyle = 'rgba(30, 30, 60, 0.6)';
+    ctx.lineWidth = 1;
+    for (let x = -gridSize + gridOffset; x <= BASE_WIDTH + gridSize; x += gridSize) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, BASE_HEIGHT); ctx.stroke();
+    }
+    for (let y = -gridSize + gridOffset; y <= BASE_HEIGHT + gridSize; y += gridSize) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(BASE_WIDTH, y); ctx.stroke();
+    }
+
+    // Floating particles
+    for (const p of game.titleBgParticles) {
+        p.y -= p.speed * dt;
+        if (p.y < -10) { p.y = BASE_HEIGHT + 10; p.x = Math.random() * BASE_WIDTH; }
+        ctx.globalAlpha = p.alpha * (0.5 + 0.5 * Math.sin(game.titleAnimTimer * 2 + p.x));
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Title glow effect
+    const glowPulse = 0.6 + 0.4 * Math.sin(game.titleAnimTimer * 1.5);
+    const cx = BASE_WIDTH / 2;
+
+    // Vertical layout: 960x640 keeps the original positions, taller frames centre them,
+    // short landscape phone frames use a compact column.
+    const compact = BASE_HEIGHT < 600;
+    const oy = compact ? (BASE_HEIGHT - 440) / 2 : (BASE_HEIGHT - 640) / 2;
+    const Y = compact
+        ? { title: 100, sub: 136, div: 158, hints: 194, btn: 244, c1: 336, c2: 358, press: 380 }
+        : { title: 170, sub: 210, div: 240, hints: 275, btn: 385, c1: 490, c2: 510, press: 555 };
+    for (const k in Y) Y[k] += oy;
+    ctx.font = 'bold 56px monospace';
+    const titleW = ctx.measureText("SURVIVOR'S DAWN").width;
+    const titlePx = titleW > BASE_WIDTH - 40 ? Math.floor(56 * (BASE_WIDTH - 40) / titleW) : 56;
+
+    // Title shadow
+    ctx.textAlign = 'center';
+    ctx.font = 'bold ' + titlePx + 'px monospace';
+    ctx.fillStyle = `rgba(255, 213, 79, ${0.15 * glowPulse})`;
+    ctx.fillText("SURVIVOR'S DAWN", cx + 2, Y.title + 2);
+
+    // Main title
+    ctx.fillStyle = '#ffd54f';
+    ctx.font = 'bold ' + titlePx + 'px monospace';
+    ctx.fillText("SURVIVOR'S DAWN", cx, Y.title);
+
+    // Subtitle
+    ctx.fillStyle = `rgba(200, 200, 255, ${0.5 + 0.3 * Math.sin(game.titleAnimTimer * 2)})`;
+    ctx.font = '18px monospace';
+    ctx.fillText('A Bullet Heaven Adventure', cx, Y.sub);
+
+    // Decorative divider
+    const divY = Y.div;
+    const divW = 300;
+    ctx.strokeStyle = `rgba(255, 213, 79, ${0.3 + 0.2 * Math.sin(game.titleAnimTimer)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - divW / 2, divY); ctx.lineTo(cx + divW / 2, divY);
+    ctx.stroke();
+    // Diamond in center of divider
+    const dd = 6;
+    ctx.fillStyle = '#ffd54f';
+    ctx.beginPath();
+    ctx.moveTo(cx, divY - dd); ctx.lineTo(cx + dd, divY);
+    ctx.lineTo(cx, divY + dd); ctx.lineTo(cx - dd, divY);
+    ctx.closePath(); ctx.fill();
+
+    // Preview icons / feature hints
+    const hintsY = Y.hints;
+    const hints = [
+        { icon: '🔮', text: 'Auto-Attack Weapons' },
+        { icon: '⚡', text: 'Level & Upgrade' },
+        { icon: '💥', text: 'Survive Waves' },
+    ];
+    const hintGap = Math.min(200, (BASE_WIDTH - 20) / hints.length);
+    const hintStart = cx - ((hints.length - 1) * hintGap) / 2;
+    for (let i = 0; i < hints.length; i++) {
+        const hx = hintStart + i * hintGap;
+        ctx.font = '28px serif';
+        ctx.fillText(hints[i].icon, hx, hintsY);
+        const hintPx = uiFont(12);
+        ctx.font = hintPx + 'px monospace';
+        ctx.fillStyle = '#8888aa';
+        const t = hints[i].text;
+        if (ctx.measureText(t).width > hintGap - 12 && t.includes(' ')) {
+            // Narrow portrait frame: two lines, split at the space nearest the middle
+            let cut = t.indexOf(' '), best = Math.abs(cut - t.length / 2);
+            for (let j = cut; j >= 0; j = t.indexOf(' ', j + 1)) if (Math.abs(j - t.length / 2) < best) { best = Math.abs(j - t.length / 2); cut = j; }
+            ctx.fillText(t.slice(0, cut), hx, hintsY + 22);
+            ctx.fillText(t.slice(cut + 1), hx, hintsY + 24 + hintPx);
+        } else {
+            ctx.fillText(t, hx, hintsY + 22);
+        }
+    }
+
+    // Start button
+    const btnW = 220, btnH = 55;
+    const btnX = cx - btnW / 2, btnY = Y.btn;
+    const isHovered = game._mouseX >= btnX && game._mouseX <= btnX + btnW &&
+                      game._mouseY >= btnY && game._mouseY <= btnY + btnH;
+
+    // Button glow
+    if (isHovered) {
+        ctx.shadowColor = '#ffd54f';
+        ctx.shadowBlur = 20;
+    }
+
+    ctx.fillStyle = isHovered ? 'rgba(255, 213, 79, 0.25)' : 'rgba(255, 213, 79, 0.1)';
+    ctx.fillRect(btnX, btnY, btnW, btnH);
+    ctx.strokeStyle = isHovered ? '#ffd54f' : 'rgba(255, 213, 79, 0.6)';
+    ctx.lineWidth = isHovered ? 3 : 2;
+    ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = isHovered ? '#fff' : '#ffd54f';
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText('START GAME', cx, btnY + 34);
+
+    // Controls hint
+    if (touchUI()) {
+        ctx.fillStyle = '#8a8aa0';
+        ctx.font = uiFont(13) + 'px monospace';
+        ctx.fillText('Drag anywhere to move', cx, Y.c1);
+        ctx.fillText('Weapons attack on their own', cx, Y.c2);
+        ctx.fillStyle = '#6a6a80';
+        ctx.fillText('Top right: ❚❚ pause  •  🔊 sound', cx, Y.press);
+    } else {
+        ctx.fillStyle = '#555';
+        ctx.font = '13px monospace';
+        ctx.fillText('WASD / Arrow Keys to move  •  M to mute', cx, Y.c1);
+        ctx.fillText('ESC / P to pause  •  Touch controls on mobile', cx, Y.c2);
+        ctx.fillStyle = '#444';
+        ctx.font = '12px monospace';
+        ctx.fillText('Press ENTER or click to start', cx, Y.press);
+    }
+
+    // Version
+    ctx.fillStyle = '#333';
+    ctx.font = uiFont(10) + 'px monospace';
+    ctx.fillText('v1.0 — Complete', cx, BASE_HEIGHT - 15 - safeArea.bottom);
+
+    ctx.textAlign = 'left';
+}
+
+/** Y of the title screen START button (same layout rules as drawTitleScreen). */
+function titleStartButtonY() {
+    if (BASE_HEIGHT < 600) return 244 + (BASE_HEIGHT - 440) / 2;
+    return 385 + (BASE_HEIGHT - 640) / 2;
+}
+
+// --- Pause Screen Overlay ---
+function drawPauseScreen(ctx) {
+    // Dim background
+    ctx.fillStyle = 'rgba(0, 0, 20, 0.65)';
+    ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+
+    const cx = BASE_WIDTH / 2;
+
+    // Pause title
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd54f';
+    ctx.font = 'bold 42px monospace';
+    ctx.fillText('PAUSED', cx, BASE_HEIGHT / 2 - 60);
+
+    // Stats while paused
+    if (spawner) {
+        ctx.fillStyle = '#aaa';
+        ctx.font = uiFont(16) + 'px monospace';
+        ctx.fillText(`Time: ${formatTime(spawner.elapsedTime)}  |  Wave: ${spawner.waveNumber + 1}  |  Kills: ${game.killCount}`, cx, BASE_HEIGHT / 2 - 20);
+    }
+
+    // Resume button
+    const btnW = 200, btnH = 50;
+    const btnX = cx - btnW / 2, btnY = BASE_HEIGHT / 2 + 20;
+    const isResumeHovered = game._mouseX >= btnX && game._mouseX <= btnX + btnW &&
+                            game._mouseY >= btnY && game._mouseY <= btnY + btnH;
+
+    ctx.fillStyle = isResumeHovered ? 'rgba(76, 175, 80, 0.3)' : 'rgba(76, 175, 80, 0.12)';
+    ctx.fillRect(btnX, btnY, btnW, btnH);
+    ctx.strokeStyle = isResumeHovered ? '#4caf50' : 'rgba(76, 175, 80, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(btnX, btnY, btnW, btnH);
+    ctx.fillStyle = isResumeHovered ? '#fff' : '#4caf50';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText('RESUME', cx, btnY + 31);
+
+    // Quit to title button
+    const qBtnY = btnY + 70;
+    const isQuitHovered = game._mouseX >= btnX && game._mouseX <= btnX + btnW &&
+                          game._mouseY >= qBtnY && game._mouseY <= qBtnY + btnH;
+
+    ctx.fillStyle = isQuitHovered ? 'rgba(244, 67, 54, 0.3)' : 'rgba(244, 67, 54, 0.12)';
+    ctx.fillRect(btnX, qBtnY, btnW, btnH);
+    ctx.strokeStyle = isQuitHovered ? '#f44336' : 'rgba(244, 67, 54, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(btnX, qBtnY, btnW, btnH);
+    ctx.fillStyle = isQuitHovered ? '#fff' : '#f44336';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText('QUIT TO TITLE', cx, qBtnY + 31);
+
+    // Hint
+    ctx.fillStyle = '#555';
+    ctx.font = uiFont(12) + 'px monospace';
+    ctx.fillText(touchUI() ? 'Tap RESUME to keep playing' : 'Press ESC or P to resume', cx, qBtnY + btnH + 30);
+
+    ctx.textAlign = 'left';
+}
+
+/** Y of the game-over buttons. Mobile: below the "Equipped Skills" row so they don't overlap it. */
+function gameOverButtonsY() {
+    const y = BASE_HEIGHT / 2 + 80;
+    if (!MOBILE_LAYOUT || !weapons) return y;
+    return Object.values(weapons).some(w => w.level > 0) ? y + 64 : y;
+}
+
+// --- Enhanced Game Over Screen ---
+function drawGameOver(ctx, spawner) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+
+    const cx = BASE_WIDTH / 2;
+
+    // Title
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f44336';
+    ctx.font = 'bold 52px monospace';
+    ctx.fillText('GAME OVER', cx, BASE_HEIGHT / 2 - 120);
+
+    // Divider line
+    ctx.strokeStyle = 'rgba(244, 67, 54, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 180, BASE_HEIGHT / 2 - 95);
+    ctx.lineTo(cx + 180, BASE_HEIGHT / 2 - 95);
+    ctx.stroke();
+
+    // Stats panel background
+    const panelW = 400, panelH = 140;
+    const panelX = cx - panelW / 2, panelY = BASE_HEIGHT / 2 - 80;
+    ctx.fillStyle = 'rgba(20, 20, 40, 0.8)';
+    ctx.fillRect(panelX, panelY, panelW, panelH);
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(panelX, panelY, panelW, panelH);
+
+    // Stats
+    const statsX = cx;
+    const statsStartY = panelY + 30;
+    const statsGap = 30;
+
+    const stats = [
+        { label: 'Survival Time', value: formatTime(spawner.elapsedTime), color: '#ffd54f' },
+        { label: 'Wave Reached', value: `Wave ${spawner.waveNumber + 1}`, color: '#ff9800' },
+        { label: 'Enemies Slain', value: `${game.killCount}`, color: '#ef5350' },
+        { label: 'Level Reached', value: `Lv ${player.level}`, color: '#7c4dff' },
+    ];
+
+    for (let i = 0; i < stats.length; i++) {
+        const sy = statsStartY + i * statsGap;
+        ctx.font = uiFont(14) + 'px monospace';
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'right';
+        ctx.fillText(stats[i].label + ':', statsX - 15, sy);
+        ctx.font = 'bold 16px monospace';
+        ctx.fillStyle = stats[i].color;
+        ctx.textAlign = 'left';
+        ctx.fillText(stats[i].value, statsX + 15, sy);
+    }
+
+    // Equipped weapons summary
+    const weaponIcons = [];
+    if (weapons) {
+        for (const [id, weapon] of Object.entries(weapons)) {
+            if (weapon.level > 0) {
+                weaponIcons.push({ icon: SKILL_DEFS[id].icon, name: SKILL_DEFS[id].name, level: weapon.level, color: SKILL_DEFS[id].color });
+            }
+        }
+    }
+    if (weaponIcons.length > 0) {
+        const wepY = panelY + panelH + 20;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#666';
+        ctx.font = uiFont(12) + 'px monospace';
+        ctx.fillText('Equipped Skills', cx, wepY);
+
+        const wepGap = 70;
+        const wepStart = cx - ((weaponIcons.length - 1) * wepGap) / 2;
+        for (let i = 0; i < weaponIcons.length; i++) {
+            const wx = wepStart + i * wepGap;
+            ctx.font = '24px serif';
+            ctx.fillText(weaponIcons[i].icon, wx, wepY + 28);
+            ctx.font = uiFont(10) + 'px monospace';
+            ctx.fillStyle = weaponIcons[i].color;
+            ctx.fillText(`Lv${weaponIcons[i].level}`, wx, wepY + 44);
+            ctx.fillStyle = '#666';
+        }
+    }
+
+    // Buttons
+    const btnW = 200, btnH = 50;
+    const btnGap = 30;
+
+    // Restart button
+    const rBtnX = cx - btnW - btnGap / 2, rBtnY = gameOverButtonsY();
+    const isRestartHovered = game._mouseX >= rBtnX && game._mouseX <= rBtnX + btnW &&
+                             game._mouseY >= rBtnY && game._mouseY <= rBtnY + btnH;
+    ctx.fillStyle = isRestartHovered ? 'rgba(76, 175, 80, 0.3)' : 'rgba(76, 175, 80, 0.12)';
+    ctx.fillRect(rBtnX, rBtnY, btnW, btnH);
+    ctx.strokeStyle = isRestartHovered ? '#4caf50' : 'rgba(76, 175, 80, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rBtnX, rBtnY, btnW, btnH);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = isRestartHovered ? '#fff' : '#4caf50';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(touchUI() ? 'RESTART' : 'RESTART (R)', rBtnX + btnW / 2, rBtnY + 31);
+
+    // Title screen button
+    const tBtnX = cx + btnGap / 2, tBtnY = rBtnY;
+    const isTitleHovered = game._mouseX >= tBtnX && game._mouseX <= tBtnX + btnW &&
+                           game._mouseY >= tBtnY && game._mouseY <= tBtnY + btnH;
+    ctx.fillStyle = isTitleHovered ? 'rgba(158, 158, 158, 0.3)' : 'rgba(158, 158, 158, 0.12)';
+    ctx.fillRect(tBtnX, tBtnY, btnW, btnH);
+    ctx.strokeStyle = isTitleHovered ? '#9e9e9e' : 'rgba(158, 158, 158, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tBtnX, tBtnY, btnW, btnH);
+    ctx.fillStyle = isTitleHovered ? '#fff' : '#9e9e9e';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(touchUI() ? 'TITLE' : 'TITLE (ESC)', tBtnX + btnW / 2, tBtnY + 31);
+
+    ctx.textAlign = 'left';
+}
+
+// --- FPS Counter ---
+let fpsValues = [];
+function drawFPS(ctx, fps) {
+    fpsValues.push(fps);
+    if (fpsValues.length > 60) fpsValues.shift();
+    const avg = Math.round(fpsValues.reduce((a, b) => a + b, 0) / fpsValues.length);
+    const fx = BASE_WIDTH - safeArea.right, fy = BASE_HEIGHT - safeArea.bottom;
+    ctx.font = uiFont(12) + 'px monospace';
+    const fw = Math.max(65, ctx.measureText(`FPS: ${avg}`).width + 12);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(fx - 5 - fw, fy - 27, fw, 22);
+    ctx.fillStyle = '#0f0'; ctx.textAlign = 'right';
+    ctx.fillText(`FPS: ${avg}`, fx - 10, fy - 10);
+    ctx.textAlign = 'left';
+}
+
+// =============================================================================
+// Game State
+// =============================================================================
+
+const camera = new Camera();
+const screenShake = new ScreenShake();
+let player, weapons, enemies, xpGems, spawner, upgradeSystem;
+let particles = [];      // Phase 5: death particles
+let damageNumbers = [];  // Phase 5: floating damage numbers
+let waveNotifyTimer = 0;
+
+const game = {
+    state: GameState.TITLE,
+    killCount: 0,
+    titleAnimTimer: 0,   // For animated title screen
+    titleBgParticles: [], // Background particles for title screen
+    _mouseX: 0,          // Mouse position for hover effects
+    _mouseY: 0,
+};
+
+function initGame() {
+    AudioSystem.init(); // Phase 7: init audio on first game start
+    player = new Player(0, 0);
+    weapons = {
+        orbit: new OrbitWeapon(player),
+        forwardShot: new ForwardShotWeapon(player),
+        areaBurst: new AreaBurstWeapon(player),
+        speedBuff: new SpeedBuffSkill(player),
+    };
+    enemies = [];
+    xpGems = [];
+    particles = [];
+    damageNumbers = [];
+    spawner = new WaveSpawner();
+    upgradeSystem = new UpgradeSystem();
+    game.state = GameState.PLAYING;
+    game.killCount = 0;
+    waveNotifyTimer = 0;
+    screenShake.intensity = 0;
+    screenShake.timer = 0;
+}
+
+/** Initialize title screen background particles */
+function initTitleParticles() {
+    game.titleBgParticles = [];
+    for (let i = 0; i < 50; i++) {
+        game.titleBgParticles.push({
+            x: Math.random() * BASE_WIDTH,
+            y: Math.random() * BASE_HEIGHT,
+            radius: 1 + Math.random() * 3,
+            speed: 10 + Math.random() * 30,
+            alpha: 0.2 + Math.random() * 0.5,
+            color: ['#ffd54f', '#42a5f5', '#ef5350', '#69f0ae', '#ab47bc'][Math.floor(Math.random() * 5)],
+        });
+    }
+}
+
+// Initialize in title state (don't call initGame yet)
+initTitleParticles();
+
+// --- Input ---
+window.addEventListener('keydown', (e) => {
+    // --- Title Screen ---
+    if (game.state === GameState.TITLE) {
+        if (e.code === 'Enter' || e.code === 'Space') {
+            initGame();
+        }
+        return;
+    }
+
+    // --- Game Over ---
+    if (game.state === GameState.GAMEOVER) {
+        if (e.code === 'KeyR') { initGame(); }
+        if (e.code === 'Escape') { game.state = GameState.TITLE; initTitleParticles(); }
+        return;
+    }
+
+    // --- Mute toggle ---
+    if (e.code === 'KeyM') {
+        AudioSystem.toggle();
+        return;
+    }
+
+    // --- Pause toggle ---
+    if (e.code === 'Escape' || e.code === 'KeyP') {
+        if (game.state === GameState.PLAYING && !upgradeSystem.isShowingPopup) {
+            game.state = GameState.PAUSED;
+            return;
+        }
+        if (game.state === GameState.PAUSED) {
+            game.state = GameState.PLAYING;
+            return;
+        }
+    }
+
+    // --- Upgrade popup input ---
+    if (upgradeSystem.isShowingPopup && game.state === GameState.PLAYING) {
+        if (e.code === 'Digit1' && upgradeSystem.choices.length >= 1) upgradeSystem.applyChoice(0, weapons);
+        else if (e.code === 'Digit2' && upgradeSystem.choices.length >= 2) upgradeSystem.applyChoice(1, weapons);
+        else if (e.code === 'Digit3' && upgradeSystem.choices.length >= 3) upgradeSystem.applyChoice(2, weapons);
+        else if (e.code === 'ArrowLeft' || e.code === 'KeyA') upgradeSystem.selectedIndex = Math.max(0, upgradeSystem.selectedIndex - 1);
+        else if (e.code === 'ArrowRight' || e.code === 'KeyD') upgradeSystem.selectedIndex = Math.min(upgradeSystem.choices.length - 1, upgradeSystem.selectedIndex + 1);
+        else if (e.code === 'Enter' || e.code === 'Space') upgradeSystem.applyChoice(upgradeSystem.selectedIndex, weapons);
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (BASE_WIDTH / rect.width);
+    const my = (e.clientY - rect.top) * (BASE_HEIGHT / rect.height);
+
+    if (upgradeSystem && upgradeSystem.isShowingPopup) {
+        upgradeSystem.hoveredIndex = upgradeSystem.getCardAt(mx, my);
+    }
+
+    // Track hover for title screen button and game over buttons
+    game._mouseX = mx;
+    game._mouseY = my;
+});
+
+canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (BASE_WIDTH / rect.width);
+    const my = (e.clientY - rect.top) * (BASE_HEIGHT / rect.height);
+
+    // Title screen click
+    if (game.state === GameState.TITLE) {
+        // Check if Start button is clicked
+        const btnW = 220, btnH = 55;
+        const btnX = BASE_WIDTH / 2 - btnW / 2, btnY = titleStartButtonY();
+        if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
+            initGame();
+        }
+        return;
+    }
+
+    // Pause screen — resume button
+    if (game.state === GameState.PAUSED) {
+        const btnW = 200, btnH = 50;
+        const btnX = BASE_WIDTH / 2 - btnW / 2, btnY = BASE_HEIGHT / 2 + 20;
+        if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
+            game.state = GameState.PLAYING;
+        }
+        // Quit button
+        const qBtnY = btnY + 70;
+        if (mx >= btnX && mx <= btnX + btnW && my >= qBtnY && my <= qBtnY + btnH) {
+            game.state = GameState.TITLE;
+            initTitleParticles();
+        }
+        return;
+    }
+
+    // Game Over — Restart / Title buttons
+    if (game.state === GameState.GAMEOVER) {
+        const btnW = 200, btnH = 50;
+        const centerX = BASE_WIDTH / 2;
+        // Restart button
+        const rBtnX = centerX - btnW - 15, rBtnY = gameOverButtonsY();
+        if (mx >= rBtnX && mx <= rBtnX + btnW && my >= rBtnY && my <= rBtnY + btnH) {
+            initGame();
+        }
+        // Title button
+        const tBtnX = centerX + 15, tBtnY = gameOverButtonsY();
+        if (mx >= tBtnX && mx <= tBtnX + btnW && my >= tBtnY && my <= tBtnY + btnH) {
+            game.state = GameState.TITLE;
+            initTitleParticles();
+        }
+        return;
+    }
+
+    // Upgrade popup click
+    if (upgradeSystem && upgradeSystem.isShowingPopup) {
+        const idx = upgradeSystem.getCardAt(mx, my);
+        if (idx >= 0) upgradeSystem.applyChoice(idx, weapons);
+    }
+});
+
+// =============================================================================
+// Main Game Loop
+// =============================================================================
+
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+    const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+    lastTime = timestamp;
+
+    // Draw in game units (desktop: 1:1 as before; mobile: canvas pixels per unit)
+    ctx.setTransform(pixelScale, 0, 0, pixelScale, 0, 0);
+    syncTouchKit();
+
+    // =====================================================================
+    // TITLE SCREEN
+    // =====================================================================
+    if (game.state === GameState.TITLE) {
+        drawTitleScreen(ctx, dt);
+        if (dt > 0) drawFPS(ctx, Math.round(1 / dt));
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+
+    // =====================================================================
+    // PLAYING / PAUSED / GAMEOVER — need game objects
+    // =====================================================================
+    const isUpgrading = upgradeSystem.isShowingPopup;
+    const isPaused = game.state === GameState.PAUSED;
+    const isGameOver = game.state === GameState.GAMEOVER;
+    const canUpdate = !isGameOver && !isPaused && !isUpgrading;
+
+    // Phase 5: Always update visual effects even when paused (for smooth rendering)
+    screenShake.update(dt);
+
+    // Update particles & damage numbers even when paused for smooth fade-out
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update(dt);
+        if (particles[i].lifetime <= 0) particles.splice(i, 1);
+    }
+    for (let i = damageNumbers.length - 1; i >= 0; i--) {
+        damageNumbers[i].update(dt);
+        if (damageNumbers[i].lifetime <= 0) damageNumbers.splice(i, 1);
+    }
+
+    if (canUpdate) {
+        // --- UPDATE ---
+        player.update(dt);
+        weapons.orbit.update(dt);
+        weapons.forwardShot.update(dt, enemies);
+        weapons.areaBurst.update(dt, enemies);
+        weapons.speedBuff.update(dt);
+
+        spawner.update(dt, player.x, player.y, enemies);
+
+        if (spawner.waveChangedFlag) {
+            waveNotifyTimer = 2.5;
+            spawner.waveChangedFlag = false;
+        }
+        if (waveNotifyTimer > 0) waveNotifyTimer -= dt;
+
+        // Update enemies + collision
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const enemy = enemies[i];
+            enemy.update(dt, player.x, player.y);
+
+            // Contact damage
+            if (circleCollision(player.x, player.y, player.radius, enemy.x, enemy.y, enemy.radius)) {
+                if (player.takeDamage(enemy.damage)) {
+                    game.state = GameState.GAMEOVER;
+                    AudioSystem.gameOver();
+                }
+            }
+
+            let killed = false;
+
+            // Orbit weapon hits
+            if (weapons.orbit.checkHit(enemy)) {
+                killed = enemy.takeDamage(weapons.orbit.damage);
+                // Phase 5: damage number
+                damageNumbers.push(new DamageNumber(enemy.x, enemy.y - enemy.radius, weapons.orbit.damage, '#ffd54f'));
+            }
+
+            // Forward shot hits
+            if (!killed) {
+                const fsDmg = weapons.forwardShot.checkHits(enemy);
+                if (fsDmg > 0) {
+                    killed = enemy.takeDamage(fsDmg);
+                    damageNumbers.push(new DamageNumber(enemy.x, enemy.y - enemy.radius, fsDmg, '#42a5f5'));
+                }
+            }
+
+            // Area burst already handles damage numbers in burst()
+            if (enemy.hp <= 0) killed = true;
+
+            if (killed) {
+                // Phase 5: death particles!
+                const isBoss = enemy.type === 'Boss';
+                const particleCount = isBoss ? 30 : enemy.type === 'Tank' ? 16 : enemy.type === 'Dasher' ? 10 : 12;
+                spawnDeathParticles(enemy.x, enemy.y, enemy.color, particleCount);
+
+                // Phase 5/7: screen shake on kill (bigger for tanks/bosses)
+                if (isBoss) {
+                    screenShake.trigger(12, 0.4);
+                    AudioSystem.bossDeath();
+                    // Boss drops extra XP gems in a burst
+                    for (let g = 0; g < 8; g++) {
+                        const ga = (Math.PI * 2 / 8) * g;
+                        xpGems.push(new XPGem(enemy.x + Math.cos(ga) * 20, enemy.y + Math.sin(ga) * 20, Math.ceil(enemy.xpValue / 8)));
+                    }
+                } else {
+                    if (enemy.type === 'Tank') screenShake.trigger(5, 0.15);
+                    AudioSystem.enemyDeath();
+                }
+
+                xpGems.push(new XPGem(enemy.x, enemy.y, enemy.xpValue));
+                enemies.splice(i, 1);
+                game.killCount++;
+                continue;
+            }
+
+            if (dist(player.x, player.y, enemy.x, enemy.y) > 1500) enemies.splice(i, 1);
+        }
+
+        // Update XP gems (Phase 5: magnet effect)
+        for (let i = xpGems.length - 1; i >= 0; i--) {
+            const gem = xpGems[i];
+            gem.update(dt, player.x, player.y, player.magnetRadius);
+
+            if (circleCollision(player.x, player.y, player.radius + 2, gem.x, gem.y, gem.radius)) {
+                player.addXP(gem.value);
+                // Phase 5: sparkle effect on pickup
+                spawnXPPickupParticles(gem.x, gem.y);
+                AudioSystem.xpPickup();
+                xpGems.splice(i, 1);
+                continue;
+            }
+            if (gem.lifetime <= 0) xpGems.splice(i, 1);
+        }
+
+        if (player.pendingLevelUps > 0) {
+            player.pendingLevelUps--;
+            upgradeSystem.generateChoices(weapons);
+            AudioSystem.levelUp();
+        }
+
+        camera.follow(player);
+    }
+
+    // --- RENDER ---
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+
+    drawGrid(ctx, camera);
+
+    // Particles (behind everything)
+    for (const p of particles) p.draw(ctx, camera);
+
+    for (const gem of xpGems) gem.draw(ctx, camera);
+    for (const enemy of enemies) enemy.draw(ctx, camera);
+
+    weapons.orbit.draw(ctx, camera);
+    weapons.forwardShot.draw(ctx, camera);
+    weapons.areaBurst.draw(ctx, camera);
+
+    player.draw(ctx, camera);
+
+    // Damage numbers (in front of everything in world space)
+    for (const dn of damageNumbers) dn.draw(ctx, camera);
+
+    drawHUD(ctx, player, weapons, spawner);
+
+    // Wave notification
+    if (waveNotifyTimer > 0 && !isUpgrading && !isPaused) {
+        const alpha = Math.min(1, waveNotifyTimer / 0.5);
+        ctx.globalAlpha = alpha;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ff9800'; ctx.font = 'bold 28px monospace';
+        ctx.fillText(`~ Wave ${spawner.waveNumber + 1} ~`, BASE_WIDTH / 2, 85);
+        ctx.fillStyle = '#fff'; ctx.font = uiFont(14) + 'px monospace';
+        ctx.fillText('Enemies grow stronger!', BASE_WIDTH / 2, 112);
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
+    }
+
+    // Phase 7: Boss warning notification
+    if (spawner.bossWarningActive && spawner.bossWarningTimer > 0) {
+        const bwAlpha = Math.min(1, spawner.bossWarningTimer / 0.5);
+        const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 100);
+        ctx.globalAlpha = bwAlpha * pulse;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ff6f00'; ctx.font = 'bold 36px monospace';
+        ctx.fillText('⚠ BOSS INCOMING ⚠', BASE_WIDTH / 2, BASE_HEIGHT / 2 - 60);
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
+        // Red border flash
+        ctx.strokeStyle = `rgba(255, 111, 0, ${0.3 * bwAlpha * pulse})`;
+        ctx.lineWidth = 4;
+        ctx.strokeRect(2, 2, BASE_WIDTH - 4, BASE_HEIGHT - 4);
+    }
+
+    // Phase 5: red vignette flash when player takes damage
+    if (player.hitFlashTimer > 0) {
+        const flashAlpha = 0.3 * (player.hitFlashTimer / 0.15);
+        ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
+        ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+    }
+
+    if (dt > 0) drawFPS(ctx, Math.round(1 / dt));
+
+    // Overlays based on state
+    if (isUpgrading) upgradeSystem.draw(ctx);
+    if (isPaused) drawPauseScreen(ctx);
+    if (isGameOver) drawGameOver(ctx, spawner);
+
+    requestAnimationFrame(gameLoop);
+}
+
+// --- Start ---
+requestAnimationFrame((timestamp) => {
+    lastTime = timestamp;
+    gameLoop(timestamp);
+});
+
+</script>
+</body>
+</html>

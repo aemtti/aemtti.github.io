@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07132f">
+<title>Abyssal Bloom — 네온 심해 해파리</title>
+<style>
+  /* 코드로 그린 SVG 애니메이션 아트 뷰어: 화면(세로·가로·PC)에 맞춰 가운데 배치, 애니메이션은 SVG 안의 SMIL 그대로 */
+  html, body { margin: 0; height: 100%; }
+  body {
+    min-height: 100vh; min-height: 100dvh; overflow: hidden; box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: linear-gradient(#07132f 0%, #07132f 30%, #020512 70%, #020512 100%); color: #bfefff;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    font: 500 13px/1.5 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  }
+  .art { display: block; width: 100%; height: auto; max-width: 100%; max-height: 100vh; max-height: 100dvh; object-fit: contain; }
+  @media (min-aspect-ratio: 3/2) { .art { width: auto; height: 100vh; height: 100dvh; } }
+  figcaption { padding: 18px 20px 0; text-align: center; letter-spacing: .06em; opacity: .72; }
+  figcaption small { display: block; margin-top: 2px; font-size: 12px; opacity: .75; letter-spacing: .12em; }
+  figure { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; }
+  /* 가로 화면에서는 그림 안의 제목만 보이게 */
+  @media (min-aspect-ratio: 1/1) { figcaption { display: none; } }
+</style>
+</head>
+<body>
+  <figure>
+    <img class="art" src="neon-abyss-jellyfish.svg" width="1200" height="800" alt="어두운 심해에서 네온빛으로 맥동하는 해파리와 기포를 표현한 애니메이션 벡터 아트">
+    <figcaption>Abyssal Bloom — 네온 심해 해파리<small>SVG · 코드로 그린 애니메이션</small></figcaption>
+  </figure>
+</body>
+</html>
