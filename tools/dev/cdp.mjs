@@ -172,7 +172,7 @@ class Page {
     const r = await this.s.send('Page.captureScreenshot', { format: file.endsWith('.jpg') ? 'jpeg' : 'png', quality: file.endsWith('.jpg') ? 82 : undefined })
     fs.writeFileSync(file, Buffer.from(r.data, 'base64')); return file
   }
-  async close() { try { await this.s.send("Browser.close") } catch {} try { this.s.ws.close() } catch {} try { this.proc.kill() } catch {} await sleep(300); try { fs.rmSync(this.dir, { recursive: true, force: true }) } catch {} }
+  async close() { try { await Promise.race([this.s.send("Browser.close"), sleep(1500)]) } catch {} try { this.s.ws.close() } catch {} try { this.proc.kill() } catch {} await sleep(300); try { fs.rmSync(this.dir, { recursive: true, force: true }) } catch {} }
 }
 
 export async function runSteps(page, steps) {

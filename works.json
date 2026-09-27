@@ -280,6 +280,90 @@
    "desktop": "클릭해서 재생 · 재생/일시정지·음소거 버튼",
    "url": "play/pixel-dawn/",
    "thumb": "thumbs/pixel-dawn.jpg"
+  },
+  {
+   "slug": "sunstone-saga",
+   "title": "태양석의 조각",
+   "en": "Shards of the Sunstone",
+   "kind": "game",
+   "orientation": "any",
+   "desc": "여섯 조각을 모아 봉인을 깨는 16비트풍 오리지널 액션 어드벤처 RPG",
+   "mobile": "왼쪽 스틱 이동 · A 칼/들기 · B 아이템 · MENU 인벤토리 · 화면 탭으로 대화 넘기기",
+   "desktop": "방향키 이동 · Z 칼 · X 아이템 · Enter 시작/일시정지 · S 저장",
+   "url": "play/sunstone-saga/",
+   "thumb": "thumbs/sunstone-saga.jpg"
+  },
+  {
+   "slug": "abyss-descent",
+   "title": "심연 하강",
+   "en": "Abyss Descent",
+   "kind": "game",
+   "orientation": "any",
+   "desc": "지하 10층을 내려가는 턴제 로그라이크 — 봇 수천 판으로 맞춘 난이도",
+   "mobile": "지도를 탭하면 한 칸(누르고 있으면 계속 걷기) · 방향 패드 · 아이템·휴식·내려가기 버튼",
+   "desktop": "방향키/WASD 이동·공격 · 1 2 3 아이템 · R 휴식 · Enter 내려가기",
+   "url": "play/abyss-descent/",
+   "thumb": "thumbs/abyss-descent.jpg"
+  },
+  {
+   "slug": "nova-rush",
+   "title": "노바 러시",
+   "en": "NOVA RUSH",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "다섯 보스의 탄막을 피하며 자동 사격으로 격파하는 10분 보스 러시",
+   "mobile": "화면 아무 데나 끌어 이동 · DASH · FOCUS 저속 · 사격은 자동",
+   "desktop": "WASD/방향키 이동 · Space 대시 · Shift 저속 · P 일시정지",
+   "url": "play/nova-rush/",
+   "thumb": "thumbs/nova-rush.jpg"
+  },
+  {
+   "slug": "night-horde",
+   "title": "나이트 호드",
+   "en": "NIGHT HORDE",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "30분을 버티는 서바이버풍 자동 공격 생존 액션",
+   "mobile": "화면 아무 데나 누르고 밀어 이동(공격 자동) · 레벨업 카드 탭 · Ⅱ 일시정지",
+   "desktop": "WASD/방향키 이동 · 1~4 레벨업 선택 · Esc 일시정지",
+   "url": "play/night-horde/",
+   "thumb": "thumbs/night-horde.jpg"
+  },
+  {
+   "slug": "cinderhall",
+   "title": "신더홀",
+   "en": "CINDERHALL",
+   "kind": "game",
+   "orientation": "any",
+   "desc": "잿불 성당을 오르는 덱빌딩 로그라이크 — 카드 169장, 유물 84개",
+   "mobile": "카드 탭=크게 보기, 한 번 더 탭=사용 · 적 탭=대상/정보 · 길게 누르면 설명",
+   "desktop": "카드 클릭=사용 · 적 클릭=대상 · 1~9 카드 · E 턴 종료",
+   "url": "play/cinderhall/",
+   "thumb": "thumbs/cinderhall.jpg"
+  },
+  {
+   "slug": "hordefall",
+   "title": "호드폴",
+   "en": "HORDEFALL",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "몰려오는 ZED 무리를 웨이브마다 버티는 1인칭 호드 슈터",
+   "mobile": "왼쪽 스틱 이동 · 오른쪽 드래그 시점 · 사격·점프·장전·무기 버튼",
+   "desktop": "클릭해 시작 · WASD · 마우스 시점 · 좌클릭 사격 · R 장전",
+   "url": "play/hordefall/",
+   "thumb": "thumbs/hordefall.jpg"
+  },
+  {
+   "slug": "horde-shooter",
+   "title": "호드 슈터",
+   "en": "Horde Shooter",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "탄약을 아끼며 카이팅으로 웨이브를 버티는 1인칭 호드 슈터",
+   "mobile": "왼쪽 스틱 이동 · 오른쪽 드래그 시점 · FIRE·AIM·JUMP·RELOAD 버튼",
+   "desktop": "클릭해 시작 · WASD · 마우스 시점 · 좌클릭 사격 · 우클릭 조준",
+   "url": "play/horde-shooter/",
+   "thumb": "thumbs/horde-shooter.jpg"
   }
  ]
 }

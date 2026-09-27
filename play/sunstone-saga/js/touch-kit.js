@@ -1,5 +1,5 @@
 /* touch-kit.js — on-screen touch controls for keyboard/mouse web games. No dependencies.
- * Inline it into a single-file game (inside a script tag) or load it next to the game.
+ * Inline it into a single-file game (<script>…</script>) or load it next to the game.
  *
  *   const kit = TouchKit.create({
  *     sticks: [

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <link rel="icon" href="data:," />
+    <title>Horde Shooter</title>
+    <script type="module" crossorigin src="./assets/index-Dyhe0zPH.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DtSTH1QX.css">
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <!--
+      Pointer Lock is only granted from a real user gesture, and only on
+      localhost or https. This panel is that gesture.
+    -->
+    <div id="start-screen">
+      <div class="start-card">
+        <h1>HORDE</h1>
+        <p class="tagline">Kite. Ration your ammo. Survive the wave.</p>
+        <button id="start-button" type="button">Click to start</button>
+        <ul class="controls controls-desktop">
+          <li><b>WASD</b> move &middot; <b>Shift</b> sprint &middot; <b>Space</b> jump</li>
+          <li><b>Mouse</b> look &middot; <b>LMB</b> fire &middot; <b>RMB</b> aim</li>
+          <li><b>R</b> reload &middot; <b>E</b> interact &middot; <b>F</b> heal &middot; <b>1-5</b> weapons</li>
+          <li><b>F1</b> debug overlay &middot; <b>Esc</b> release the cursor</li>
+        </ul>
+        <ul class="controls controls-touch">
+          <li><b>Left thumb</b> move &middot; <b>Right side</b> drag to look</li>
+          <li><b>FIRE</b> shoot (drag it to aim too) &middot; <b>AIM</b> sights on/off</li>
+          <li><b>JUMP</b> &middot; <b>RELOAD</b> &middot; <b>RUN</b> sprint on/off &middot; <b>II</b> pause</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="boot-error" hidden></div>
+
+  </body>
+</html>
