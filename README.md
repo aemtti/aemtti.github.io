@@ -1,7 +1,7 @@
 # aemtti.github.io
 
-The front page at **https://aemtti.github.io/**: a list of the small pieces I have published.
+코드로 만든 게임과 작품 모음 — https://aemtti.github.io/
 
-Every public repository with GitHub Pages turned on appears here automatically (read from the GitHub API when the page opens). A few have hand-written descriptions in `index.html`.
-
-코드로 만든 작품들의 목록 페이지예요. 새로 공개한 작품은 자동으로 나타나요.
+- 사이트에 나오는 것은 `works.json`에 적힌 작품뿐입니다. 페이지는 `node tools/build-site.mjs`로 만듭니다.
+- 작품 파일은 `play/<이름>/`, 썸네일은 `thumbs/`에 있습니다.
+- 올릴 때마다 GitHub Actions가 `tools/guard.mjs` 검사를 먼저 하고, 통과해야만 배포합니다.
