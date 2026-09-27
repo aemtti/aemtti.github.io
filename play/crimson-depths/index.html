@@ -1,0 +1,3015 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="CRIMSON DEPTHS - a procedural raycasting shooter. Web port of the Python/pygame original: every texture, sprite, sound and floor is generated at runtime.">
+<title>CRIMSON DEPTHS</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden;overscroll-behavior:none}
+body{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#screen{position:fixed;left:0;top:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+#look{position:fixed;left:42%;top:0;right:0;bottom:0;touch-action:none;display:none;z-index:5}
+#fs{position:fixed;right:calc(12px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));display:none;z-index:10;min-height:44px;
+  padding:0 16px;border-radius:22px;border:1px solid rgba(255,255,255,.35);background:rgba(24,8,8,.62);color:#eadbd4;font:600 14px/44px system-ui,sans-serif;letter-spacing:.04em}
+#safe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.tk-btn span{font-size:12px}
+</style>
+</head>
+<body>
+<canvas id="screen"></canvas>
+<div id="look"></div>
+<button id="fs" type="button">&#x26F6; FULLSCREEN</button>
+<div id="safe"></div>
+<script id="core">
+/* CRIMSON DEPTHS - web port, core (no DOM access: also runs under Node for tests).
+ * A line-by-line port of the Python/pygame/numpy game in the parent folder:
+ *   textures.py -> textures & sprites (numpy generators on typed arrays, a small pygame.draw-style rasterizer)
+ *   audio.py    -> sound bank & music loop synthesis (Float32Arrays; playback lives in the browser shell)
+ *   level.py    -> level generator (exact port of CPython's `random`, so every floor is the same map as the original)
+ *   raycast.py  -> software raycaster (walls, doors, floors, ceilings, baked light map, dynamic lights, sprites)
+ *   entities.py -> enemies, projectiles, particles, pickups, barrels
+ *   main.py     -> Game (state machine, player, weapons); HUD/input/audio playback are in the shell
+ */
+(function (G) {
+'use strict'
+const TAU = Math.PI * 2
+const F = Math.fround
+const trunc = Math.trunc
+const fdiv = (a, b) => Math.floor(a / b)                 // Python // on ints
+const pmod = (a, b) => a - b * Math.floor(a / b)          // Python % (b > 0)
+const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v
+
+// =================================================================== RNG ===
+// CPython random.Random (MT19937 + init_by_array seeding): identical sequences for int seeds.
+class PyRandom {
+  constructor(seed) {
+    this.mt = new Uint32Array(624); this.index = 624
+    let n = Math.abs(trunc(seed)); const key = []
+    do { key.push(n % 4294967296); n = Math.floor(n / 4294967296) } while (n > 0)
+    this.initByArray(key)
+  }
+  initGenrand(s) {
+    const mt = this.mt
+    mt[0] = s >>> 0
+    for (let i = 1; i < 624; i++) mt[i] = (Math.imul(1812433253, mt[i - 1] ^ (mt[i - 1] >>> 30)) + i) >>> 0
+    this.index = 624
+  }
+  initByArray(key) {
+    const mt = this.mt, N = 624
+    this.initGenrand(19650218)
+    let i = 1, j = 0
+    for (let k = Math.max(N, key.length); k; k--) {
+      mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1664525)) >>> 0) + key[j] + j
+      i++; j++
+      if (i >= N) { mt[0] = mt[N - 1]; i = 1 }
+      if (j >= key.length) j = 0
+    }
+    for (let k = N - 1; k; k--) {
+      mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1566083941)) >>> 0) - i
+      i++
+      if (i >= N) { mt[0] = mt[N - 1]; i = 1 }
+    }
+    mt[0] = 0x80000000
+  }
+  u32() {
+    const mt = this.mt
+    if (this.index >= 624) {
+      let kk = 0, y
+      for (; kk < 227; kk++) { y = (mt[kk] & 0x80000000) | (mt[kk + 1] & 0x7fffffff); mt[kk] = mt[kk + 397] ^ (y >>> 1) ^ (y & 1 ? 0x9908b0df : 0) }
+      for (; kk < 623; kk++) { y = (mt[kk] & 0x80000000) | (mt[kk + 1] & 0x7fffffff); mt[kk] = mt[kk - 227] ^ (y >>> 1) ^ (y & 1 ? 0x9908b0df : 0) }
+      y = (mt[623] & 0x80000000) | (mt[0] & 0x7fffffff); mt[623] = mt[396] ^ (y >>> 1) ^ (y & 1 ? 0x9908b0df : 0)
+      this.index = 0
+    }
+    let y = mt[this.index++]
+    y ^= y >>> 11
+    y ^= (y << 7) & 0x9d2c5680
+    y ^= (y << 15) & 0xefc60000
+    y ^= y >>> 18
+    return y >>> 0
+  }
+  random() { const a = this.u32() >>> 5, b = this.u32() >>> 6; return (a * 67108864 + b) / 9007199254740992 }
+  getrandbits(k) { return this.u32() >>> (32 - k) }
+  below(n) { const k = 32 - Math.clz32(n); let r = this.getrandbits(k); while (r >= n) r = this.getrandbits(k); return r }
+  randint(a, b) { return a + this.below(b - a + 1) }
+  randrange(n) { return this.below(n) }
+  choice(seq) { return seq[this.below(seq.length)] }
+  choices(pop, weights) {                                   // k = 1, returns the element
+    const cum = []; let s = 0
+    for (const w of weights) { s += w; cum.push(s) }
+    const x = this.random() * s
+    let lo = 0, hi = pop.length - 1
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (x < cum[mid]) hi = mid; else lo = mid + 1 }
+    return pop[lo]
+  }
+  shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = this.below(i + 1), t = a[i]; a[i] = a[j]; a[j] = t } }
+  sample(pop, k) {
+    const n = pop.length, res = []
+    let setsize = 21
+    if (k > 5) setsize += 4 ** Math.ceil(Math.log(k * 3) / Math.log(4))
+    if (n <= setsize) {
+      const pool = pop.slice()
+      for (let i = 0; i < k; i++) { const j = this.below(n - i); res.push(pool[j]); pool[j] = pool[n - i - 1] }
+    } else {
+      const sel = new Set()
+      for (let i = 0; i < k; i++) { let j = this.below(n); while (sel.has(j)) j = this.below(n); sel.add(j); res.push(pop[j]) }
+    }
+    return res
+  }
+}
+
+// numpy.random.default_rng(seed) = PCG64 seeded through SeedSequence; .random() -> float64 in [0, 1).
+function seedSequence(entropy, nWords) {
+  const INIT_A = 0x43b0d7e5, MULT_A = 0x931e8875, INIT_B = 0x8b51f9dd, MULT_B = 0x58f38ded, MIX_L = 0xca01f9dd, MIX_R = 0x4973f715
+  let hc = INIT_A
+  const hashmix = v => { v = (v ^ hc) >>> 0; hc = Math.imul(hc, MULT_A) >>> 0; v = Math.imul(v, hc) >>> 0; return (v ^ (v >>> 16)) >>> 0 }
+  const mix = (x, y) => { const r = (Math.imul(MIX_L, x) - Math.imul(MIX_R, y)) >>> 0; return (r ^ (r >>> 16)) >>> 0 }
+  const ent = [entropy >>> 0], pool = [0, 0, 0, 0]
+  for (let i = 0; i < 4; i++) pool[i] = hashmix(i < ent.length ? ent[i] : 0)
+  for (let s = 0; s < 4; s++) for (let d = 0; d < 4; d++) if (s !== d) pool[d] = mix(pool[d], hashmix(pool[s]))
+  let hb = INIT_B
+  const out = []
+  for (let i = 0; i < nWords; i++) {
+    let v = pool[i % 4]
+    v = (v ^ hb) >>> 0; hb = Math.imul(hb, MULT_B) >>> 0; v = Math.imul(v, hb) >>> 0; v = (v ^ (v >>> 16)) >>> 0
+    out.push(v)
+  }
+  return out
+}
+const PCG_MULT = 0x2360ED051FC65DA44385DF649FCCF645n, M128 = (1n << 128n) - 1n, M64 = (1n << 64n) - 1n
+class PCG64 {
+  constructor(seed) {
+    const st = seedSequence(seed, 8)
+    const v = [0, 1, 2, 3].map(i => BigInt(st[2 * i]) | (BigInt(st[2 * i + 1]) << 32n))
+    const initstate = (v[0] << 64n) | v[1], initseq = (v[2] << 64n) | v[3]
+    this.inc = ((initseq << 1n) | 1n) & M128
+    this.s = this.inc & M128
+    this.s = (this.s + initstate) & M128
+    this.s = (this.s * PCG_MULT + this.inc) & M128
+  }
+  next64() {
+    this.s = (this.s * PCG_MULT + this.inc) & M128
+    const s = this.s, x = ((s >> 64n) ^ s) & M64, rot = s >> 122n
+    return ((x >> rot) | (x << ((64n - rot) & 63n))) & M64
+  }
+  random() { return Number(this.next64() >> 11n) / 9007199254740992 }
+}
+
+// Iteration order of a CPython (3.8-3.10, 64-bit) set of (x, y) int tuples.  level.py builds the door table from a set,
+// and main.py picks the start direction with min() over it, so ties between equally near doors follow this order.
+const XXP1 = 11400714785074694791n, XXP2 = 14029467366897019727n, XXP5 = 2870177450012600261n
+function pyHashPair(a, b) {                             // hash((a, b)) for small non-negative ints
+  let acc = XXP5
+  for (const v of [a, b]) {
+    acc = (acc + BigInt(v) * XXP2) & M64
+    acc = ((acc << 31n) | (acc >> 33n)) & M64
+    acc = (acc * XXP1) & M64
+  }
+  acc = (acc + (2n ^ (XXP5 ^ 3527539n))) & M64
+  return acc === M64 ? 1546275796n : acc
+}
+function pySetOrder(keys) {                             // open addressing: 9 linear probes, then perturbed jumps; grows x4
+  let mask = 7, table = new Array(8).fill(null), fill = 0, used = 0
+  const place = (tbl, msk, e) => {
+    let perturb = e.h, i = Number(e.h & BigInt(msk))
+    for (;;) {
+      const probes = i + 9 <= msk ? 9 : 0
+      for (let j = 0; j <= probes; j++) if (tbl[i + j] === null) { tbl[i + j] = e; return }
+      perturb >>= 5n
+      i = Number((BigInt(i) * 5n + 1n + perturb) & BigInt(msk))
+    }
+  }
+  for (const key of keys) {
+    place(table, mask, { key, h: pyHashPair(key[0], key[1]) }); fill++; used++
+    if (fill * 5 >= mask * 3) {
+      let size = 8; const minused = used > 50000 ? used * 2 : used * 4
+      while (size <= minused) size <<= 1
+      const old = table; mask = size - 1; table = new Array(size).fill(null)
+      for (const e of old) if (e) place(table, mask, e)
+    }
+  }
+  return table.filter(Boolean).map(e => e.key)
+}
+
+// Python's module-level `random` for gameplay (unseeded there too).
+const rnd = Math.random
+const uniform = (a, b) => a + (b - a) * rnd()
+function gauss(mu, sigma) { let u = 0; while (u === 0) u = rnd(); return mu + sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * rnd()) }
+
+// ============================================================= textures ===
+const TEX = 64
+
+function vnoise(w, h, cells, rng, octaves = 3, persistence = 0.5) {   // tileable value noise, (h, w) row-major float32
+  const out = new Float32Array(h * w)
+  let amp = 1.0, total = 0.0, c = cells
+  for (let o = 0; o < octaves; o++) {
+    const n1 = c + 1, g = new Float32Array(n1 * n1)
+    for (let i = 0; i < n1 * n1; i++) g[i] = rng.random()
+    for (let j = 0; j < n1; j++) g[(n1 - 1) * n1 + j] = g[j]
+    for (let i = 0; i < n1; i++) g[i * n1 + n1 - 1] = g[i * n1]
+    const ix = new Int32Array(w), fx = new Float64Array(w), sx = c / w, sy = c / h
+    for (let x = 0; x < w; x++) { const xs = x * sx; ix[x] = trunc(xs); const f = xs - ix[x]; fx[x] = f * f * (3 - 2 * f) }
+    for (let y = 0; y < h; y++) {
+      const ys = y * sy, iy = trunc(ys); let fy = ys - iy; fy = fy * fy * (3 - 2 * fy)
+      const r0 = iy * n1, r1 = (iy + 1) * n1
+      for (let x = 0; x < w; x++) {
+        const a = g[r0 + ix[x]], b = g[r0 + ix[x] + 1], cc = g[r1 + ix[x]], d = g[r1 + ix[x] + 1], f = fx[x]
+        const v = (a * (1 - f) + b * f) * (1 - fy) + (cc * (1 - f) + d * f) * fy
+        out[y * w + x] = out[y * w + x] + v * amp
+      }
+    }
+    total += amp; amp *= persistence; c *= 2
+  }
+  for (let i = 0; i < out.length; i++) out[i] = out[i] / total
+  return out
+}
+// float32 helpers mirroring numpy's weak-scalar float32 arithmetic: (a + b*n) on a float32 array
+const lin32 = (a, b, n) => F(F(a) + F(F(b) * n))
+
+function finish(img) {                                    // (y, x, 3) float -> (x, y, 3) uint8 (clip + truncate)
+  const out = new Uint8Array(TEX * TEX * 3)
+  for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) for (let c = 0; c < 3; c++) {
+    const v = img[(y * TEX + x) * 3 + c]
+    out[(x * TEX + y) * 3 + c] = v < 0 ? 0 : v > 255 ? 255 : v
+  }
+  return out
+}
+function voronoi(rng, count) {
+  const pts = []
+  for (let i = 0; i < count * 2; i++) pts.push(rng.random() * TEX)
+  const b1 = new Float64Array(TEX * TEX).fill(1e9), b2 = new Float64Array(TEX * TEX).fill(1e9), ids = new Int32Array(TEX * TEX)
+  for (let i = 0; i < count; i++) {
+    const py = pts[2 * i], px = pts[2 * i + 1]
+    for (let y = 0; y < TEX; y++) {
+      let dy = Math.abs(y - py); dy = Math.min(dy, TEX - dy)
+      for (let x = 0; x < TEX; x++) {
+        let dx = Math.abs(x - px); dx = Math.min(dx, TEX - dx)
+        const d = Math.sqrt(dx * dx + dy * dy), k = y * TEX + x
+        if (d < b1[k]) { b2[k] = b1[k]; b1[k] = d; ids[k] = i } else b2[k] = Math.min(b2[k], d)
+      }
+    }
+  }
+  const edge = new Float64Array(TEX * TEX)
+  for (let k = 0; k < edge.length; k++) edge[k] = b2[k] - b1[k]
+  return { ids, edge }
+}
+function randArr(rng, n) { const a = new Float64Array(n); for (let i = 0; i < n; i++) a[i] = rng.random(); return a }
+function texImage(fn) {                                  // fn(x, y, out3) fills colour for pixel (x, y)
+  const img = new Float64Array(TEX * TEX * 3), c = [0, 0, 0]
+  for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) { fn(x, y, c); const i = (y * TEX + x) * 3; img[i] = c[0]; img[i + 1] = c[1]; img[i + 2] = c[2] }
+  return finish(img)
+}
+
+function texBrick(rng, base = [160, 62, 48], mortar = [82, 72, 66]) {
+  const n = vnoise(TEX, TEX, 8, rng, 3), bh = 8, bw = 16, cols = fdiv(TEX, bw) + 3
+  const bvg = randArr(rng, (fdiv(TEX, bh) + 1) * cols)
+  return texImage((x, y, o) => {
+    const row = fdiv(y, bh), xs = x + (row % 2) * fdiv(bw, 2), xo = xs % bw, yo = y % bh
+    const bv = bvg[row * cols + fdiv(xs, bw)], nv = n[y * TEX + x]
+    const f1 = 0.7 + 0.55 * bv, f2 = lin32(0.8, 0.4, nv), fm = lin32(0.75, 0.5, nv)
+    for (let c = 0; c < 3; c++) {
+      let v = base[c] * f1 * f2
+      if (xo === 1 || yo === 1) v = v * 1.18
+      if (xo === bw - 1 || yo === bh - 1) v = v * 0.72
+      if (xo === 0 || yo === 0) v = mortar[c] * fm
+      o[c] = v
+    }
+  })
+}
+function texStone(rng, base = [120, 118, 112]) {
+  const { ids, edge } = voronoi(rng, 14), n = vnoise(TEX, TEX, 6, rng, 4), sh = randArr(rng, 14)
+  return texImage((x, y, o) => {
+    const k = y * TEX + x, f1 = 0.6 + 0.6 * sh[ids[k]], f2 = lin32(0.75, 0.5, n[k]), e = clamp(edge[k] / 2.5, 0.35, 1.0)
+    for (let c = 0; c < 3; c++) o[c] = base[c] * f1 * f2 * e
+  })
+}
+function texTech(rng, base = [70, 82, 100], glow = [60, 220, 255]) {
+  const n = vnoise(TEX, TEX, 16, rng, 2), p = 32
+  return texImage((x, y, o) => {
+    const xo = x % p, yo = y % p, nv = n[y * TEX + x], f = lin32(0.85, 0.3, nv), fg = lin32(0.8, 0.4, nv)
+    const checker = (fdiv(x, p) + fdiv(y, p)) % 2
+    const inset = xo >= 4 && xo < p - 4 && yo >= 4 && yo < p - 4
+    const rivet = (xo - 2) ** 2 + (yo - 2) ** 2 <= 1.5 || (xo - (p - 3)) ** 2 + (yo - (p - 3)) ** 2 <= 1.5
+    const strip = yo >= 14 && yo < 18 && xo >= 8 && xo < p - 8 && checker === 0
+    const vent = xo >= 8 && xo < p - 8 && yo >= 10 && yo < 22 && yo % 3 === 0 && checker === 1
+    for (let c = 0; c < 3; c++) {
+      let v = base[c] * f
+      if (inset) v = v * 0.75
+      if (xo === 0 || yo === 0) v = v * 1.4
+      if (xo === p - 1 || yo === p - 1) v = v * 0.5
+      if (xo === 4 || yo === 4) v = v * 0.55
+      if (rivet) v = v * 1.6
+      if (strip) v = glow[c] * fg
+      if (vent) v = v * 0.4
+      o[c] = v
+    }
+  })
+}
+function texHell(rng, base = [110, 28, 30], vein = [255, 120, 40]) {
+  const n = vnoise(TEX, TEX, 5, rng, 4), vv = vnoise(TEX, TEX, 3, rng, 3)
+  return texImage((x, y, o) => {
+    const k = y * TEX + x, d = F(vv[k] - F(0.5)), veins = F(Math.exp(F(F(-F(d * d)) * 900))), f = lin32(0.5, 0.9, n[k])
+    for (let c = 0; c < 3; c++) o[c] = base[c] * f + vein[c] * veins * 0.9
+  })
+}
+function texMetal(rng, base = [92, 96, 104]) {
+  const n = vnoise(TEX, 4, 4, rng, 2), m = vnoise(TEX, TEX, 12, rng, 2)   // brushed: row 0 of n repeated
+  return texImage((x, y, o) => {
+    const f = F(F(F(0.7) + F(F(0.4) * n[x])) + F(F(0.2) * m[y * TEX + x]))
+    const rivet = (x % 16 === 4 || x % 16 === 12) && y % 16 === 8
+    for (let c = 0; c < 3; c++) {
+      let v = base[c] * f
+      if (y % 16 === 0) v = v * 0.45
+      if (y % 16 === 1) v = v * 1.3
+      if (rivet) v = v * 1.5
+      o[c] = v
+    }
+  })
+}
+function texDoor(rng) {
+  const n = vnoise(TEX, TEX, 10, rng, 2), base = [96, 104, 118], yel = [225, 190, 30], blk = [30, 30, 32], win = [40, 200, 120]
+  return texImage((x, y, o) => {
+    const nv = n[y * TEX + x], f = lin32(0.8, 0.4, nv), fw = lin32(0.6, 0.6, nv)
+    const border = x < 3 || x >= TEX - 3 || y < 3 || y >= TEX - 3, hz = y >= 26 && y < 38, stripe = fdiv(x + y, 6) % 2 === 0
+    const rivet = x % 12 === 6 && (y === 8 || y === 55), wnd = x >= 20 && x < 44 && y >= 10 && y < 18
+    for (let c = 0; c < 3; c++) {
+      let v = base[c] * f
+      if (border) v = v * 0.55
+      if (hz && stripe) v = yel[c] * f
+      if (hz && !stripe) v = blk[c] * f
+      if (y === 25 || y === 38) v = v * 0.4
+      if (rivet) v = v * 1.6
+      if (wnd) v = win[c] * fw
+      o[c] = v
+    }
+  })
+}
+function texTiles(rng, base = [96, 88, 78]) {
+  const n = vnoise(TEX, TEX, 8, rng, 3), t = 16, tv = randArr(rng, 16)
+  return texImage((x, y, o) => {
+    const f1 = 0.7 + 0.5 * tv[fdiv(y, t) * 4 + fdiv(x, t)], f2 = lin32(0.8, 0.4, n[y * TEX + x])
+    for (let c = 0; c < 3; c++) {
+      let v = base[c] * f1 * f2
+      if (x % t === 0 || y % t === 0) v = v * 0.45
+      if (x % t === 1 || y % t === 1) v = v * 1.15
+      o[c] = v
+    }
+  })
+}
+function texGrate(rng, base = [58, 62, 70]) {
+  const n = vnoise(TEX, TEX, 8, rng, 3)
+  return texImage((x, y, o) => {
+    const f = lin32(0.8, 0.4, n[y * TEX + x]), hole = x % 8 >= 2 && x % 8 < 6 && y % 8 >= 2 && y % 8 < 6
+    for (let c = 0; c < 3; c++) {
+      let v = base[c] * f
+      if (hole) v = v * 0.25
+      if (x % 8 === 1 || y % 8 === 1) v = v * 1.3
+      o[c] = v
+    }
+  })
+}
+function texFlagstone(rng, base = [88, 84, 80]) {
+  const { ids, edge } = voronoi(rng, 10), n = vnoise(TEX, TEX, 6, rng, 3), sh = randArr(rng, 10)
+  return texImage((x, y, o) => {
+    const k = y * TEX + x, f1 = 0.65 + 0.5 * sh[ids[k]], f2 = lin32(0.8, 0.4, n[k]), e = clamp(edge[k] / 3.0, 0.3, 1.0)
+    for (let c = 0; c < 3; c++) o[c] = base[c] * f1 * f2 * e
+  })
+}
+function texRock(rng, base = [70, 52, 48]) {
+  const n = vnoise(TEX, TEX, 4, rng, 5)
+  return texImage((x, y, o) => { const f = lin32(0.4, 1.0, n[y * TEX + x]); for (let c = 0; c < 3; c++) o[c] = base[c] * f })
+}
+function texPanels(rng, base = [48, 52, 62]) {
+  const n = vnoise(TEX, TEX, 8, rng, 2), p = 32, lampc = [200, 210, 230]
+  return texImage((x, y, o) => {
+    const f = lin32(0.8, 0.4, n[y * TEX + x])
+    const lamp = (x % p - 16) ** 2 + (y % p - 16) ** 2 <= 9 && (fdiv(x, p) + fdiv(y, p)) % 2 === 0
+    for (let c = 0; c < 3; c++) {
+      let v = base[c] * f
+      if (x % p === 0 || y % p === 0) v = v * 0.4
+      if (x % p === 1 || y % p === 1) v = v * 1.3
+      if (lamp) v = lampc[c]
+      o[c] = v
+    }
+  })
+}
+
+// Wall ids used in the level grid.  0 = floor, 1..9 walls, DOOR = 10.
+const DOOR = 10
+const THEMES = { brick: [1, 0, 2], stone: [2, 2, 1], tech: [3, 1, 0], hell: [4, 3, 1], metal: [5, 1, 0] }
+const THEME_NAMES = ['brick', 'stone', 'tech', 'hell', 'metal']
+const TEXN = TEX * TEX * 3
+
+function buildAtlases(seed = 1) {
+  const rng = new PCG64(seed)
+  const walls = new Uint8Array(16 * TEXN), floors = new Uint8Array(4 * TEXN), ceils = new Uint8Array(3 * TEXN)
+  const put = (arr, i, t) => arr.set(t, i * TEXN)
+  put(walls, 1, texBrick(rng)); put(walls, 2, texStone(rng)); put(walls, 3, texTech(rng)); put(walls, 4, texHell(rng))
+  put(walls, 5, texMetal(rng)); put(walls, 6, texBrick(rng, [70, 74, 90], [40, 40, 48])); put(walls, DOOR, texDoor(rng))
+  put(floors, 0, texTiles(rng)); put(floors, 1, texGrate(rng)); put(floors, 2, texFlagstone(rng)); put(floors, 3, texRock(rng, [90, 30, 26]))
+  put(ceils, 0, texPanels(rng)); put(ceils, 1, texRock(rng, [52, 44, 42])); put(ceils, 2, texBrick(rng, [80, 40, 34], [40, 36, 34]))
+  return { walls, floors, ceils }
+}
+
+// ------------------------------------------- pygame.draw-style rasterizer ---
+// RGBA surfaces, row-major.  Drawing *sets* pixels (pygame.draw never alpha-blends), shapes are aliased.
+class Surf {
+  constructor(w, h) { this.w = w; this.h = h; this.d = new Uint8Array(w * h * 4) }
+  put(x, y, c) {
+    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return
+    const i = (y * this.w + x) << 2, d = this.d
+    d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = c.length > 3 ? c[3] : 255
+  }
+  hline(x1, y, x2, c) {
+    if (y < 0 || y >= this.h) return
+    if (x1 > x2) { const t = x1; x1 = x2; x2 = t }
+    if (x1 < 0) x1 = 0
+    if (x2 >= this.w) x2 = this.w - 1
+    for (let x = x1; x <= x2; x++) this.put(x, y, c)
+  }
+  vline(x, y1, y2, c) {
+    if (x < 0 || x >= this.w) return
+    if (y1 > y2) { const t = y1; y1 = y2; y2 = t }
+    if (y1 < 0) y1 = 0
+    if (y2 >= this.h) y2 = this.h - 1
+    for (let y = y1; y <= y2; y++) this.put(x, y, c)
+  }
+  rect(x, y, w, h, c) { x = trunc(x); y = trunc(y); w = trunc(w); h = trunc(h); for (let yy = y; yy < y + h; yy++) this.hline(x, yy, x + w - 1, c) }
+  line1(x1, y1, x2, y2, c) {                             // Bresenham, 1 px
+    if (x1 === x2 && y1 === y2) { this.put(x1, y1, c); return }
+    if (y1 === y2) { this.hline(x1, y1, x2, c); return }
+    if (x1 === x2) { this.vline(x1, y1, y2, c); return }
+    const dx = Math.abs(x2 - x1), sx = x1 < x2 ? 1 : -1, dy = Math.abs(y2 - y1), sy = y1 < y2 ? 1 : -1
+    let err = trunc((dx > dy ? dx : -dy) / 2)
+    while (x1 !== x2 || y1 !== y2) {
+      this.put(x1, y1, c)
+      const e2 = err
+      if (e2 > -dx) { err -= dy; x1 += sx }
+      if (e2 < dy) { err += dx; y1 += sy }
+    }
+    this.put(x2, y2, c)
+  }
+  line(ax, ay, bx, by, c, width = 1) {                   // pygame draw_line_width: flat ends, spans across the minor axis
+    let x1 = trunc(ax), y1 = trunc(ay), x2 = trunc(bx), y2 = trunc(by)
+    if (width < 1) return
+    if (width === 1) { this.line1(x1, y1, x2, y2, c); return }
+    const extra = 1 - (width % 2), half = width >> 1, xinc = Math.abs(x1 - x2) <= Math.abs(y1 - y2)
+    if (x1 === x2 && y1 === y2) { this.hline(x1 - half + extra, y1, x1 + half, c); return }
+    const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1), sx = x2 > x1 ? 1 : -1, sy = y2 > y1 ? 1 : -1
+    let err = trunc((dx > dy ? dx : -dy) / 2)
+    if (xinc) {
+      while (y1 !== y2 + sy) {
+        this.hline(x1 - half + extra, y1, x1 + half, c)
+        const e2 = err
+        if (e2 > -dx) { err -= dy; x1 += sx }
+        if (e2 < dy) { err += dx; y1 += sy }
+      }
+    } else {
+      while (x1 !== x2 + sx) {
+        this.vline(x1, y1 - half + extra, y1 + half, c)
+        const e2 = err
+        if (e2 > -dx) { err -= dy; x1 += sx }
+        if (e2 < dy) { err += dx; y1 += sy }
+      }
+    }
+  }
+  polygon(pts, c) {                                     // pygame polygon(): triangles use draw_filltri, others draw_fillpoly
+    if (pts.length === 3) return this.tri(pts, c)
+    this.fillpoly(pts.map(p => trunc(p[0])), pts.map(p => trunc(p[1])), c)
+  }
+  tri(pts, c) {                                         // pygame-ce draw_filltri
+    let p0x = trunc(pts[0][0]), p1x = trunc(pts[1][0]), p2x = trunc(pts[2][0])
+    let p0y = trunc(pts[0][1]), p1y = trunc(pts[1][1]), p2y = trunc(pts[2][1]), t
+    if (p1y < p0y) { t = p1x; p1x = p0x; p0x = t; t = p1y; p1y = p0y; p0y = t }
+    if (p2y < p1y) {
+      t = p1x; p1x = p2x; p2x = t; t = p1y; p1y = p2y; p2y = t
+      if (p1y < p0y) { t = p1x; p1x = p0x; p0x = t; t = p1y; p1y = p0y; p0y = t }
+    }
+    if (p0y === p1y && p1y === p2y && p0x === p1x && p1x !== p2x) { t = p1x; p1x = p2x; p2x = t; t = p1y; p1y = p2y; p2y = t }
+    const d1 = F((p2x - p0x) / ((p2y - p0y) + 1e-17)), d2 = F((p1x - p0x) / ((p1y - p0y) + 1e-17)), d3 = F((p2x - p1x) / ((p2y - p1y) + 1e-17))
+    for (let y = p0y; y <= p2y; y++) {
+      const x1 = p0x + trunc(F((y - p0y) * d1))
+      const x2 = y < p1y ? p0x + trunc(F((y - p0y) * d2)) : p1x + trunc(F((y - p1y) * d3))
+      this.hline(x1, y, x2, c)
+    }
+  }
+  fillpoly(px, py, c) {                                 // pygame draw_fillpoly (scanline, integer vertices)
+    const n = px.length
+    let miny = py[0], maxy = py[0]
+    for (let i = 1; i < n; i++) { miny = Math.min(miny, py[i]); maxy = Math.max(maxy, py[i]) }
+    if (miny === maxy) { this.hline(Math.min(...px), miny, Math.max(...px), c); return }
+    const xs = []
+    for (let y = miny; y <= maxy; y++) {
+      xs.length = 0
+      for (let i = 0; i < n; i++) {
+        const ip = i ? i - 1 : n - 1
+        let y1 = py[ip], y2 = py[i], x1, x2
+        if (y1 < y2) { x1 = px[ip]; x2 = px[i] } else if (y1 > y2) { y2 = py[ip]; y1 = py[i]; x2 = px[ip]; x1 = px[i] } else continue
+        if ((y >= y1 && y < y2) || (y === maxy && y2 === maxy)) {
+          let t = F((y - y1) * (x2 - x1) / F(y2 - y1))
+          t = xs.length % 2 === 0 ? Math.floor(t) : Math.ceil(t)
+          xs.push(t + x1)
+        }
+      }
+      xs.sort((a, b) => a - b)
+      for (let i = 0; i + 1 < xs.length; i += 2) this.hline(xs[i], y, xs[i + 1], c)
+    }
+    for (let i = 0; i < n; i++) {
+      const ip = i ? i - 1 : n - 1, y = py[i]
+      if (miny < y && py[ip] === y && y < maxy) this.hline(px[i], y, px[ip], c)
+    }
+  }
+  circle(cx, cy, r, c, width = 0) {                     // pygame draw.circle: filled (midpoint; diameter 2r) or ring
+    const x0 = trunc(cx), y0 = trunc(cy); r = trunc(r)
+    if (r < 1) return
+    if (width > r) width = r
+    if (width && width !== r) return this.ring(x0, y0, r, width, c)
+    let f = 1 - r, ddx = 0, ddy = -2 * r, x = 0, y = r
+    while (x < y) {
+      if (f >= 0) { y--; ddy += 2; f += ddy }
+      x++; ddx += 2; f += ddx + 1
+      if (f >= 0) { this.hline(x0 - x, y0 + y - 1, x0 + x - 1, c); this.hline(x0 - x, y0 - y, x0 + x - 1, c) }
+      this.hline(x0 - y, y0 + x - 1, x0 + y - 1, c); this.hline(x0 - y, y0 - x, x0 + y - 1, c)
+    }
+  }
+  ring(x0, y0, radius, thickness, c) {                  // pygame-ce draw_circle_bresenham (width > 1)
+    let x = 0, y = radius, line = 1, xi = 0, yi = radius - thickness + 1, d2i = 0
+    const r2 = radius * radius, dr2 = 2 * r2, ri = radius - thickness + 1, ri2 = ri * ri, dri2 = 2 * ri2
+    let d1 = r2 * (1.25 - radius), dx = 0, dy = dr2 * y, d1i = ri2 * (1.25 - ri), dxi = 0, dyi = dri2 * yi
+    const rows = () => {
+      if (line) { this.hline(x0 - x, y0 - y, x0 + x - 1, c); this.hline(x0 - x, y0 + y - 1, x0 + x - 1, c) }
+      else {
+        this.hline(x0 - x, y0 - y, x0 - xi, c); this.hline(x0 - x, y0 + y - 1, x0 - xi, c)
+        this.hline(x0 + xi - 1, y0 - y, x0 + x - 1, c); this.hline(x0 + xi - 1, y0 + y - 1, x0 + x - 1, c)
+      }
+    }
+    while (dx < dy) {
+      while (d1 < 0) { x++; dx += dr2; d1 += dx + r2 }
+      rows()
+      x++; y--; dx += dr2; dy -= dr2; d1 += dx - dy + r2
+      if (line && y < ri) line = 0
+      if (!line) {
+        while (d1i < 0) { xi += 1; dxi += dri2; d1i += dxi + ri2 }
+        xi++; yi--; dxi += dri2; dyi -= dri2; d1i += dxi - dyi + ri2
+      }
+    }
+    d1 = r2 * ((x + 0.5) * (x + 0.5) + (y - 1) * (y - 1) - r2)
+    while (y >= 0) {
+      rows()
+      if (d1 > 0) { y--; dy -= dr2; d1 += r2 - dy }
+      else { y--; x++; dx += dr2; dy -= dr2; d1 += dx - dy + r2 }
+      if (line && y < ri) line = 0
+      if (!line) {
+        if (dxi < dyi) {
+          while (d1i < 0) { xi += 1; dxi += dri2; d1i += dxi + ri2 }
+          xi++; yi--; dxi += dri2; dyi -= dri2; d1i += dxi - dyi + ri2
+        } else {
+          if (!d2i) d2i = ri2 * ((xi + 0.5) * (xi + 0.5) + (yi - 1) * (yi - 1) - ri2)
+          if (d2i > 0) { yi--; dyi -= dri2; d2i += ri2 - dyi }
+          else { yi--; xi++; dxi += dri2; dyi -= dri2; d2i += dxi - dyi + ri2 }
+        }
+      }
+    }
+  }
+  quadrant(x0, y0, radius, thickness, c, tr, tl, bl, br) {   // pygame-ce draw_circle_quadrant
+    let f = 1 - radius, ddx = 0, ddy = -2 * radius, x = 0, y = radius, iy = radius - thickness, iF = 1 - iy, iddx = 0, iddy = -2 * iy
+    if (radius === 1) {
+      if (tr) this.put(x0, y0 - 1, c)
+      if (tl) this.put(x0 - 1, y0 - 1, c)
+      if (bl) this.put(x0 - 1, y0, c)
+      if (br) this.put(x0, y0, c)
+      return
+    }
+    if (thickness !== 0) {
+      while (x < y) {
+        if (f >= 0) { y--; ddy += 2; f += ddy }
+        if (iF >= 0) { iy--; iddy += 2; iF += iddy }
+        x++; ddx += 2; f += ddx + 1; iddx += 2; iF += iddx + 1
+        if (thickness > 1) thickness = y - iy
+        for (let i = 0; i < thickness; i++) {
+          const y1 = y - i
+          if (tr) { if (y0 - y1 < y0 - x) this.put(x0 + x - 1, y0 - y1, c); if (x0 + y1 - 1 >= x0 + x - 1) this.put(x0 + y1 - 1, y0 - x, c) }
+          if (tl) { if (y0 - y1 <= y0 - x) this.put(x0 - x, y0 - y1, c); if (x0 - y1 < x0 - x) this.put(x0 - y1, y0 - x, c) }
+          if (bl) { if (x0 - y1 <= x0 - x) this.put(x0 - y1, y0 + x - 1, c); if (y0 + y1 - 1 > y0 + x - 1) this.put(x0 - x, y0 + y1 - 1, c) }
+          if (br) { if (y0 + y1 - 1 >= y0 + x - 1) this.put(x0 + x - 1, y0 + y1 - 1, c); if (x0 + y1 - 1 > x0 + x - 1) this.put(x0 + y1 - 1, y0 + x - 1, c) }
+        }
+      }
+    } else {
+      while (x < y) {
+        if (f >= 0) { y--; ddy += 2; f += ddy }
+        x++; ddx += 2; f += ddx + 1
+        if (tr) { for (let y1 = y0 - x; y1 <= y0; y1++) this.put(x0 + y - 1, y1, c); for (let y1 = y0 - y; y1 <= y0; y1++) this.put(x0 + x - 1, y1, c) }
+        if (tl) { for (let y1 = y0 - x; y1 <= y0; y1++) this.put(x0 - y, y1, c); for (let y1 = y0 - y; y1 <= y0; y1++) this.put(x0 - x, y1, c) }
+        if (bl) { for (let y1 = y0; y1 < y0 + x; y1++) this.put(x0 - y, y1, c); for (let y1 = y0; y1 < y0 + y; y1++) this.put(x0 - x, y1, c) }
+        if (br) { for (let y1 = y0; y1 < y0 + x; y1++) this.put(x0 + y - 1, y1, c); for (let y1 = y0; y1 < y0 + y; y1++) this.put(x0 + x - 1, y1, c) }
+      }
+    }
+  }
+  ellipse(rx, ry, rw, rh, c) {                          // pygame draw_ellipse_filled (midpoint)
+    let x0 = trunc(rx), y0 = trunc(ry); const width = trunc(rw), height = trunc(rh)
+    if (width <= 0 || height <= 0) return
+    if (width === 1) { this.line1(x0, y0, x0, y0 + height - 1, c); return }
+    if (height === 1) { this.hline(x0, y0, x0 + width - 1, c); return }
+    x0 += width >> 1; y0 += height >> 1
+    const xo = (width + 1) % 2, yo = (height + 1) % 2, a = width >> 1, b = height >> 1
+    let x = 0, y = b
+    let d1 = b * b - a * a * b + 0.25 * a * a, dx = 2 * b * b * x, dy = 2 * a * a * y
+    while (dx < dy) {
+      this.hline(x0 - x, y0 - y, x0 + x - xo, c); this.hline(x0 - x, y0 + y - yo, x0 + x - xo, c)
+      if (d1 < 0) { x++; dx += 2 * b * b; d1 += dx + b * b }
+      else { x++; y--; dx += 2 * b * b; dy -= 2 * a * a; d1 += dx - dy + b * b }
+    }
+    let d2 = b * b * ((x + 0.5) * (x + 0.5)) + a * a * ((y - 1) * (y - 1)) - a * a * b * b
+    while (y >= 0) {
+      this.hline(x0 - x, y0 - y, x0 + x - xo, c); this.hline(x0 - x, y0 + y - yo, x0 + x - xo, c)
+      if (d2 > 0) { y--; dy -= 2 * a * a; d2 += a * a - dy }
+      else { y--; x++; dx += 2 * b * b; dy -= 2 * a * a; d2 += dx - dy + a * a }
+    }
+  }
+  arc(rx, ry, rw, rh, a0, a1, c, width = 1) {           // pygame-ce draw.arc (per-pixel elliptic ring + angle test)
+    rx = trunc(rx); ry = trunc(ry); rw = trunc(rw); rh = trunc(rh)
+    if (width < 0) return
+    if (width > (rw >> 1) || width > (rh >> 1)) width = Math.max(rw >> 1, rh >> 1)
+    if (a1 < a0) a1 += TAU
+    width = Math.min(width, Math.min(rw, rh) >> 1)
+    const xc = rx + (rw >> 1), yc = ry + (rh >> 1), r1 = rw >> 1, r2 = rh >> 1
+    if (width <= 0 || a1 <= a0) return
+    const am = 0.5 * (a0 + a1), ad = am - a0, xm = Math.cos(am), ym = -Math.sin(am)
+    const ir1 = r1 - width, ir2 = r2 - width
+    const is1 = 1 / (r1 * r1), is2 = 1 / (r2 * r2), iis1 = 1 / (ir1 * ir1), iis2 = 1 / (ir2 * ir2)
+    const minDot = ad < Math.PI ? Math.cos(am - a0) : -1.0
+    const inArc = (x, y) => {
+      if (x * x * is1 + y * y * is2 > 1) return false
+      if (x * x * iis1 + y * y * iis2 < 1) return false
+      return x * xm + y * ym >= minDot * Math.sqrt(x * x + y * y)
+    }
+    const xs = Math.cos(a0), ys = -Math.sin(a0), xe = Math.cos(a1), ye = -Math.sin(a1)
+    const xsi = trunc(xs * ir1 + 0.5), ysi = trunc(ys * ir2 + 0.5), xei = trunc(xe * ir1 + 0.5), yei = trunc(ye * ir2 + 0.5)
+    const xso = trunc(xs * r1 + 0.5), yso = trunc(ys * r2 + 0.5), xeo = trunc(xe * r1 + 0.5), yeo = trunc(ye * r2 + 0.5)
+    let minx = -r1; if (-xm < minDot) minx = Math.min(xsi, xei, xso, xeo)
+    minx = Math.max(minx, -xc)
+    let miny = -r2; if (-ym < minDot) miny = Math.min(ysi, yei, yso, yeo)
+    miny = Math.max(miny, -yc)
+    let maxx = r1; if (xm < minDot) maxx = Math.max(xsi, xei, xso, xeo)
+    maxx = Math.min(maxx, this.w - xc - 1)
+    let maxy = r2; if (ym < minDot) maxy = Math.max(ysi, yei, yso, yeo)
+    maxy = Math.min(maxy, this.h - yc - 1)
+    if (minx >= maxx || miny >= maxy) return
+    const rowHas = y => { for (let x = minx; x <= maxx; x++) if (inArc(x, y)) return true; return false }
+    const colHas = x => { for (let y = miny; y <= maxy; y++) if (inArc(x, y)) return true; return false }
+    while (!rowHas(miny)) { miny++; if (miny >= maxy) return }
+    while (!rowHas(maxy)) { maxy--; if (maxy <= miny) return }
+    while (!colHas(minx)) { minx++; if (minx >= maxx) return }
+    while (!colHas(maxx)) { maxx--; if (minx >= maxx) return }
+    for (let y = 0; y <= Math.max(maxy, -miny); y++) {
+      const posY = y >= miny && y <= maxy, negY = -y >= miny && -y <= maxy, y2 = y * y
+      const xOuter = trunc(r1 * Math.sqrt(1.0 - y2 * is2))
+      const xInner = y < ir2 ? trunc(ir1 * Math.sqrt(1.0 - y2 * iis2)) : 0
+      const yDot = y * ym
+      for (let x = xInner; x <= xOuter; x++) {
+        const posX = x >= minx && x <= maxx, negX = -x >= minx && -x <= maxx
+        if (!(posX || negX)) continue
+        const cmp = minDot * Math.sqrt(x * x + y2), xDot = x * xm
+        if (posY && posX && xDot + yDot >= cmp) this.put(xc + x, yc + y, c)
+        if (posY && negX && -xDot + yDot >= cmp) this.put(xc - x, yc + y, c)
+        if (negY && posX && xDot - yDot >= cmp) this.put(xc + x, yc - y, c)
+        if (negY && negX && -xDot - yDot >= cmp) this.put(xc - x, yc - y, c)
+      }
+    }
+  }
+  roundRect(rx, ry, rw, rh, c, width, radius) {         // pygame-ce draw.rect(..., width, border_radius) -> draw_round_rect
+    if (width > (rw >> 1) || width > (rh >> 1)) width = Math.max(rw >> 1, rh >> 1)
+    const x1 = rx, y1 = ry, x2 = rx + rw - 1, y2 = ry + rh - 1
+    let tl = radius, tr = radius, bl = radius, br = radius
+    if (tl + tr > x2 - x1 + 1 || bl + br > x2 - x1 + 1 || tl + bl > y2 - y1 + 1 || tr + br > y2 - y1 + 1) {
+      const f = Math.min(F((x2 - x1 + 1) / F(tl + tr)), F((y2 - y1 + 1) / F(tl + bl)), F((x2 - x1 + 1) / F(bl + br)), F((y2 - y1 + 1) / F(tr + br)))
+      tl = trunc(tl * f); tr = trunc(tr * f); bl = trunc(bl * f); br = trunc(br * f)
+    }
+    if (width === 0) {
+      this.fillpoly([x1, x1 + tl, x2 - tr, x2, x2, x2 - br, x1 + bl, x1], [y1 + tl, y1, y1, y1 + tr, y2 - br, y2, y2, y2 - bl], c)
+      this.quadrant(x2 - tr + 1, y1 + tr, tr, 0, c, 1, 0, 0, 0)
+      this.quadrant(x1 + tl, y1 + tl, tl, 0, c, 0, 1, 0, 0)
+      this.quadrant(x1 + bl, y2 - bl + 1, bl, 0, c, 0, 0, 1, 0)
+      this.quadrant(x2 - br + 1, y2 - br + 1, br, 0, c, 0, 0, 0, 1)
+    } else {
+      const hw = width >> 1, odd = width % 2
+      if (x2 - tr === x1 + tl) for (let i = 0; i < width; i++) this.put(x1 + tl, y1 + i, c)
+      else this.line(x1 + tl, y1 + hw - 1 + odd, x2 - tr, y1 + hw - 1 + odd, c, width)
+      if (y2 - bl === y1 + tl) for (let i = 0; i < width; i++) this.put(x1 + i, y1 + tl, c)
+      else this.line(x1 + hw - 1 + odd, y1 + tl, x1 + hw - 1 + odd, y2 - bl, c, width)
+      if (x2 - br === x1 + bl) for (let i = 0; i < width; i++) this.put(x1 + bl, y2 - i, c)
+      else this.line(x1 + bl, y2 - hw, x2 - br, y2 - hw, c, width)
+      if (y2 - br === y1 + tr) for (let i = 0; i < width; i++) this.put(x2 - i, y1 + tr, c)
+      else this.line(x2 - hw, y1 + tr, x2 - hw, y2 - br, c, width)
+      this.quadrant(x2 - tr + 1, y1 + tr, tr, width, c, 1, 0, 0, 0)
+      this.quadrant(x1 + tl, y1 + tl, tl, width, c, 0, 1, 0, 0)
+      this.quadrant(x1 + bl, y2 - bl + 1, bl, width, c, 0, 0, 1, 0)
+      this.quadrant(x2 - br + 1, y2 - br + 1, br, width, c, 0, 0, 0, 1)
+    }
+  }
+  addRGB(v) { const d = this.d; for (let i = 0; i < d.length; i += 4) { d[i] = Math.min(255, d[i] + v); d[i + 1] = Math.min(255, d[i + 1] + v); d[i + 2] = Math.min(255, d[i + 2] + v) } }
+}
+// pygame.transform.smoothscale (shrink): X then Y box filter, same integer math as pygame-ce's SSE2 filter
+// (14-bit fixed point, 16-bit lanes, mulhi), which is what the original uses on x86-64.
+const mulhi = (a, b) => ((a & 0xffff) * (b & 0xffff)) >>> 16
+const packus = v => { v &= 0xffff; return v >= 0x8000 ? 0 : v > 255 ? 255 : v }
+function shrinkX(s, dw) {
+  const sw = s.w, h = s.h, o = new Surf(dw, h), S = s.d, D = o.d
+  const xspace = fdiv(0x4000 * sw, dw), xrecip = fdiv(0x40000000, xspace) & 0xffff
+  const acc = [0, 0, 0, 0]
+  for (let y = 0; y < h; y++) {
+    acc.fill(0)
+    let xc = xspace, si = y * sw * 4, di = y * dw * 4
+    for (let x = 0; x < sw; x++, si += 4) {
+      if (xc > 0x4000) { for (let k = 0; k < 4; k++) acc[k] = (acc[k] + S[si + k]) & 0xffff; xc -= 0x4000 }
+      else {
+        const xf = 0x4000 - xc
+        for (let k = 0; k < 4; k++) {
+          const src = S[si + k] << 2, dst = (mulhi(src, xc) + acc[k]) & 0xffff
+          acc[k] = mulhi(src, xf)
+          D[di + k] = packus(mulhi(dst, xrecip))
+        }
+        di += 4; xc = xspace - xf
+      }
+    }
+  }
+  return o
+}
+function shrinkY(s, dh) {
+  const w = s.w, sh = s.h, o = new Surf(w, dh), S = s.d, D = o.d
+  const yspace = fdiv(0x4000 * sh, dh), yrecip = fdiv(0x40000000, yspace) & 0xffff
+  const acc = new Uint16Array(w * 4)
+  let yc = yspace, drow = 0
+  for (let y = 0; y < sh; y++) {
+    const si = y * w * 4
+    if (yc > 0x4000) { for (let i = 0; i < w * 4; i++) acc[i] = acc[i] + S[si + i]; yc -= 0x4000 }
+    else {
+      const yf = 0x4000 - yc, di = drow * w * 4
+      for (let i = 0; i < w * 4; i++) {
+        const src = S[si + i] << 2, old = acc[i]
+        acc[i] = mulhi(src, yf)
+        D[di + i] = packus(mulhi((mulhi(src, yc) + old) & 0xffff, yrecip))
+      }
+      drow++; yc = yspace - yf
+    }
+  }
+  return o
+}
+function smoothscale(s, w, h) {
+  let t = s
+  if (w < s.w) t = shrinkX(t, w)
+  if (h < s.h) t = shrinkY(t, h)
+  return t
+}
+const shade = (c, f) => c.map(v => Math.max(0, Math.min(255, trunc(v * f))))
+
+function drawDemon(kind, pose, t, size = 64) {
+  const S = size * 2, s = new Surf(S, S), cx = S >> 1, ground = S - 6
+  const body = [[178, 44, 36], [96, 60, 150], [72, 120, 52]][kind]
+  const dark = shade(body, 0.55), light = shade(body, 1.35)
+  const eye = [[255, 220, 60], [90, 255, 240], [255, 90, 40]][kind]
+  const scale = [0.82, 0.9, 1.15][kind]
+  const fall = pose === 'death' ? t : 0.0
+  if (pose === 'death' && t > 0.75) {                    // puddle / remains
+    const r = trunc(34 * scale)
+    s.ellipse(cx - r, ground - 10, 2 * r, 14, [60, 10, 12])
+    s.ellipse(cx - (r >> 1), ground - 16, r, 14, dark)
+    s.ellipse(cx - fdiv(r, 3), ground - 14, r >> 1, 8, body)
+    return smoothscale(s, size, size)
+  }
+  const bob = pose === 'walk' ? Math.sin(t * TAU) * 4 : 0
+  const lean = trunc(fall * 40), h = trunc(70 * scale), w = trunc(40 * scale)
+  let top = ground - h + trunc(bob) + trunc(fall * 30)
+  if (kind === 1) top -= 14 + trunc(Math.sin(t * TAU) * 5)
+  if (kind !== 1) {                                      // legs
+    [-1, 1].forEach((sgn, i) => {
+      const step = pose === 'walk' ? trunc(Math.sin(t * TAU + i * Math.PI) * 9) : 0
+      const lx = cx + fdiv(sgn * w, 3) + lean
+      s.polygon([[lx - 7, top + h - 24], [lx + 7, top + h - 24], [lx + 5 + step, ground], [lx - 5 + step, ground]], dark)
+      s.ellipse(lx - 9 + step, ground - 4, 18, 8, [30, 20, 20])
+    })
+  } else {                                               // tattered robe
+    const pts = [[cx - (w >> 1) + lean, top + h - 30]]
+    for (let i = 0; i < 7; i++) pts.push([cx - (w >> 1) + fdiv(i * w, 6) + lean, ground - 10 + (i % 2 ? 12 : 0) + trunc(Math.sin(t * TAU + i) * 4)])
+    pts.push([cx + (w >> 1) + lean, top + h - 30])
+    s.polygon(pts, dark)
+  }
+  const tx = cx - (w >> 1) + lean, ty = top + 18, tw = w, th = h - 34      // torso
+  s.ellipse(tx, ty, tw, th, body)
+  s.ellipse(tx + 6, ty + 6, tw >> 1, th >> 1, light)
+  if (kind === 2) s.ellipse(tx - 8, ty + 4, tw + 16, 22, dark)                // shoulders
+  const raise = pose === 'attack' ? 0.5 + 0.5 * Math.sin(t * Math.PI) : 0.0 // arms
+  for (const sgn of [-1, 1]) {
+    const ax = cx + sgn * ((w >> 1) - 2) + lean, ay = top + 30
+    const ex = ax + sgn * trunc(16 + 8 * raise), ey = ay + trunc(26 - 40 * raise)
+    s.line(ax, ay, ex, ey, dark, 9)
+    s.line(ax, ay, ex, ey, body, 5)
+    for (let k = 0; k < 3; k++) s.line(ex, ey, ex + sgn * (6 + k * 2), ey + (k - 1) * 5, [240, 230, 210], 2)   // claws
+    if (kind === 1 && pose === 'attack') {
+      const g = trunc(10 + 8 * raise)
+      s.circle(ex, ey, g, [120, 255, 240])
+      s.circle(ex, ey, g >> 1, [255, 255, 255])
+    }
+  }
+  const hr = trunc(15 * scale), hx = cx + lean, hy = top + hr + 2           // head
+  s.circle(hx, hy, hr, body)
+  s.circle(hx - fdiv(hr, 3), hy - fdiv(hr, 3), hr >> 1, light)
+  for (const sgn of [-1, 1]) s.polygon([[hx + fdiv(sgn * hr, 2), hy - (hr >> 1)], [hx + sgn * (hr + 8), hy - hr - 10], [hx + sgn * hr, hy - fdiv(hr, 4)]], [230, 215, 190])  // horns
+  const er = kind !== 2 ? 3 : 4
+  for (const sgn of [-1, 1]) {                           // eyes
+    s.circle(hx + fdiv(sgn * hr, 2), hy, er + 1, eye)
+    s.circle(hx + fdiv(sgn * hr, 2), hy, Math.max(1, er - 1), [255, 255, 255])
+  }
+  s.arc(hx - (hr >> 1), hy + 2, hr, (hr >> 1) + 2, Math.PI, TAU, [20, 5, 5], 3)                      // mouth
+  for (let k = -2; k < 3; k++) s.polygon([[hx + k * 4 - 2, hy + (hr >> 1) + 1], [hx + k * 4 + 2, hy + (hr >> 1) + 1], [hx + k * 4, hy + (hr >> 1) + 5]], [240, 240, 230])
+  if (pose === 'pain') s.addRGB(255)                     // fill((255,255,255,0), BLEND_RGBA_ADD): white silhouette
+  return smoothscale(s, size, size)
+}
+function drawTorch(t, size = 64) {
+  const s = new Surf(size, size), cx = size >> 1
+  s.rect(cx - 3, 30, 6, 30, [70, 50, 30])
+  s.rect(cx - 5, 28, 10, 5, [110, 90, 60])
+  for (let i = 0; i < 3; i++) {
+    const fl = trunc(Math.sin(t * TAU * 2 + i * 2) * 3), r = 9 - i * 2
+    s.ellipse(cx - r + fl, 12 + i * 3 + fl, 2 * r, 20 - i * 4, [[255, 120, 20], [255, 200, 60], [255, 255, 200]][i])
+  }
+  return s
+}
+function drawMedkit(size = 64) {
+  const s = new Surf(size, size)
+  s.roundRect(14, 34, 36, 24, [230, 230, 230], 0, 4)
+  s.roundRect(14, 34, 36, 24, [160, 160, 165], 2, 4)
+  s.rect(29, 38, 6, 16, [220, 40, 40])
+  s.rect(24, 43, 16, 6, [220, 40, 40])
+  return s
+}
+function drawAmmo(kind, size = 64) {
+  const s = new Surf(size, size)
+  if (kind === 'shells') {
+    s.rect(18, 40, 28, 18, [120, 80, 40])
+    for (let i = 0; i < 4; i++) { s.rect(21 + i * 6, 32, 4, 12, [200, 40, 40]); s.rect(21 + i * 6, 42, 4, 3, [220, 190, 80]) }
+  } else {
+    s.roundRect(20, 34, 24, 24, [40, 60, 90], 0, 3)
+    s.rect(25, 39, 14, 14, [80, 200, 255])
+    s.rect(29, 43, 6, 6, [200, 255, 255])
+  }
+  return s
+}
+function drawBarrel(size = 64) {
+  const s = new Surf(size, size)
+  s.roundRect(20, 18, 24, 44, [70, 76, 82], 0, 5)
+  s.rect(24, 20, 6, 40, [110, 116, 124])
+  s.rect(20, 32, 24, 8, [180, 40, 30])
+  s.rect(20, 24, 24, 2, [40, 44, 48])
+  s.rect(20, 52, 24, 2, [40, 44, 48])
+  s.ellipse(20, 14, 24, 8, [100, 106, 112])
+  return s
+}
+function drawPortal(t, size = 64) {
+  const s = new Surf(size, size), cx = size >> 1, cy = (size >> 1) + 4
+  for (let i = 6; i > 0; i--) s.circle(cx, cy, 6 + i * 4, [80, 40 + i * 20, 255, Math.min(255, 60 + 30 * i)])
+  for (let k = 0; k < 8; k++) {
+    const ang = t * TAU + k * TAU / 8
+    s.circle(trunc(cx + Math.cos(ang) * 22), trunc(cy + Math.sin(ang) * 22 * 0.6), 3, [220, 240, 255])
+  }
+  s.circle(cx, cy, 6, [255, 255, 255])
+  return s
+}
+function drawBall(color, size = 32) {
+  const s = new Surf(size, size), cx = size >> 1
+  for (let i = 6; i > 0; i--) {
+    const r = trunc(cx * i / 6), f = i / 6
+    const col = color.map(c => Math.min(255, trunc(c * (1 - f) + 255 * f * 0.3 + c * 0.7 * f)))
+    s.circle(cx, cx, r, [col[0], col[1], col[2], trunc(255 * (1.1 - f))])
+  }
+  s.circle(cx, cx, fdiv(cx, 3), [255, 255, 240])
+  return s
+}
+function buildSprites() {
+  const sp = {}
+  ;['imp', 'wraith', 'brute'].forEach((name, kind) => {
+    sp[name + '_walk'] = [0, 1, 2, 3].map(i => drawDemon(kind, 'walk', i / 4))
+    sp[name + '_attack'] = [0, 1, 2].map(i => drawDemon(kind, 'attack', i / 3))
+    sp[name + '_pain'] = [drawDemon(kind, 'pain', 0)]
+    sp[name + '_death'] = [0, 1, 2, 3, 4].map(i => drawDemon(kind, 'death', i / 4))
+  })
+  sp.torch = [0, 1, 2].map(i => drawTorch(i / 3))
+  sp.medkit = [drawMedkit()]
+  sp.shells = [drawAmmo('shells')]
+  sp.cells = [drawAmmo('cells')]
+  sp.barrel = [drawBarrel()]
+  sp.portal = [0, 1, 2, 3, 4, 5, 6, 7].map(i => drawPortal(i / 8))
+  sp.fireball = [drawBall([255, 120, 20])]
+  sp.plasma = [drawBall([40, 160, 255])]
+  sp.void = [drawBall([190, 60, 255])]
+  return sp
+}
+
+function prism(s, cxn, cxf, yn, yf, wn, wf, sideH, top, left, right, stripe) {   // box seen from behind, converging to the muzzle
+  const ln = cxn - wn / 2, lf = cxf - wf / 2, rn = cxn + wn / 2, rf = cxf + wf / 2
+  s.polygon([[ln, yn], [lf, yf], [lf, yf + sideH * 0.45], [ln, yn + sideH]], left)
+  s.polygon([[rn, yn], [rf, yf], [rf, yf + sideH * 0.45], [rn, yn + sideH]], right)
+  s.polygon([[ln, yn], [rn, yn], [rf, yf], [lf, yf]], top)
+  if (stripe) s.polygon([[cxn - wn * 0.1, yn], [cxn + wn * 0.1, yn], [cxf + wf * 0.1, yf], [cxf - wf * 0.1, yf]], stripe)
+}
+function hand(s, x, y, w, h, col = [72, 50, 36]) {
+  s.ellipse(x, y, w, h, col)
+  s.ellipse(x + w * 0.1, y + h * 0.1, w * 0.8, h * 0.35, shade(col, 1.25))
+  const dark = shade(col, 0.6)
+  for (let i = 1; i < 4; i++) { const fx = x + w * i / 4; s.line(fx, y + h * 0.12, fx, y + h * 0.7, dark, 3) }
+}
+// muzzle position as a fraction of the weapon image (x, y); the flash is centred there
+const WEAPON_MUZZLE = { pistol: [0.55, 0.26], shotgun: [0.5, 0.2], plasma: [0.5, 0.235] }
+function drawWeapon(name) {
+  const s = new Surf(400, 280)
+  if (name === 'pistol') {
+    const cx = 220
+    hand(s, cx - 76, 232, 156, 80)
+    s.ellipse(cx - 92, 226, 44, 28, [60, 42, 30])                          // thumb
+    s.rect(cx - 46, 206, 92, 40, [52, 54, 60])                             // rear of slide
+    s.rect(cx - 22, 196, 14, 12, [72, 74, 82])                             // rear sight
+    s.rect(cx + 8, 196, 14, 12, [72, 74, 82])
+    prism(s, cx, cx, 206, 76, 92, 40, 36, [88, 92, 100], [46, 48, 54], [62, 64, 72], [122, 126, 136])
+    s.polygon([[cx + 6, 150], [cx + 28, 150], [cx + 22, 182], [cx + 4, 182]], [40, 42, 48])   // ejection port
+    s.ellipse(cx - 18, 66, 36, 22, [30, 30, 34])                           // muzzle
+    s.ellipse(cx - 9, 71, 18, 12, [8, 8, 10])                              // bore
+    s.rect(cx - 4, 52, 8, 16, [96, 100, 108])                              // front sight
+  } else if (name === 'shotgun') {
+    const cx = 200
+    hand(s, cx - 54, 244, 136, 64)
+    s.rect(cx - 80, 212, 160, 44, [42, 42, 48])                            // rear of receiver
+    prism(s, cx, cx, 212, 160, 160, 104, 40, [64, 66, 74], [36, 36, 42], [48, 48, 56])
+    prism(s, cx + 24, cx + 9, 160, 56, 30, 13, 20, [98, 100, 106], [52, 54, 60], [66, 68, 74], [142, 144, 150])
+    prism(s, cx - 24, cx - 9, 160, 56, 30, 13, 20, [98, 100, 106], [52, 54, 60], [66, 68, 74], [142, 144, 150])
+    prism(s, cx, cx, 142, 104, 92, 66, 26, [130, 86, 44], [88, 56, 28], [106, 68, 34])   // wooden forend
+    hand(s, cx - 108, 114, 84, 48)
+    for (const sx of [-9, 9]) { s.circle(cx + sx, 56, 8, [30, 30, 34]); s.circle(cx + sx, 56, 4, [8, 8, 10]) }
+    s.circle(cx, 48, 3, [210, 196, 120])                                   // bead sight
+  } else {                                                                 // plasma rifle
+    const cx = 200
+    hand(s, cx - 62, 240, 148, 64)
+    s.rect(cx - 88, 202, 176, 52, [34, 40, 54])                            // rear of body
+    s.rect(cx - 32, 212, 64, 28, [18, 50, 70])                             // rear display
+    for (let i = 0; i < 4; i++) s.rect(cx - 26 + i * 15, 218 + (i % 2) * 6, 9, 10, [40, 200, 255])
+    prism(s, cx, cx, 202, 70, 176, 72, 44, [58, 72, 96], [30, 38, 52], [40, 50, 68], [24, 30, 40])
+    for (const y of [180, 156, 132, 110, 92]) {
+      const w = 176 + (72 - 176) * (202 - y) / (202 - 70)
+      s.rect(cx - w * 0.36, y - 5, w * 0.72, 10, [40, 200, 255])
+      s.rect(cx - w * 0.36 + 4, y - 2, w * 0.72 - 8, 4, [180, 250, 255])
+    }
+    hand(s, cx - 124, 150, 80, 46)
+    s.circle(cx, 66, 20, [30, 60, 80])                                     // emitter
+    s.ring(cx, 66, 20, 5, [60, 220, 255])
+    s.circle(cx, 66, 6, [230, 255, 255])
+  }
+  return s
+}
+function drawMuzzleFlash(size = 90) {
+  const s = new Surf(size, size), cx = size >> 1, pts = []
+  for (let k = 0; k < 16; k++) { const ang = k * TAU / 16, r = cx * (k % 2 === 0 ? 1.0 : 0.45); pts.push([cx + Math.cos(ang) * r, cx + Math.sin(ang) * r]) }
+  s.polygon(pts, [255, 200, 60, 200])
+  s.circle(cx, cx, cx >> 1, [255, 240, 180, 255])
+  s.circle(cx, cx, cx >> 2, [255, 255, 255, 255])
+  return s
+}
+
+// ================================================================ audio ===
+// Sound synthesis only (Float32Array, 22050 Hz mono).  The shell turns these into WebAudio buffers.
+const SR = 22050
+function makeSynth(rand = rnd) {
+  const tArr = dur => { const n = trunc(SR * dur), t = new Float32Array(n); for (let i = 0; i < n; i++) t[i] = i / SR; return t }
+  const noise = n => { const x = new Float32Array(n); for (let i = 0; i < n; i++) x[i] = rand() * 2 - 1; return x }
+  const kernels = new Map()
+  const kernel = cutoff => {              // numpy's FFT lowpass exp(-(f/fc)^2) == convolution with a Gaussian, sigma = SR/(sqrt2*pi*fc)
+    let k = kernels.get(cutoff)
+    if (!k) {
+      const sig = SR / (Math.SQRT2 * Math.PI * cutoff), R = Math.ceil(sig * 4.5)
+      k = new Float64Array(2 * R + 1); let s = 0
+      for (let i = -R; i <= R; i++) { k[i + R] = Math.exp(-i * i / (2 * sig * sig)); s += k[i + R] }
+      for (let i = 0; i < k.length; i++) k[i] /= s
+      kernels.set(cutoff, k)
+    }
+    return k
+  }
+  const lowpass = (x, cutoff) => {        // circular, like rfft/irfft over the whole buffer
+    const k = kernel(cutoff), R = (k.length - 1) >> 1, n = x.length, y = new Float32Array(n)
+    for (let i = 0; i < n; i++) {
+      let s = 0
+      if (i >= R && i + R < n) for (let j = -R; j <= R; j++) s += x[i + j] * k[j + R]
+      else for (let j = -R; j <= R; j++) s += x[pmod(i + j, n)] * k[j + R]
+      y[i] = s
+    }
+    return y
+  }
+  const highpass = (x, cutoff) => { const l = lowpass(x, cutoff), y = new Float32Array(x.length); for (let i = 0; i < x.length; i++) y[i] = x[i] - l[i]; return y }
+  const map = (t, f) => { const y = new Float32Array(t.length); for (let i = 0; i < t.length; i++) y[i] = f(t[i], i); return y }
+  const sine = (t, f) => map(t, v => Math.sin(2 * Math.PI * f * v))
+  const sweep = (t, f0, f1, k = 8.0) => { let ph = 0; return map(t, v => { ph += f1 + (f0 - f1) * Math.exp(-k * v); return Math.sin(2 * Math.PI * ph / SR) }) }
+  const env = (t, a, d) => Math.min(t / Math.max(a, 1e-4), 1.0) * Math.exp(-t * d)
+  const fade = (x, ms = 4) => {
+    const n = trunc(SR * ms / 1000)
+    if (n && x.length > 2 * n) for (let i = 0; i < n; i++) { const r = n > 1 ? i / (n - 1) : 0; x[i] *= r; x[x.length - 1 - i] *= r }
+    return x
+  }
+  const norm = (x, peak = 0.9) => { let m = 0; for (let i = 0; i < x.length; i++) m = Math.max(m, Math.abs(x[i])); m = m || 1; for (let i = 0; i < x.length; i++) x[i] = x[i] / m * peak; return x }
+  const S = {
+    pistol() {
+      const t = tArr(0.28), n = t.length
+      let x = noise(n); for (let i = 0; i < n; i++) x[i] *= Math.exp(-t[i] * 28)
+      x = lowpass(x, 3500)
+      const sw = sweep(t, 220, 60, 30), h = highpass(noise(n), 3000)
+      for (let i = 0; i < n; i++) x[i] += sw[i] * Math.exp(-t[i] * 18) * 0.9 + h[i] * Math.exp(-t[i] * 90) * 0.5
+      return norm(x)
+    },
+    shotgun() {
+      const t = tArr(0.55), n = t.length, x = lowpass(noise(n), 2200), sw = sweep(t, 160, 45, 20), h = highpass(noise(n), 2500)
+      for (let i = 0; i < n; i++) x[i] = x[i] * Math.exp(-t[i] * 9) + sw[i] * Math.exp(-t[i] * 9) * 1.1 + h[i] * Math.exp(-t[i] * 60) * 0.6
+      return norm(x)
+    },
+    pump() {
+      const t = tArr(0.25), x = lowpass(noise(t.length), 1500)
+      for (let i = 0; i < t.length; i++) x[i] *= Math.exp(-t[i] * 60) + Math.exp(-((t[i] - 0.13) ** 2) * 4000)
+      return norm(x, 0.5)
+    },
+    plasma() {
+      const t = tArr(0.32), n = t.length, x = sweep(t, 1400, 300, 12), l = lowpass(noise(n), 1200)
+      for (let i = 0; i < n; i++) x[i] = x[i] * Math.exp(-t[i] * 9) + Math.sin(2 * Math.PI * 60 * t[i]) * Math.sin(2 * Math.PI * 900 * t[i]) * Math.exp(-t[i] * 14) * 0.5 + l[i] * Math.exp(-t[i] * 20) * 0.3
+      return norm(x, 0.8)
+    },
+    fireball() {
+      const t = tArr(0.5), n = t.length, a = lowpass(noise(n), 1400), b = lowpass(noise(n), 300), sw = sweep(t, 400, 90, 6), x = new Float32Array(n)
+      for (let i = 0; i < n; i++) x[i] = (a[i] - b[i]) * env(t[i], 0.06, 6) + sw[i] * env(t[i], 0.02, 8) * 0.5
+      return norm(x, 0.7)
+    },
+    explosion() {
+      const t = tArr(1.3), n = t.length, a = lowpass(noise(n), 500), b = lowpass(noise(n), 3000), x = new Float32Array(n)
+      for (let i = 0; i < n; i++) x[i] = a[i] * Math.exp(-t[i] * 3.2) * 1.2 + Math.sin(2 * Math.PI * 48 * t[i]) * Math.exp(-t[i] * 4) * 0.9 + b[i] * Math.exp(-t[i] * 9) * 0.5
+      return norm(x)
+    },
+    hurt() {
+      const t = tArr(0.35), n = t.length, x = sweep(t, 180, 70, 14), l = lowpass(noise(n), 700)
+      for (let i = 0; i < n; i++) x[i] = x[i] * Math.exp(-t[i] * 12) + l[i] * Math.exp(-t[i] * 18) * 0.7
+      return norm(x, 0.8)
+    },
+    growl(pitch = 1.0, dur = 0.45, decay = 5.0) {
+      const t = tArr(dur), n = t.length
+      let ph = 0
+      let x = map(t, v => {
+        ph += 85 * pitch * (1 + 0.15 * Math.sin(2 * Math.PI * 7 * v))
+        const p = ph / SR
+        return (Math.sign(Math.sin(2 * Math.PI * p)) * 0.5 + Math.sin(2 * Math.PI * p * 2) * 0.5) * (0.6 + 0.4 * Math.sin(2 * Math.PI * 23 * v))
+      })
+      x = lowpass(x, 900)
+      const l = lowpass(noise(n), 600)
+      for (let i = 0; i < n; i++) { const e = env(t[i], 0.03, decay); x[i] = x[i] * e + l[i] * e * 0.3 }
+      return norm(x, 0.7)
+    },
+    enemyDeath(pitch = 1.0) {
+      const t = tArr(0.8), n = t.length
+      let ph = 0
+      let x = map(t, v => { ph += 130 * pitch * Math.exp(-v * 1.6); const p = ph / SR; return Math.sign(Math.sin(2 * Math.PI * p)) * 0.5 + Math.sin(2 * Math.PI * p) * 0.5 })
+      x = lowpass(x, 1200)
+      const l = lowpass(noise(n), 800)
+      for (let i = 0; i < n; i++) x[i] = x[i] * Math.exp(-t[i] * 3.5) + l[i] * Math.exp(-t[i] * 5) * 0.5
+      return norm(x, 0.8)
+    },
+    pickup() {
+      const t = tArr(0.35)
+      return norm(map(t, v => { const u = Math.max(v - 0.11, 0); return Math.sin(2 * Math.PI * 660 * v) * env(v, 0.005, 14) + (v > 0.11 ? Math.sin(2 * Math.PI * 990 * u) * env(u, 0.005, 14) : 0) }), 0.5)
+    },
+    door() {
+      const t = tArr(0.7), n = t.length, a = lowpass(noise(n), 350), b = lowpass(noise(n), 2500), x = new Float32Array(n)
+      for (let i = 0; i < n; i++) {
+        const v = t[i], on = v < 0.55 ? 1 : 0
+        x[i] = a[i] * on * (0.5 + 0.5 * Math.sin(2 * Math.PI * 30 * v)) + Math.sin(2 * Math.PI * 55 * v) * on * 0.5 + b[i] * Math.exp(-Math.abs(v - 0.58) * 80) * 0.8
+      }
+      return norm(fade(x), 0.5)
+    },
+    step() { const t = tArr(0.09), x = lowpass(noise(t.length), 600); for (let i = 0; i < t.length; i++) x[i] *= Math.exp(-t[i] * 55); return norm(x, 0.35) },
+    click() { return norm(map(tArr(0.05), v => Math.sin(2 * Math.PI * 1200 * v) * Math.exp(-v * 120)), 0.4) },
+    hitmark() { return norm(map(tArr(0.06), v => Math.sin(2 * Math.PI * 2400 * v) * Math.exp(-v * 90)), 0.35) },
+    levelDone() {
+      const t = tArr(1.8), x = new Float32Array(t.length)
+      ;[440, 554, 659, 880, 1108].forEach((f, i) => {
+        for (let j = 0; j < t.length; j++) {
+          if (!(t[j] > i * 0.14)) continue
+          const tt = t[j] - i * 0.14
+          x[j] += (Math.sin(2 * Math.PI * f * tt) + 0.4 * Math.sin(2 * Math.PI * f * 2 * tt)) * env(tt, 0.01, 3)
+        }
+      })
+      return norm(x, 0.6)
+    },
+    death() {
+      const t = tArr(2.0), n = t.length, x = sweep(t, 300, 40, 2), l = lowpass(noise(n), 400)
+      for (let i = 0; i < n; i++) x[i] = x[i] * Math.exp(-t[i] * 1.5) + l[i] * Math.exp(-t[i] * 2)
+      return norm(x, 0.8)
+    },
+  }
+  const BANK = {
+    pistol: () => S.pistol(), shotgun: () => S.shotgun(), pump: () => S.pump(), plasma: () => S.plasma(), fireball: () => S.fireball(),
+    explosion: () => S.explosion(), hurt: () => S.hurt(), growl_imp: () => S.growl(1.4, 0.35), growl_wraith: () => S.growl(0.9, 0.7, 3),
+    growl_brute: () => S.growl(0.6, 0.6, 4), pain: () => S.growl(1.2, 0.2, 14), die_imp: () => S.enemyDeath(1.3), die_wraith: () => S.enemyDeath(0.9),
+    die_brute: () => S.enemyDeath(0.6), pickup: () => S.pickup(), door: () => S.door(), step: () => S.step(), click: () => S.click(),
+    hitmark: () => S.hitmark(), level: () => S.levelDone(), death: () => S.death(),
+  }
+  function* bankGen() { for (const k in BANK) yield [k, BANK[k]()] }   // one sound per step
+  function bank() { const b = {}; for (const [k, v] of bankGen()) b[k] = v; return b }
+  // 24-second ambient loop.  Generator (yields between stages) so a browser can keep animating while it builds.
+  function* music() {
+    const dur = 24.0, t = tArr(dur), n = t.length, x = new Float32Array(n)
+    const saw = (v, f) => 2 * pmod(v * f, 1.0) - 1
+    let d = new Float32Array(n)
+    for (let i = 0; i < n; i++) { const v = t[i]; d[i] = 0.35 * saw(v, 55) + 0.35 * saw(v, 55.35) + 0.25 * saw(v, 82.41) + 0.2 * saw(v, 110.2) }
+    yield
+    // drone lowpass (380 Hz) in slices
+    const k = kernel(380), R = (k.length - 1) >> 1
+    for (let i0 = 0; i0 < n; i0 += 65536) {
+      for (let i = i0; i < Math.min(n, i0 + 65536); i++) {
+        let s = 0
+        if (i >= R && i + R < n) for (let j = -R; j <= R; j++) s += d[i + j] * k[j + R]
+        else for (let j = -R; j <= R; j++) s += d[pmod(i + j, n)] * k[j + R]
+        x[i] = s * (0.65 + 0.35 * Math.sin(2 * Math.PI * t[i] / 9.0))
+      }
+      yield
+    }
+    d = null
+    for (let i = 0; i < n; i++) x[i] += 0.45 * Math.sin(2 * Math.PI * 27.5 * t[i]) * (0.7 + 0.3 * Math.sin(2 * Math.PI * t[i] / 6.0))   // sub
+    yield
+    const chords = [[110, 130.8, 164.8], [98, 116.5, 146.8], [110, 130.8, 164.8], [87.3, 103.8, 130.8]]
+    for (let ci = 0; ci < chords.length; ci++) {         // pad (oscillator recurrences instead of millions of Math.sin)
+      const i0 = Math.ceil(ci * 6.0 * SR - 1e-9), i1 = Math.min(n, i0 + trunc(18 * SR)), env8 = new Float64Array(i1 - i0)
+      for (let i = i0; i < i1; i++) { const tt = i / SR - ci * 6.0; env8[i - i0] = Math.min(tt / 2.5, 1.0) * Math.exp(-Math.max(tt - 3.5, 0) * 1.2) * 0.08 }
+      for (const f of chords[ci]) for (const [ff, amp] of [[f, 1], [f * 1.003, 1], [f * 2.01, 0.3]]) {
+        const w = 2 * Math.PI * ff / SR, c2 = 2 * Math.cos(w)
+        let s1 = Math.sin(-w), s0 = 0                    // sin at tt = -1 and 0 samples
+        for (let i = i0; i < i1; i++) {
+          x[i] += s0 * amp * env8[i - i0]
+          const s2 = c2 * s0 - s1; s1 = s0; s0 = s2
+        }
+      }
+      yield
+    }
+    for (let kb = 0; kb < trunc(dur / 1.7); kb++) for (const [off, amp] of [[0.0, 1.0], [0.22, 0.6]]) {   // heartbeat
+      const st = kb * 1.7 + off, i0 = Math.ceil(st * SR - 1e-9), i1 = Math.min(n, i0 + trunc(1.2 * SR))
+      for (let i = i0; i < i1; i++) { const tt = t[i] - st; if (tt < 0) continue; x[i] += Math.sin(2 * Math.PI * 52 * tt) * Math.exp(-tt * 18) * amp * 0.5 }
+    }
+    yield
+    const hk = kernel(5000), HR = (hk.length - 1) >> 1
+    for (let kt = 0; kt < trunc(dur / 0.85); kt++) {     // ticks: high-passed noise bursts
+      const st = kt * 0.85, i0 = Math.ceil(st * SR - 1e-9), len = Math.min(n - i0, trunc(0.4 * SR))
+      if (len <= 0) continue
+      const nz = noise(len + 2 * HR)
+      for (let i = 0; i < len; i++) {
+        let s = 0
+        for (let j = -HR; j <= HR; j++) s += nz[i + HR + j] * hk[j + HR]
+        const tt = t[i0 + i] - st
+        if (tt >= 0) x[i0 + i] += (nz[i + HR] - s) * Math.exp(-tt * 70) * 0.05
+      }
+    }
+    fade(x, 60)
+    norm(x, 0.55)
+    return x
+  }
+  return { bank, bankGen, music, S }
+}
+
+// ================================================================ level ===
+const UNTHEMED = 9, EXIT_WALL = 6
+class Room {
+  constructor(x, y, w, h, theme) { this.x = x; this.y = y; this.w = w; this.h = h; this.theme = theme }
+  get cx() { return this.x + this.w / 2 }
+  get cy() { return this.y + this.h / 2 }
+  contains(px, py) { return this.x <= px && px < this.x + this.w && this.y <= py && py < this.y + this.h }
+}
+class Level {
+  constructor(w, h) {
+    this.w = w; this.h = h
+    const n = w * h
+    this.grid = new Int8Array(n); this.floorId = new Int8Array(n); this.ceilId = new Int8Array(n)
+    this.doorOpen = new Float32Array(n); this.doorAxis = new Int8Array(n); this.explored = new Uint8Array(n)
+    this.rooms = []; this.enemies = []; this.pickups = []; this.barrels = []; this.torches = []; this.lights = []
+    this.doorIdle = new Map()                                                 // cell index -> idle seconds
+    this.start = null; this.exit = null; this.light = null
+    this.bfsQ = new Int32Array(n)
+  }
+  idx(x, y) { return x * this.h + y }
+  inBounds(x, y) { return 0 <= x && x < this.w && 0 <= y && y < this.h }
+  isWall(x, y) { if (!this.inBounds(x, y)) return true; const v = this.grid[x * this.h + y]; return v !== 0 && v !== DOOR }
+  solid(x, y) {                                          // walls, and doors that aren't open enough
+    if (!this.inBounds(x, y)) return true
+    const i = x * this.h + y, v = this.grid[i]
+    if (v === 0) return false
+    if (v === DOOR) return this.doorOpen[i] < 0.75
+    return true
+  }
+  blocked(px, py, r) {
+    const x0 = Math.floor(px - r), x1 = Math.floor(px + r), y0 = Math.floor(py - r), y1 = Math.floor(py + r)
+    for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) if (this.solid(cx, cy)) return true
+    return false
+  }
+  move(px, py, dx, dy, r = 0.3) {                        // slide-move a circle of radius r
+    const nx = px + dx
+    if (!this.blocked(nx, py, r)) px = nx
+    const ny = py + dy
+    if (!this.blocked(px, ny, r)) py = ny
+    return [px, py]
+  }
+  los(x0, y0, x1, y1, doorThresh = 0.5) {
+    let dx = x1 - x0, dy = y1 - y0
+    const dist = Math.hypot(dx, dy)
+    if (dist < 1e-6) return true
+    dx /= dist; dy /= dist
+    let mx = Math.floor(x0), my = Math.floor(y0)
+    const tx = Math.floor(x1), ty = Math.floor(y1), stepX = dx > 0 ? 1 : -1, stepY = dy > 0 ? 1 : -1
+    const ddx = dx ? Math.abs(1 / dx) : 1e30, ddy = dy ? Math.abs(1 / dy) : 1e30
+    let sdx = (dx > 0 ? mx + 1 - x0 : x0 - mx) * ddx, sdy = (dy > 0 ? my + 1 - y0 : y0 - my) * ddy
+    for (let k = 0; k < 256; k++) {
+      if (mx === tx && my === ty) return true
+      if (sdx < sdy) { sdx += ddx; mx += stepX } else { sdy += ddy; my += stepY }
+      if (Math.min(sdx, sdy) - Math.min(ddx, ddy) > dist + 1) return true
+      if (!this.inBounds(mx, my)) return false
+      const i = mx * this.h + my, v = this.grid[i]
+      if (v === DOOR) { if (this.doorOpen[i] < doorThresh) return false }
+      else if (v !== 0) return false
+    }
+    return false
+  }
+  raycast(x0, y0, dx, dy, maxDist = 64.0) {             // distance to the first wall (doors count when closed); [d, hit]
+    let mx = Math.floor(x0), my = Math.floor(y0)
+    const stepX = dx > 0 ? 1 : -1, stepY = dy > 0 ? 1 : -1
+    const ddx = dx ? Math.abs(1 / dx) : 1e30, ddy = dy ? Math.abs(1 / dy) : 1e30
+    let sdx = (dx > 0 ? mx + 1 - x0 : x0 - mx) * ddx, sdy = (dy > 0 ? my + 1 - y0 : y0 - my) * ddy
+    for (let k = 0; k < 512; k++) {
+      let d
+      if (sdx < sdy) { d = sdx; sdx += ddx; mx += stepX } else { d = sdy; sdy += ddy; my += stepY }
+      if (d > maxDist) return [maxDist, false]
+      if (!this.inBounds(mx, my)) return [d, true]
+      const i = mx * this.h + my, v = this.grid[i]
+      if (v === DOOR) { if (this.doorOpen[i] < 0.5) return [d + 0.5 * Math.min(ddx, ddy), true] }
+      else if (v !== 0) return [d, true]
+    }
+    return [maxDist, false]
+  }
+  distField(sx, sy, limit = 60, out) {                  // BFS distance through passable cells; -1 = unreachable
+    const w = this.w, h = this.h, d = out || new Int16Array(w * h), q = this.bfsQ, grid = this.grid
+    d.fill(-1)
+    sx = trunc(sx); sy = trunc(sy)
+    if (!this.inBounds(sx, sy)) return d
+    d[sx * h + sy] = 0
+    let head = 0, tail = 0
+    q[tail++] = sx * h + sy
+    while (head < tail) {
+      const c = q[head++], x = (c / h) | 0, y = c - x * h, nd = d[c] + 1
+      if (nd > limit) continue
+      if (x + 1 < w) { const j = c + h; if (d[j] < 0) { const v = grid[j]; if (v === 0 || v === DOOR) { d[j] = nd; q[tail++] = j } } }
+      if (x - 1 >= 0) { const j = c - h; if (d[j] < 0) { const v = grid[j]; if (v === 0 || v === DOOR) { d[j] = nd; q[tail++] = j } } }
+      if (y + 1 < h) { const j = c + 1; if (d[j] < 0) { const v = grid[j]; if (v === 0 || v === DOOR) { d[j] = nd; q[tail++] = j } } }
+      if (y - 1 >= 0) { const j = c - 1; if (d[j] < 0) { const v = grid[j]; if (v === 0 || v === DOOR) { d[j] = nd; q[tail++] = j } } }
+    }
+    return d
+  }
+  roomAt(x, y) { for (const r of this.rooms) if (r.contains(x, y)) return r; return null }
+  updateDoors(dt, actors) {                             // actors: flat [x0, y0, x1, y1, ...]; returns cells that started opening
+    const events = []
+    for (const [c, idle] of this.doorIdle) {
+      const dx = (c / this.h) | 0, dy = c - dx * this.h, cx = dx + 0.5, cy = dy + 0.5
+      let near = false, inside = false
+      for (let k = 0; k < actors.length; k += 2) {
+        const dd = (actors[k] - cx) ** 2 + (actors[k + 1] - cy) ** 2
+        if (dd < 1.6) near = true
+        if (dd < 0.9) inside = true
+      }
+      const o = this.doorOpen[c]
+      if (near) {
+        this.doorIdle.set(c, 0.0)
+        if (o < 1.0) {
+          if (o === 0.0) events.push([dx, dy])
+          this.doorOpen[c] = Math.min(1.0, o + dt * 1.6)
+        }
+      } else {
+        this.doorIdle.set(c, idle + dt)
+        if (idle + dt > 2.0 && o > 0.0 && !inside) this.doorOpen[c] = Math.max(0.0, o - dt * 1.6)
+      }
+    }
+    return events
+  }
+}
+
+function generate(levelNum, seed) {
+  const rng = new PyRandom(seed != null ? seed : levelNum * 7919 + 13)
+  const size = Math.min(64, 40 + levelNum * 4), w = size, h = size
+  const lv = new Level(w, h), grid = lv.grid, floorId = lv.floorId, ceilId = lv.ceilId
+  const I = (x, y) => x * h + y
+  grid.fill(UNTHEMED)
+  const rooms = lv.rooms
+  let attempts = 0
+  const target = 9 + levelNum * 2
+  while (rooms.length < target && attempts < 600) {
+    attempts++
+    const rw = rng.randint(4, 10), rh = rng.randint(4, 10)
+    const rx = rng.randint(2, w - rw - 3), ry = rng.randint(2, h - rh - 3)
+    let ok = true
+    for (const r of rooms) if (rx < r.x + r.w + 3 && rx + rw + 3 > r.x && ry < r.y + r.h + 3 && ry + rh + 3 > r.y) { ok = false; break }
+    if (ok) rooms.push(new Room(rx, ry, rw, rh, rng.choices(THEME_NAMES, [3, 3, 2, 1 + levelNum, 2])))
+  }
+  for (const r of rooms) {                               // carve rooms
+    const [wid, fid, cid] = THEMES[r.theme]
+    for (let x = r.x; x < r.x + r.w; x++) for (let y = r.y; y < r.y + r.h; y++) { grid[I(x, y)] = 0; floorId[I(x, y)] = fid; ceilId[I(x, y)] = cid }
+    for (let x = r.x - 1; x < r.x + r.w + 1; x++) for (let y = r.y - 1; y < r.y + r.h + 1; y++) if (grid[I(x, y)] === UNTHEMED) grid[I(x, y)] = wid
+  }
+  const corridor = []                                    // [x, y, wid]
+  const carveCorridor = (a, b) => {
+    const [wid, fid, cid] = THEMES[a.theme]
+    const x0 = trunc(a.cx), y0 = trunc(a.cy), x1 = trunc(b.cx), y1 = trunc(b.cy), cells = []
+    if (rng.random() < 0.5) {
+      for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) cells.push([x, y0])
+      for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) cells.push([x1, y])
+    } else {
+      for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) cells.push([x0, y])
+      for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) cells.push([x, y1])
+    }
+    for (const [x, y] of cells) if (grid[I(x, y)] !== 0) { grid[I(x, y)] = 0; floorId[I(x, y)] = fid; ceilId[I(x, y)] = cid; corridor.push([x, y, wid]) }
+  }
+  rooms.sort((a, b) => (a.cx + a.cy * 0.3) - (b.cx + b.cy * 0.3))   // chain sorted by x, plus a few loops
+  for (let i = 0; i < rooms.length - 1; i++) carveCorridor(rooms[i], rooms[i + 1])
+  for (let k = 0; k < Math.max(1, fdiv(rooms.length, 4)); k++) { const [a, b] = rng.sample(rooms, 2); carveCorridor(a, b) }
+  for (const [x, y, wid] of corridor) for (let nx = x - 1; nx <= x + 1; nx++) for (let ny = y - 1; ny <= y + 1; ny++)
+    if (0 <= nx && nx < w && 0 <= ny && ny < h && grid[I(nx, ny)] === UNTHEMED) grid[I(nx, ny)] = wid
+  for (let i = 0; i < w * h; i++) if (grid[i] === UNTHEMED) grid[i] = THEMES.stone[0]
+  for (let k = 0; k < w; k++) { grid[I(0, k)] = 2; grid[I(w - 1, k)] = 2; grid[I(k, 0)] = 2; grid[I(k, h - 1)] = 2 }
+  // doors: corridor cells on a room's border line with walls on both perpendicular sides
+  const doors = [], notOpen = v => v !== 0 && v !== DOOR
+  for (const [x, y] of corridor) for (const r of rooms) {
+    const onV = (x === r.x - 1 || x === r.x + r.w) && r.y <= y && y < r.y + r.h
+    const onH = (y === r.y - 1 || y === r.y + r.h) && r.x <= x && x < r.x + r.w
+    if (onV && notOpen(grid[I(x, y - 1)]) && notOpen(grid[I(x, y + 1)])) doors.push([x, y, 0])
+    else if (onH && notOpen(grid[I(x - 1, y)]) && notOpen(grid[I(x + 1, y)])) doors.push([x, y, 1])
+  }
+  const placed = new Set(), placedList = []
+  for (const [x, y, axis] of doors) {
+    if (grid[I(x, y)] !== 0) continue
+    let near = false
+    for (let ox = -1; ox <= 1 && !near; ox++) for (let oy = -1; oy <= 1; oy++) if (placed.has((x + ox) * 1000 + y + oy)) { near = true; break }
+    if (near) continue
+    grid[I(x, y)] = DOOR; lv.doorAxis[I(x, y)] = axis
+    placed.add(x * 1000 + y); placedList.push([x, y])
+  }
+  const startRoom = rooms[0]
+  lv.start = [startRoom.cx, startRoom.cy]
+  lv.doorCells = pySetOrder(placedList)                  // door_idle = {c: 0.0 for c in placed}: CPython set order
+  for (const [x, y] of lv.doorCells) lv.doorIdle.set(I(x, y), 0.0)
+  const df = lv.distField(trunc(startRoom.cx), trunc(startRoom.cy), 10000)
+  let far = rooms[1]
+  for (const r of rooms.slice(1)) if (df[I(trunc(r.cx), trunc(r.cy))] > df[I(trunc(far.cx), trunc(far.cy))]) far = r
+  lv.exit = [far.cx, far.cy]
+  for (let x = far.x - 1; x < far.x + far.w + 1; x++) for (let y = far.y - 1; y < far.y + far.h + 1; y++) if (notOpen(grid[I(x, y)])) grid[I(x, y)] = EXIT_WALL
+  // lights & decorations
+  const L = (x, y, color, intensity, radius) => ({ x, y, color, intensity, radius })
+  const lights = [L(far.cx, far.cy, [0.5, 0.6, 1.0], 1.8, 9)]
+  for (const r of rooms) {
+    const nTorch = Math.max(1, fdiv(r.w + r.h, 6)), cand = []
+    for (let x = r.x; x < r.x + r.w; x++) cand.push([x + 0.5, r.y + 0.18], [x + 0.5, r.y + r.h - 0.18])
+    for (let y = r.y; y < r.y + r.h; y++) cand.push([r.x + 0.18, y + 0.5], [r.x + r.w - 0.18, y + 0.5])
+    rng.shuffle(cand)
+    for (const [tx, ty] of cand.slice(0, nTorch)) {
+      if (placedList.some(([dx, dy]) => Math.abs(tx - dx - 0.5) < 1.2 && Math.abs(ty - dy - 0.5) < 1.2)) continue   // not right in front of doors
+      lv.torches.push([tx, ty])
+      lights.push(L(tx, ty, [1.0, 0.62, 0.28], 1.5, 7.5))
+    }
+    if (!lv.torches.some(([tx, ty]) => r.contains(tx, ty))) lights.push(L(r.cx, r.cy, [0.8, 0.6, 0.45], 0.7, 6))
+    if (r.theme === 'tech') lights.push(L(r.cx, r.cy, [0.55, 0.75, 1.0], 1.0, 7))
+    if (r.theme === 'hell') for (let k = 0; k < 2; k++) { const lx = r.x + rng.random() * r.w, ly = r.y + rng.random() * r.h; lights.push(L(lx, ly, [1.0, 0.3, 0.12], 0.8, 5)) }
+  }
+  for (let i = 0; i < corridor.length; i += 9) {         // occasional corridor lamps so long halls are not pitch black
+    const [x, y] = corridor[i]
+    if (grid[I(x, y)] === 0) lights.push(L(x + 0.5, y + 0.5, [0.9, 0.75, 0.55], 0.55, 5))
+  }
+  lv.lights = lights
+  lv.light = bakeLights(lv, lights)
+  // spawns
+  const kindsW = [6, 2 + levelNum, Math.max(0, levelNum - 1)]
+  const free = new Map()
+  for (const r of rooms) { const cells = []; for (let x = r.x; x < r.x + r.w; x++) for (let y = r.y; y < r.y + r.h; y++) cells.push([x + 0.5, y + 0.5]); free.set(r, cells) }
+  const spawnRooms = rooms.slice(1)
+  for (let i = 0; i < 6 + levelNum * 4; i++) {
+    const r = rng.choice(spawnRooms), cells = free.get(r)
+    if (!cells.length) continue
+    const pos = cells.splice(rng.randrange(cells.length), 1)[0]
+    let kind
+    if (far.contains(pos[0], pos[1]) && rng.random() < 0.5) kind = 2
+    else kind = rng.choices([0, 1, 2], kindsW)
+    lv.enemies.push([pos[0], pos[1], kind])
+  }
+  for (const r of rooms) {
+    const cells = free.get(r)
+    if (rng.random() < 0.6 && cells.length) {
+      const k = rng.randint(1, 2)
+      for (let j = 0; j < k; j++) if (cells.length) lv.barrels.push(cells.splice(rng.randrange(cells.length), 1)[0])
+    }
+  }
+  for (const r of rooms.slice(1)) {
+    const cells = free.get(r), k = rng.randint(1, 3)
+    for (let j = 0; j < k; j++) if (cells.length) {
+      const pos = cells.splice(rng.randrange(cells.length), 1)[0]
+      lv.pickups.push([pos[0], pos[1], rng.choices(['medkit', 'shells', 'cells'], [3, 4, 3])])
+    }
+  }
+  const sc = free.get(startRoom)
+  if (sc.length) { const pos = sc.pop(); lv.pickups.push([pos[0], pos[1], 'shells']) }
+  return lv
+}
+
+function bakeLights(lv, lights, ambient = [0.07, 0.07, 0.1]) {   // cell-centred colour light map, occluded by walls; padded by 1
+  const w = lv.w, h = lv.h, W2 = w + 2, H2 = h + 2, lm = new Float32Array(W2 * H2 * 3), grid = lv.grid
+  for (let i = 0; i < W2 * H2; i++) { lm[i * 3] = ambient[0]; lm[i * 3 + 1] = ambient[1]; lm[i * 3 + 2] = ambient[2] }
+  const seen = new Int32Array(w * h).fill(-1)
+  lights.forEach((L, li) => {
+    const col = L.color.map(c => F(F(c) * F(L.intensity)))
+    const nRays = trunc(Math.max(90, L.radius * 24)), steps = trunc(L.radius / 0.35)
+    for (let i = 0; i < nRays; i++) {
+      const a = i * TAU / nRays, dx = Math.cos(a), dy = Math.sin(a)
+      for (let s = 1; s <= steps; s++) {
+        const d = s * 0.35, cx = Math.floor(L.x + dx * d), cy = Math.floor(L.y + dy * d)
+        if (!(0 <= cx && cx < w && 0 <= cy && cy < h)) break
+        const ci = cx * h + cy
+        if (seen[ci] !== li) {
+          seen[ci] = li
+          const cd = Math.hypot(cx + 0.5 - L.x, cy + 0.5 - L.y)
+          let f = Math.max(0.0, 1.0 - cd / L.radius)
+          f = f * f * (3 - 2 * f)
+          const att = F(1.0 / (1.0 + cd * cd * 0.12)), o = ((cx + 1) * H2 + cy + 1) * 3
+          for (let c = 0; c < 3; c++) lm[o + c] = lm[o + c] + F(F(col[c] * F(f)) * att)
+        }
+        if (grid[ci] !== 0) break                         // walls and doors both stop the ray
+      }
+    }
+  })
+  return lm
+}
+
+// ============================================================= renderer ===
+const FOG = 0.05, LM_RES = 8
+class Renderer {
+  constructor(W, H, atlas) {
+    this.walls = atlas.walls
+    const fc = new Uint8Array(atlas.floors.length + atlas.ceils.length)
+    fc.set(atlas.floors, 0); fc.set(atlas.ceils, atlas.floors.length)
+    this.fc = fc; this.nFloors = atlas.floors.length / TEXN
+    this.level = null; this.lm = null
+    this.resize(W, H)
+  }
+  resize(W, H, planeLen) {                              // planeLen: tan(fov/2); 70 degrees at 16:9 like the original
+    this.W = W; this.H = H
+    this.planeLen = planeLen || Math.tan(70 * Math.PI / 360)
+    this.frame = new Uint8ClampedArray(W * H * 4); this.frame32 = new Uint32Array(this.frame.buffer)
+    this.zbuf = new Float32Array(W).fill(1e9)
+    const A = n => new Float64Array(n)
+    this.rdx = A(W); this.rdy = A(W); this.dist = A(W); this.texx = A(W)
+    this.side = new Int8Array(W); this.texid = new Int32Array(W)
+    this.wTop = A(W); this.wBot = A(W); this.wScale = A(W); this.wBase = new Int32Array(W); this.wR = A(W); this.wG = A(W); this.wB = A(W)
+    this.DX = A(4); this.DY = A(4); this.DI = A(4); this.DR = A(4); this.DG = A(4); this.DB = A(4)   // per-frame scratch (no garbage)
+    this.us = new Int32Array(W + 1); this.lbuf = [0, 0, 0]
+  }
+  setLevel(lv) { this.level = lv; this.rebuildLightmap() }
+  rebuildLightmap() {                                   // bilinear up-sample of the cell light map, LM_RES samples per cell
+    const lv = this.level, lm = lv.light, R = LM_RES, lw = lv.w * R, lh = lv.h * R, H2 = lv.h + 2
+    const out = new Float32Array(lw * lh * 3)
+    const ix = new Int32Array(lw), fx = new Float32Array(lw), iy = new Int32Array(lh), fy = new Float32Array(lh)
+    for (let i = 0; i < lw; i++) { const g = (i + 0.5) / R - 0.5 + 1.0, f = Math.floor(g); fx[i] = g - f; ix[i] = clamp(f, 0, lv.w) }
+    for (let j = 0; j < lh; j++) { const g = (j + 0.5) / R - 0.5 + 1.0, f = Math.floor(g); fy[j] = g - f; iy[j] = clamp(f, 0, lv.h) }
+    for (let i = 0; i < lw; i++) for (let j = 0; j < lh; j++) {
+      const a = (ix[i] * H2 + iy[j]) * 3, b = ((ix[i] + 1) * H2 + iy[j]) * 3, c = (ix[i] * H2 + iy[j] + 1) * 3, d = ((ix[i] + 1) * H2 + iy[j] + 1) * 3
+      const fxi = fx[i], fyj = fy[j], gx = F(1 - fxi), gy = F(1 - fyj), o = (i * lh + j) * 3
+      for (let k = 0; k < 3; k++) {
+        const top = F(F(lm[a + k] * gx) + F(lm[b + k] * fxi)), bot = F(F(lm[c + k] * gx) + F(lm[d + k] * fxi))
+        out[o + k] = Math.min(F(F(top * gy) + F(bot * fyj)), 3.0)
+      }
+    }
+    this.lm = out; this.lmW = lw; this.lmH = lh
+  }
+  sampleLight(x, y, out) {
+    const ix = clamp(trunc(x * LM_RES), 0, this.lmW - 1), iy = clamp(trunc(y * LM_RES), 0, this.lmH - 1), o = (ix * this.lmH + iy) * 3
+    out[0] = this.lm[o]; out[1] = this.lm[o + 1]; out[2] = this.lm[o + 2]
+    return out
+  }
+  makeCamera(x, y, angle, pitchPx, eyeZ) {
+    return { x, y, angle, pitch: pitchPx, eyeZ, dirx: Math.cos(angle), diry: Math.sin(angle),
+      planex: -Math.sin(angle) * this.planeLen, planey: Math.cos(angle) * this.planeLen, horizon: this.H / 2 + pitchPx }
+  }
+  cast(cam) {                                           // DDA per column, with sliding doors set in the middle of their cell
+    const lv = this.level, W = this.W, px = cam.x, py = cam.y, grid = lv.grid, dOpen = lv.doorOpen, dAxis = lv.doorAxis, expl = lv.explored
+    const w = lv.w, h = lv.h
+    for (let c = 0; c < W; c++) {
+      const camx = 2 * c / W - 1
+      let rdx = cam.dirx + cam.planex * camx, rdy = cam.diry + cam.planey * camx
+      if (Math.abs(rdx) < 1e-6) rdx = 1e-6
+      if (Math.abs(rdy) < 1e-6) rdy = 1e-6
+      this.rdx[c] = rdx; this.rdy[c] = rdy
+      let mapx = Math.floor(px), mapy = Math.floor(py)
+      const ddx = Math.abs(1 / rdx), ddy = Math.abs(1 / rdy), stepx = rdx < 0 ? -1 : 1, stepy = rdy < 0 ? -1 : 1
+      let sdx = rdx < 0 ? (px - mapx) * ddx : (mapx + 1 - px) * ddx
+      let sdy = rdy < 0 ? (py - mapy) * ddy : (mapy + 1 - py) * ddy
+      let side = 0, dist = 60.0, texid = 2, texx = 0
+      for (let it = 0; it < 140; it++) {
+        let tEntry
+        if (sdx < sdy) { tEntry = sdx; sdx += ddx; mapx += stepx; side = 0 } else { tEntry = sdy; sdy += ddy; mapy += stepy; side = 1 }
+        const cx = clamp(mapx, 0, w - 1), cy = clamp(mapy, 0, h - 1), oob = mapx !== cx || mapy !== cy, ci = cx * h + cy
+        const cell = grid[ci]
+        expl[ci] = 1
+        if (cell === DOOR && !oob) {
+          const axis = dAxis[ci], op = dOpen[ci], tExit = Math.min(sdx, sdy)
+          let td, texd
+          if (axis === 0) { td = (mapx + 0.5 - px) / rdx; const hy = py + td * rdy; texd = hy - Math.floor(hy) }
+          else { td = (mapy + 0.5 - py) / rdy; const hx = px + td * rdx; texd = hx - Math.floor(hx) }
+          if (td >= tEntry - 1e-5 && td <= tExit + 1e-5 && texd >= op) { dist = td; texx = texd - op; texid = DOOR; side = axis; break }
+        } else if (oob || cell !== 0) {
+          const d = side === 0 ? sdx - ddx : sdy - ddy
+          const wx = side === 0 ? py + d * rdy : px + d * rdx
+          let tx = wx - Math.floor(wx)
+          if ((side === 0 && rdx > 0) || (side === 1 && rdy < 0)) tx = 1.0 - tx
+          dist = d; texx = tx; texid = oob ? 2 : cell
+          break
+        }
+      }
+      this.dist[c] = Math.max(dist, 0.02); this.side[c] = side; this.texid[c] = texid; this.texx[c] = texx
+    }
+  }
+  render(cam, dyn) {                                    // dyn: [[x, y, radius, [r, g, b]], ...]
+    const W = this.W, H = this.H, lv = this.level
+    this.cast(cam)
+    const horizon = cam.horizon, eye = cam.eyeZ, lm = this.lm, lmW = this.lmW, lmH = this.lmH
+    const nd = Math.min(4, dyn.length), DX = this.DX, DY = this.DY, DI = this.DI, DR = this.DR, DG = this.DG, DB = this.DB
+    for (let k = 0; k < nd; k++) { const l = dyn[k]; DX[k] = l[0]; DY[k] = l[1]; DI[k] = 1.0 / (l[2] * l[2]); DR[k] = l[3][0]; DG[k] = l[3][1]; DB[k] = l[3][2] }
+    const zbuf = this.zbuf
+    for (let c = 0; c < W; c++) {                        // per-column wall data
+      const d = this.dist[c], rdx = this.rdx[c], rdy = this.rdy[c]
+      zbuf[c] = d
+      const lhc = H / d, top = horizon - lhc * (1 - eye), bot = horizon + lhc * eye
+      this.wTop[c] = top; this.wBot[c] = bot; this.wScale[c] = TEX / (bot - top)
+      const tx = clamp(trunc(this.texx[c] * TEX), 0, TEX - 1)
+      this.wBase[c] = (this.texid[c] * TEX + tx) * TEX * 3
+      const hx = cam.x + d * rdx, hy = cam.y + d * rdy
+      const sx = clamp(trunc((hx - rdx * 0.06) * LM_RES), 0, lmW - 1), sy = clamp(trunc((hy - rdy * 0.06) * LM_RES), 0, lmH - 1), o = (sx * lmH + sy) * 3
+      let r = lm[o], g = lm[o + 1], b = lm[o + 2]
+      for (let k = 0; k < nd; k++) {
+        const d2 = (hx - DX[k]) ** 2 + (hy - DY[k]) ** 2
+        let f = 1.0 - d2 * DI[k]
+        if (f > 0) { if (f > 1) f = 1; f *= f; r += f * DR[k]; g += f * DG[k]; b += f * DB[k] }
+      }
+      const fog = Math.exp(-d * FOG) * (this.side[c] === 1 ? 0.78 : 1.0)
+      this.wR[c] = r * fog; this.wG[c] = g * fog; this.wB[c] = b * fog
+    }
+    const walls = this.walls, fcT = this.fc, frame = this.frame32, grid = lv.grid, lw = lv.w, lh = lv.h
+    const floorId = lv.floorId, ceilId = lv.ceilId, nF = this.nFloors, RDX = this.rdx, RDY = this.rdy
+    const wTop = this.wTop, wBot = this.wBot, wScale = this.wScale, wBase = this.wBase, wR = this.wR, wG = this.wG, wB = this.wB
+    const camX = cam.x, camY = cam.y
+    for (let r = 0; r < H; r++) {
+      const row = r + 0.5, dy = row - horizon, isFloor = dy > 0
+      const rowdist = isFloor ? eye * H / Math.max(dy, 0.5) : (1 - eye) * H / Math.max(-dy, 0.5)
+      const fog = Math.exp(-rowdist * FOG), ids = isFloor ? floorId : ceilId, idOff = isFloor ? 0 : nF
+      let p = r * W
+      for (let c = 0; c < W; c++, p++) {
+        if (row >= wTop[c] && row < wBot[c]) {
+          let ty = trunc((row - wTop[c]) * wScale[c]); if (ty > TEX - 1) ty = TEX - 1; else if (ty < 0) ty = 0
+          const ti = wBase[c] + ty * 3
+          let R = walls[ti] * wR[c], Gc = walls[ti + 1] * wG[c], B = walls[ti + 2] * wB[c]
+          frame[p] = 0xff000000 | ((B > 255 ? 255 : B) << 16) | ((Gc > 255 ? 255 : Gc) << 8) | (R > 255 ? 255 : R)
+        } else {
+          const fx = camX + rowdist * RDX[c], fy = camY + rowdist * RDY[c]
+          const ix = Math.floor(fx), iy = Math.floor(fy)
+          const ftx = trunc((fx - ix) * TEX), fty = trunc((fy - iy) * TEX)
+          const cix = ix < 0 ? 0 : ix >= lw ? lw - 1 : ix, ciy = iy < 0 ? 0 : iy >= lh ? lh - 1 : iy
+          const ti = (((ids[cix * lh + ciy] + idOff) * TEX + ftx) * TEX + fty) * 3
+          let lx = trunc(fx * LM_RES), ly = trunc(fy * LM_RES)
+          lx = lx < 0 ? 0 : lx >= lmW ? lmW - 1 : lx; ly = ly < 0 ? 0 : ly >= lmH ? lmH - 1 : ly
+          const o = (lx * lmH + ly) * 3
+          let lr = lm[o], lg = lm[o + 1], lb = lm[o + 2]
+          for (let k = 0; k < nd; k++) {
+            const d2 = (fx - DX[k]) ** 2 + (fy - DY[k]) ** 2
+            let f = 1.0 - d2 * DI[k]
+            if (f > 0) { if (f > 1) f = 1; f *= f; lr += f * DR[k]; lg += f * DG[k]; lb += f * DB[k] }
+          }
+          const R = fcT[ti] * (lr * fog), Gc = fcT[ti + 1] * (lg * fog), B = fcT[ti + 2] * (lb * fog)
+          frame[p] = 0xff000000 | ((B > 255 ? 255 : B) << 16) | ((Gc > 255 ? 255 : Gc) << 8) | (R > 255 ? 255 : R)
+        }
+      }
+    }
+    return this.frame
+  }
+  project(cam, sx, sy) {                                // [screenX, depth] or null when behind the camera
+    const dx = sx - cam.x, dy = sy - cam.y, inv = 1.0 / (cam.planex * cam.diry - cam.dirx * cam.planey)
+    const tx = inv * (cam.diry * dx - cam.dirx * dy), ty = inv * (-cam.planey * dx + cam.planex * dy)
+    if (ty <= 0.05) return null
+    return [(this.W / 2) * (1 + tx / ty), ty]
+  }
+  drawSprite(cam, tex, sx, sy, scale = 1.0, zoff = 0.0, light = null, tint = null, dyn = []) {   // depth-tested billboard
+    const p = this.project(cam, sx, sy)
+    if (!p) return
+    const [screenX, depth] = p, W = this.W, H = this.H
+    const sh = H / depth * scale
+    if (sh < 1) return
+    const sw = sh, bottom = cam.horizon + (cam.eyeZ - zoff) * H / depth, top = bottom - sh, left = screenX - sw / 2
+    const x0 = Math.max(0, Math.floor(left)), x1 = Math.min(W, Math.ceil(left + sw)), y0 = Math.max(0, Math.floor(top)), y1 = Math.min(H, Math.ceil(bottom))
+    if (x1 <= x0 || y1 <= y0) return
+    const S = tex.w, td = tex.d, zb = this.zbuf
+    let any = false
+    for (let x = x0; x < x1; x++) if (zb[x] > depth) { any = true; break }
+    if (!any) return
+    let lr, lg, lb
+    if (light == null) {
+      const L = this.sampleLight(sx, sy, this.lbuf)
+      lr = L[0]; lg = L[1]; lb = L[2]
+      for (const [lx, ly, rad, col] of dyn) {
+        const d2 = (sx - lx) ** 2 + (sy - ly) ** 2, f = Math.max(0.0, 1.0 - d2 / (rad * rad))
+        lr += col[0] * f * f; lg += col[1] * f * f; lb += col[2] * f * f
+      }
+      const fog = Math.exp(-depth * FOG); lr *= fog; lg *= fog; lb *= fog
+    } else { lr = light; lg = light; lb = light }
+    const tk = tint ? tint[3] : 0, ta = 1 - tk, tr = tint ? tint[0] * tk : 0, tg = tint ? tint[1] * tk : 0, tb = tint ? tint[2] * tk : 0
+    const frame = this.frame32
+    const us = this.us
+    for (let x = x0; x < x1; x++) us[x - x0] = clamp(trunc((x + 0.5 - left) / sw * S), 0, S - 1)
+    for (let y = y0; y < y1; y++) {
+      const v = clamp(trunc((y + 0.5 - top) / sh * S), 0, S - 1), rowBase = v * S
+      for (let x = x0; x < x1; x++) {
+        if (!(zb[x] > depth)) continue
+        const ti = (rowBase + us[x - x0]) << 2
+        if (td[ti + 3] <= 64) continue
+        let R = td[ti] * lr, Gc = td[ti + 1] * lg, B = td[ti + 2] * lb
+        if (tint) { R = R * ta + tr; Gc = Gc * ta + tg; B = B * ta + tb }
+        frame[y * W + x] = 0xff000000 | ((B > 255 ? 255 : B) << 16) | ((Gc > 255 ? 255 : Gc) << 8) | (R > 255 ? 255 : R)
+      }
+    }
+  }
+  drawParticles(cam, parts) {                           // cheap depth-tested squares
+    const W = this.W, H = this.H, frame = this.frame32, zbuf = this.zbuf
+    const inv = 1.0 / (cam.planex * cam.diry - cam.dirx * cam.planey)
+    const P = parts.p, n = parts.count
+    for (let i = 0; i < n; i++) {
+      const dx = P[i * 3] - cam.x, dy = P[i * 3 + 1] - cam.y
+      const depth = inv * (-cam.planey * dx + cam.planex * dy)
+      if (depth <= 0.1) continue
+      const tx = inv * (cam.diry * dx - cam.dirx * dy), scx = (W / 2) * (1 + tx / depth)
+      if (scx < 0 || scx >= W) continue
+      if (zbuf[trunc(scx)] <= depth) continue
+      const s = Math.max(1, trunc(H / depth * parts.size[i]))
+      const scy = cam.horizon + (cam.eyeZ - P[i * 3 + 2]) * H / depth
+      let x0 = trunc(scx - s / 2), y0 = trunc(scy - s / 2)
+      let x1 = x0 + s, y1 = y0 + s
+      x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(W, x1); y1 = Math.min(H, y1)
+      if (x1 > x0 && y1 > y0) {
+        const col = 0xff000000 | (parts.col[i * 3 + 2] << 16) | (parts.col[i * 3 + 1] << 8) | parts.col[i * 3]
+        for (let y = y0; y < y1; y++) frame.fill(col, y * W + x0, y * W + x1)
+      }
+    }
+  }
+}
+
+// ============================================================= entities ===
+const KINDS = {
+  0: { name: 'imp', hp: 40, speed: 2.9, radius: 0.3, scale: 0.8, ranged: false, melee_dmg: 12, melee_range: 1.15,
+    attack_time: 0.7, pain_chance: 0.5, zoff: 0.0, score: 100, growl: 'growl_imp', die: 'die_imp', keep: 0.0 },
+  1: { name: 'wraith', hp: 55, speed: 1.7, radius: 0.3, scale: 0.9, ranged: true, melee_dmg: 8, melee_range: 1.0,
+    proj_speed: 6.5, proj_dmg: 16, attack_time: 1.1, pain_chance: 0.35, zoff: 0.25, score: 150, growl: 'growl_wraith', die: 'die_wraith', keep: 4.0 },
+  2: { name: 'brute', hp: 170, speed: 1.6, radius: 0.42, scale: 1.15, ranged: true, melee_dmg: 30, melee_range: 1.3,
+    proj_speed: 5.0, proj_dmg: 24, attack_time: 1.4, pain_chance: 0.12, zoff: 0.0, score: 300, growl: 'growl_brute', die: 'die_brute', keep: 0.0 },
+}
+
+class Enemy {
+  constructor(x, y, kind) {
+    this.x = x; this.y = y; this.kind = kind; this.k = KINDS[kind]
+    this.hp = this.k.hp
+    this.state = 'idle'                                   // idle | chase | attack | pain | dead
+    this.phase = rnd(); this.timer = 0.0; this.cooldown = uniform(0.4, 1.2); this.losTimer = rnd() * 0.3
+    this.hasLos = false; this.fired = false; this.flash = 0.0; this.dead = false; this.deathT = 0.0; this.dist = 99.0
+    this.bob = rnd() * TAU; this.corpse = false
+  }
+  update(dt, game) {
+    const k = this.k, px = game.player.x, py = game.player.y, dx = px - this.x, dy = py - this.y
+    this.dist = Math.hypot(dx, dy)
+    this.flash = Math.max(0.0, this.flash - dt)
+    this.bob += dt * 3
+    if (this.state === 'dead') { this.deathT += dt; if (this.deathT > 1.0) this.corpse = true; return }
+    this.losTimer -= dt
+    if (this.losTimer <= 0) { this.losTimer = 0.25; this.hasLos = this.dist < 16 && game.level.los(this.x, this.y, px, py) }
+    if (this.state === 'idle') {
+      const heard = game.noiseT > game.time - 0.5 && this.dist < (this.hasLos ? 12 : 6)
+      if ((this.hasLos && this.dist < 13) || heard) this.wake(game)
+      return
+    }
+    if (this.state === 'pain') { this.timer -= dt; if (this.timer <= 0) this.state = 'chase'; return }
+    if (this.state === 'attack') {
+      this.timer -= dt
+      const prog = 1 - this.timer / k.attack_time
+      if (!this.fired && prog >= 0.55) { this.fired = true; this.doAttack(game, dx, dy) }
+      if (this.timer <= 0) { this.state = 'chase'; this.cooldown = k.attack_time * uniform(0.6, 1.5) }
+      return
+    }
+    this.cooldown -= dt                                   // chase
+    if (this.cooldown <= 0) {
+      if (this.dist < k.melee_range && this.hasLos) { this.beginAttack(); return }
+      if (k.ranged && this.hasLos && 1.5 < this.dist && this.dist < 13 && rnd() < 0.6) { this.beginAttack(); return }
+    }
+    this.moveTowardPlayer(dt, game, dx, dy)
+  }
+  wake(game) {
+    this.state = 'chase'; this.cooldown = uniform(0.3, 0.9)
+    game.playAt(this.k.growl, this.x, this.y, 0.9)
+  }
+  beginAttack() { this.state = 'attack'; this.timer = this.k.attack_time; this.fired = false }
+  doAttack(game, dx, dy) {
+    const k = this.k
+    if (this.dist < k.melee_range + 0.35) game.damagePlayer(k.melee_dmg, this.x, this.y)
+    else if (k.ranged && this.hasLos) {
+      const ang = Math.atan2(dy, dx) + uniform(-0.05, 0.05), kind = this.kind === 1 ? 'void' : 'fireball'
+      game.projectiles.push(new Projectile(this.x + Math.cos(ang) * 0.4, this.y + Math.sin(ang) * 0.4, Math.cos(ang), Math.sin(ang),
+        k.proj_speed, k.proj_dmg, 'enemy', kind, 0.5 + k.zoff))
+      game.playAt('fireball', this.x, this.y, 0.8)
+    }
+  }
+  moveTowardPlayer(dt, game, dx, dy) {
+    const k = this.k
+    let mx, my
+    if (k.keep > 0 && this.hasLos && this.dist < k.keep) {   // hover: strafe sideways a little instead of closing in
+      const s = Math.sin(this.bob * 0.5)
+      mx = -dy / this.dist * s; my = dx / this.dist * s
+    } else [mx, my] = this.pathDir(game, dx, dy)
+    for (const o of game.enemies) {                        // separation from other enemies
+      if (o === this || o.state === 'dead') continue
+      const ox = this.x - o.x, oy = this.y - o.y, d2 = ox * ox + oy * oy
+      if (1e-6 < d2 && d2 < 0.8) { const d = Math.sqrt(d2); mx += ox / d * (0.9 - d) * 1.5; my += oy / d * (0.9 - d) * 1.5 }
+    }
+    const mag = Math.hypot(mx, my)
+    if (mag > 1e-6) {
+      mx /= mag; my /= mag
+      const sp = k.speed * dt;
+      [this.x, this.y] = game.level.move(this.x, this.y, mx * sp, my * sp, k.radius)
+      this.phase = pmod(this.phase + dt * k.speed * 0.6, 1.0)
+    }
+  }
+  pathDir(game, dx, dy) {
+    const df = game.distField, cx = trunc(this.x), cy = trunc(this.y), lv = game.level
+    if (!df || !lv.inBounds(cx, cy)) return [dx, dy]
+    const h = lv.h, here = df[cx * h + cy]
+    if (here <= 1 || (this.hasLos && this.dist < 3.0)) return [dx, dy]
+    let best = here, bx = null, by = null
+    for (const [nx, ny] of [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]]) {
+      if (lv.inBounds(nx, ny)) { const v = df[nx * h + ny]; if (0 <= v && v < best) { best = v; bx = nx; by = ny } }
+    }
+    if (bx === null) return [dx, dy]
+    return [bx + 0.5 - this.x, by + 0.5 - this.y]
+  }
+  hurt(dmg, game) {
+    if (this.state === 'dead') return
+    this.hp -= dmg
+    this.flash = 0.12
+    if (this.state === 'idle') this.wake(game)
+    const px = game.player.x, py = game.player.y, ang = Math.atan2(this.y - py, this.x - px)
+    game.particles.emit(this.x, this.y, 0.5 + this.k.zoff, 10, [170, 20, 20], 2.2, 0.6, 0.03, 4.0, Math.cos(ang), Math.sin(ang))
+    if (this.hp <= 0) {
+      this.state = 'dead'; this.deathT = 0.0
+      game.particles.emit(this.x, this.y, 0.5 + this.k.zoff, 26, [150, 10, 10], 3.0, 0.9, 0.04)
+      game.playAt(this.k.die, this.x, this.y, 1.0)
+      game.onEnemyKilled(this)
+    } else {
+      game.playAt('pain', this.x, this.y, 0.7)
+      if (rnd() < this.k.pain_chance) { this.state = 'pain'; this.timer = 0.3 }
+    }
+  }
+  sprite(sp) {
+    const name = this.k.name
+    if (this.state === 'dead') { const f = sp[name + '_death']; return f[Math.min(f.length - 1, trunc(this.deathT / 0.9 * f.length))] }
+    if (this.state === 'attack') { const f = sp[name + '_attack'], prog = 1 - this.timer / this.k.attack_time; return f[Math.min(f.length - 1, trunc(prog * f.length))] }
+    if (this.state === 'pain') return sp[name + '_pain'][0]
+    const f = sp[name + '_walk']
+    if (this.state === 'idle') return f[0]
+    return f[pmod(trunc(this.phase * f.length), f.length)]
+  }
+  get zoff() { let z = this.k.zoff; if (this.kind === 1 && this.state !== 'dead') z += 0.08 * Math.sin(this.bob); return z }
+}
+
+class Projectile {
+  constructor(x, y, dx, dy, speed, dmg, owner, kind, z = 0.5) {
+    this.x = x; this.y = y; this.z = z; this.dx = dx; this.dy = dy
+    this.speed = speed; this.dmg = dmg; this.owner = owner; this.kind = kind; this.alive = true; this.age = 0.0
+  }
+  update(dt, game) {
+    this.age += dt
+    const steps = Math.max(1, trunc(this.speed * dt / 0.15) + 1), sdt = dt / steps
+    for (let s = 0; s < steps; s++) {
+      const nx = this.x + this.dx * this.speed * sdt, ny = this.y + this.dy * this.speed * sdt
+      if (game.level.blocked(nx, ny, 0.08)) { this.explode(game); return }
+      this.x = nx; this.y = ny
+      if (this.owner === 'enemy') {
+        const p = game.player
+        if ((p.x - this.x) ** 2 + (p.y - this.y) ** 2 < 0.36) { game.damagePlayer(this.dmg, this.x - this.dx, this.y - this.dy); this.explode(game); return }
+      } else {
+        for (const e of game.enemies) {
+          if (e.state === 'dead') continue
+          const r = e.k.radius + 0.15
+          if ((e.x - this.x) ** 2 + (e.y - this.y) ** 2 < r * r) { e.hurt(this.dmg, game); this.explode(game); return }
+        }
+        for (const b of game.barrels) if (!b.dead && (b.x - this.x) ** 2 + (b.y - this.y) ** 2 < 0.25) { b.hurt(this.dmg, game); this.explode(game); return }
+      }
+    }
+    if (this.age > 6) this.alive = false
+    if (game.particles.count < 300 && rnd() < 0.5) game.particles.emit(this.x, this.y, this.z, 1, Projectile.TRAIL[this.kind], 0.3, 0.25, 0.025, 0.0)
+  }
+  explode(game) {
+    this.alive = false
+    game.particles.emit(this.x, this.y, this.z, 14, Projectile.TRAIL[this.kind], 2.5, 0.4, 0.035, 2.0)
+    game.addFlash(this.x, this.y, 3.0, Projectile.LIGHT[this.kind], 0.18, 1.6)
+    game.playAt(this.kind !== 'fireball' ? 'click' : 'hurt', this.x, this.y, 0.35)
+  }
+  light() { return [this.x, this.y, 3.2, Projectile.LIGHT[this.kind]] }
+}
+Projectile.LIGHT = { fireball: [1.0, 0.45, 0.12], plasma: [0.25, 0.6, 1.0], void: [0.7, 0.25, 1.0] }
+Projectile.TRAIL = { fireball: [255, 140, 40], plasma: [120, 200, 255], void: [200, 120, 255] }
+
+class Particles {                                       // struct-of-arrays particle pool
+  constructor(cap = 400) {
+    this.cap = cap; this.p = new Float32Array(cap * 3); this.v = new Float32Array(cap * 3); this.life = new Float32Array(cap)
+    this.size = new Float32Array(cap); this.col = new Uint8Array(cap * 3); this.grav = new Float32Array(cap); this.count = 0
+  }
+  emit(x, y, z, n, color, speed, life, size, gravity = 4.0, dirx = null, diry = null) {
+    n = Math.min(n, this.cap - this.count)
+    if (n <= 0) return
+    for (let i = this.count; i < this.count + n; i++) {
+      const ang = rnd() * TAU, el = uniform(-0.6, 1.0), sp = uniform(0.3, 1.0) * speed
+      let vx = Math.cos(ang) * sp, vy = Math.sin(ang) * sp
+      if (dirx !== null) { vx += dirx * speed * 0.8; vy += diry * speed * 0.8 }
+      this.p[i * 3] = x; this.p[i * 3 + 1] = y; this.p[i * 3 + 2] = z
+      this.v[i * 3] = vx; this.v[i * 3 + 1] = vy; this.v[i * 3 + 2] = el * sp
+      this.life[i] = uniform(0.5, 1.0) * life; this.size[i] = size * uniform(0.6, 1.3)
+      this.col[i * 3] = color[0]; this.col[i * 3 + 1] = color[1]; this.col[i * 3 + 2] = color[2]
+      this.grav[i] = gravity
+    }
+    this.count += n
+  }
+  update(dt, level) {
+    const n = this.count, P = this.p, V = this.v, grid = level.grid, h = level.h
+    let m = 0
+    for (let i = 0; i < n; i++) {
+      const ox = P[i * 3], oy = P[i * 3 + 1]
+      P[i * 3] += V[i * 3] * dt; P[i * 3 + 1] += V[i * 3 + 1] * dt; P[i * 3 + 2] += V[i * 3 + 2] * dt
+      V[i * 3 + 2] -= this.grav[i] * dt
+      const ix = clamp(trunc(P[i * 3]), 0, level.w - 1), iy = clamp(trunc(P[i * 3 + 1]), 0, h - 1)
+      if (grid[ix * h + iy] !== 0) { P[i * 3] = ox; P[i * 3 + 1] = oy; V[i * 3] = 0; V[i * 3 + 1] = 0 }
+      if (P[i * 3 + 2] < 0.01) { P[i * 3 + 2] = 0.01; V[i * 3 + 2] *= -0.25; V[i * 3] *= 0.6; V[i * 3 + 1] *= 0.6 }
+      this.life[i] -= dt
+      if (this.life[i] > 0) {                            // compact the survivors in place
+        if (m !== i) {
+          for (let k = 0; k < 3; k++) { P[m * 3 + k] = P[i * 3 + k]; V[m * 3 + k] = V[i * 3 + k]; this.col[m * 3 + k] = this.col[i * 3 + k] }
+          this.life[m] = this.life[i]; this.size[m] = this.size[i]; this.grav[m] = this.grav[i]
+        }
+        m++
+      }
+    }
+    this.count = m
+  }
+}
+class Pickup { constructor(x, y, kind) { this.x = x; this.y = y; this.kind = kind; this.taken = false; this.bob = rnd() * TAU } }
+class Barrel {
+  constructor(x, y) { this.x = x; this.y = y; this.hp = 30; this.dead = false }
+  hurt(dmg, game) { if (this.dead) return; this.hp -= dmg; if (this.hp <= 0) this.explode(game) }
+  explode(game) {
+    this.dead = true
+    game.particles.emit(this.x, this.y, 0.4, 40, [255, 160, 40], 4.0, 0.8, 0.07, 3.0)
+    game.particles.emit(this.x, this.y, 0.4, 20, [60, 60, 60], 1.5, 1.4, 0.09, -0.5)
+    game.addFlash(this.x, this.y, 6.0, [1.0, 0.55, 0.2], 0.45, 2.5)
+    game.playAt('explosion', this.x, this.y, 1.0, 0.03)
+    game.shake = Math.max(game.shake, 0.5)
+    for (const e of game.enemies) {
+      const d = Math.hypot(e.x - this.x, e.y - this.y)
+      if (d < 2.6 && e.state !== 'dead') e.hurt(trunc(110 * (1 - d / 2.6)) + 10, game)
+    }
+    for (const b of game.barrels) {
+      if (b !== this && !b.dead && Math.hypot(b.x - this.x, b.y - this.y) < 2.0) {
+        b.hp = 0
+        // The Python original appends the bare barrel here while main.py unpacks (barrel, time) pairs, which raises
+        // a TypeError (crash) on the first chain reaction.  Port of the evident intent: neighbours go off a moment later.
+        game.pendingExplosions.push([b, game.time + CHAIN_DELAY])
+      }
+    }
+    const p = game.player, d = Math.hypot(p.x - this.x, p.y - this.y)
+    if (d < 2.6) game.damagePlayer(trunc(60 * (1 - d / 2.6)) + 5, this.x, this.y)
+  }
+}
+const CHAIN_DELAY = 0.2
+
+// ================================================================= game ===
+const WEAPONS = {
+  pistol: { label: 'PISTOL', dmg: 14, rate: 0.28, ammo: null, spread: 0.012, kick: 0.5, pellets: 1, sound: 'pistol' },
+  shotgun: { label: 'SHOTGUN', dmg: 9, rate: 0.9, ammo: 'shells', spread: 0.075, kick: 1.0, pellets: 8, sound: 'shotgun' },
+  plasma: { label: 'PLASMA RIFLE', dmg: 32, rate: 0.15, ammo: 'cells', spread: 0.01, kick: 0.3, pellets: 1, sound: 'plasma' },
+}
+const WEAPON_ORDER = ['pistol', 'shotgun', 'plasma']
+
+class Player {
+  constructor(x, y, angle) {
+    this.x = x; this.y = y; this.angle = angle; this.pitch = 0.0; this.health = 100
+    this.ammo = { shells: 8, cells: 0 }; this.weapon = 'pistol'; this.fireCd = 0.0; this.recoil = 0.0
+    this.bob = 0.0; this.eyeZ = 0.5; this.swayX = 0.0; this.swayY = 0.0
+  }
+}
+
+// Stereo position of a sound (audio.play_at): returns [volume, pan] or null when inaudible.
+function positional(sx, sy, px, py, pdir, base = 1.0, falloff = 0.12) {
+  const dx = sx - px, dy = sy - py, d = Math.hypot(dx, dy), vol = base / (1.0 + d * d * falloff)
+  if (vol < 0.02) return null
+  const side = (-dy * Math.cos(pdir) + dx * Math.sin(pdir)) / (d + 1e-6)
+  return [Math.min(1.0, vol), 0.5 - 0.5 * side * 0.8]
+}
+
+class Game {
+  // opts: { RH, god, autotest }   hooks: { play(name, vol, pan), startMusic(vol), setMusicVolume(vol), lockMouse(on) }
+  constructor(opts, hooks, assets) {
+    this.opts = opts; this.hooks = hooks
+    this.RH = opts.RH || 225; this.RW = opts.RW || Math.round(this.RH * 16 / 9)
+    const atlas = assets.atlas || buildAtlases()
+    this.sprites = assets.sprites || buildSprites()
+    this.renderer = new Renderer(this.RW, this.RH, atlas)
+    this.weaponRaw = {}
+    for (const n of WEAPON_ORDER) this.weaponRaw[n] = drawWeapon(n)
+    this.flashRaw = drawMuzzleFlash()
+    this.buildViewAssets()
+    this.state = 'title'; this.time = 0.0; this.levelNum = 1; this.score = 0; this.totalKills = 0
+    this.paused = false; this.fps = 0.0
+    this.input = { mx: 0, my: 0, fwd: 0, strafe: 0, turn: 0, sprint: false, fire: false }
+    this.autotest = opts.autotest || 0
+    this.newGame()
+    if (this.autotest) this.state = 'play'
+  }
+  buildViewAssets() {                                   // weapon sprites sized from the internal height, like main.py
+    const wh = trunc(this.RH * 0.62), fs = trunc(this.RH * 0.3)
+    this.weaponImgs = {}
+    for (const n of WEAPON_ORDER) this.weaponImgs[n] = smoothscale(this.weaponRaw[n], trunc(wh * 200 / 140), wh)
+    this.flashImg = smoothscale(this.flashRaw, fs, fs)
+  }
+  resizeView(RW, planeLen) { this.RW = RW; this.renderer.resize(RW, this.RH, planeLen); if (this.level) this.renderer.level = this.level }
+  setRH(RH) {                                           // internal render height (the shell lowers it on slow phones)
+    if (RH === this.RH) return
+    if (this.player) this.player.pitch *= RH / this.RH
+    this.RH = RH
+    this.buildViewAssets()
+  }
+  newGame() {
+    this.levelNum = 1; this.score = 0; this.totalKills = 0
+    this.loadLevel(this.levelNum)
+    this.player.health = 100
+    this.player.ammo = { shells: 8, cells: 0 }
+  }
+  loadLevel(n, keepPlayer = null) {
+    this.level = generate(n)
+    this.renderer.setLevel(this.level)
+    const lv = this.level, [px, py] = lv.start
+    let door = [px + 1, py]
+    if (lv.doorCells.length) {
+      let best = Infinity
+      for (const d of lv.doorCells) { const dd = (d[0] + 0.5 - px) ** 2 + (d[1] + 0.5 - py) ** 2; if (dd < best) { best = dd; door = d } }
+    }
+    const ang = Math.atan2(door[1] + 0.5 - py, door[0] + 0.5 - px)
+    if (!keepPlayer) this.player = new Player(px, py, ang)
+    else { this.player.x = px; this.player.y = py; this.player.angle = ang; this.player.pitch = 0.0 }
+    this.enemies = lv.enemies.map(([x, y, k]) => new Enemy(x, y, k))
+    this.pickups = lv.pickups.map(([x, y, k]) => new Pickup(x, y, k))
+    this.barrels = lv.barrels.map(([x, y]) => new Barrel(x, y))
+    this.projectiles = []; this.particles = new Particles(); this.flashes = []; this.pendingExplosions = []
+    this.distField = new Int16Array(lv.w * lv.h); this.dfCell = null; this.dfTimer = 0.0
+    this.noiseT = -10.0; this.shake = 0.0; this.dmgFlash = 0.0; this.dmgDir = null; this.dmgDirT = 0; this.hitmarkT = 0.0
+    this.muzzleT = 0.0; this.pumpT = 0.0; this.messages = []; this.kills = 0; this.levelTime = 0.0; this.levelEndT = 0.0
+    this.msg(`LEVEL ${n}`, 3.0)
+    this.msg('Find the exit portal', 4.0)
+  }
+  msg(text, dur = 2.5) { this.messages.push([text, this.time + dur, dur]) }
+  play(name, vol = 1.0, pan = 0.5) { this.hooks.play(name, vol, pan) }
+  playAt(name, sx, sy, base = 1.0, falloff = 0.12) {
+    const p = this.player, r = positional(sx, sy, p.x, p.y, p.angle, base, falloff)
+    if (r) this.hooks.play(name, r[0], r[1])
+  }
+  lockMouse(on) { if (!this.autotest) this.hooks.lockMouse(on) }
+  // ---- discrete actions (handle_events)
+  start() { this.state = 'play'; this.paused = false; this.lockMouse(true); this.hooks.startMusic(0.5) }
+  restart() { this.newGame(); this.start() }
+  selectWeapon(name) { if (name !== this.player.weapon) { this.player.weapon = name; this.player.recoil = 0.6; this.play('click', 0.5) } }
+  cycleWeapon(dir) { const i = WEAPON_ORDER.indexOf(this.player.weapon); this.selectWeapon(WEAPON_ORDER[pmod(i + dir, 3)]) }
+  // ---- update
+  update(dt) {
+    this.time += dt
+    if (this.state === 'title') { this.player.angle += dt * 0.15; return }
+    if (this.state === 'levelend') {
+      this.levelEndT -= dt
+      if (this.levelEndT <= 0) {
+        this.levelNum += 1
+        this.loadLevel(this.levelNum, this.player)
+        this.player.health = Math.min(100, this.player.health + 25)
+        this.state = 'play'
+      }
+      return
+    }
+    if (this.state === 'dead' || this.paused) return
+    this.updatePlay(dt)
+  }
+  updatePlay(dt) {
+    const p = this.player, lv = this.level, inp = this.input
+    this.levelTime += dt
+    let mx = inp.mx, my = inp.my                          // look (mouse pixels since last frame)
+    if (this.autotest) [mx, my] = this.autoLook(dt)
+    inp.mx = 0; inp.my = 0
+    p.angle += mx * 0.0024 + inp.turn * dt * 2.4
+    p.pitch = Math.max(-this.RH * 0.45, Math.min(this.RH * 0.45, p.pitch - my * 0.6))
+    p.swayX = p.swayX * 0.85 - mx * 0.06
+    p.swayY = p.swayY * 0.85 - my * 0.04
+    const fx = Math.cos(p.angle), fy = Math.sin(p.angle), rx = -fy, ry = fx     // move
+    let mvx = inp.fwd * fx + inp.strafe * rx, mvy = inp.fwd * fy + inp.strafe * ry
+    if (this.autotest) { const [amx, amy] = this.autoMove(dt); mvx += amx * fx + amy * rx; mvy += amx * fy + amy * ry }
+    const mag = Math.hypot(mvx, mvy), sprint = inp.sprint
+    if (mag > 0) {
+      const speed = (sprint ? 6.2 : 4.2) * dt;
+      [p.x, p.y] = lv.move(p.x, p.y, mvx / mag * speed, mvy / mag * speed, 0.28)
+      const old = p.bob
+      p.bob += dt * (sprint ? 13 : 9.5)
+      if (Math.sin(old) > 0 && 0 >= Math.sin(p.bob)) this.play('step', 0.25, 0.5)
+    } else p.bob += (0 - pmod(p.bob, TAU)) * Math.min(1, dt * 6)
+    p.eyeZ = 0.5 + 0.02 * Math.sin(p.bob)
+    p.fireCd = Math.max(0.0, p.fireCd - dt)                // weapons
+    p.recoil = Math.max(0.0, p.recoil - dt * 4)
+    this.muzzleT = Math.max(0.0, this.muzzleT - dt)
+    if (this.pumpT > 0) { this.pumpT -= dt; if (this.pumpT <= 0) this.play('pump', 0.6) }
+    let firing = inp.fire
+    if (this.autotest) firing = pmod(this.time, 0.6) < 0.1
+    if (firing && p.fireCd <= 0) this.fire()
+    const actors = [p.x, p.y]                             // world
+    for (const e of this.enemies) if (e.state !== 'idle' && e.state !== 'dead') actors.push(e.x, e.y)
+    for (const [dx, dy] of lv.updateDoors(dt, actors)) this.playAt('door', dx + 0.5, dy + 0.5, 0.8)
+    const cx = trunc(p.x), cy = trunc(p.y)
+    this.dfTimer -= dt
+    if (!this.dfCell || cx !== this.dfCell[0] || cy !== this.dfCell[1] || this.dfTimer <= 0) {
+      lv.distField(cx, cy, 45, this.distField); this.dfCell = [cx, cy]; this.dfTimer = 0.5
+    }
+    for (const e of this.enemies) e.update(dt, this)
+    for (const pr of this.projectiles) pr.update(dt, this)
+    this.projectiles = this.projectiles.filter(pr => pr.alive)
+    if (this.pendingExplosions.length) {
+      const keep = []
+      for (const [b, t] of this.pendingExplosions) { if (t <= this.time) { if (!b.dead) b.explode(this) } else keep.push([b, t]) }
+      this.pendingExplosions = keep
+    }
+    this.particles.update(dt, lv)
+    for (const pk of this.pickups) if (!pk.taken && (pk.x - p.x) ** 2 + (pk.y - p.y) ** 2 < 0.4) this.takePickup(pk)
+    this.flashes = this.flashes.filter(f => f[4] > this.time)
+    this.shake = Math.max(0.0, this.shake - dt * 1.8)
+    this.dmgFlash = Math.max(0.0, this.dmgFlash - dt)
+    this.hitmarkT = Math.max(0.0, this.hitmarkT - dt)
+    this.messages = this.messages.filter(m => m[1] > this.time)
+    const [ex, ey] = lv.exit
+    if ((ex - p.x) ** 2 + (ey - p.y) ** 2 < 0.5) this.finishLevel()
+  }
+  // scripted input for ?autotest (same as the Python --autotest)
+  autoLook() { const t = this.time; return [Math.sin(t * 0.7) * 6.0, Math.sin(t * 1.3) * 1.5] }
+  autoMove() { const t = this.time; return [pmod(t, 4) < 3 ? 1.0 : -0.3, Math.sin(t * 0.5) * 0.4] }
+  // ---- actions
+  fire() {
+    const p = this.player, w = WEAPONS[p.weapon]
+    if (w.ammo && p.ammo[w.ammo] <= 0) { this.play('click', 0.6); p.fireCd = 0.3; this.selectWeapon('pistol'); return }
+    if (w.ammo) p.ammo[w.ammo] -= 1
+    p.fireCd = w.rate; p.recoil = 1.0; this.muzzleT = 0.06
+    this.shake = Math.max(this.shake, w.kick * 0.18)
+    this.noiseT = this.time
+    this.play(w.sound, 0.9)
+    const col = p.weapon === 'plasma' ? [0.3, 0.6, 1.0] : [1.0, 0.75, 0.4]
+    this.addFlash(p.x + Math.cos(p.angle) * 0.6, p.y + Math.sin(p.angle) * 0.6, 6.0, col, 0.09, 0.7)
+    if (p.weapon === 'plasma') {
+      const ang = p.angle + gauss(0, w.spread)
+      this.projectiles.push(new Projectile(p.x + Math.cos(ang) * 0.4, p.y + Math.sin(ang) * 0.4, Math.cos(ang), Math.sin(ang), 15.0, w.dmg, 'player', 'plasma', 0.45))
+      return
+    }
+    if (p.weapon === 'shotgun') this.pumpT = 0.45
+    for (let i = 0; i < w.pellets; i++) this.hitscan(p.angle + gauss(0, w.spread), w.dmg)
+  }
+  hitscan(ang, dmg) {
+    const p = this.player, lv = this.level, dx = Math.cos(ang), dy = Math.sin(ang)
+    const [wallD, hitWall] = lv.raycast(p.x, p.y, dx, dy, 40)
+    let best = null, bestD = wallD
+    for (const e of this.enemies) {
+      if (e.state === 'dead') continue
+      const rx = e.x - p.x, ry = e.y - p.y, along = rx * dx + ry * dy
+      if (along <= 0 || along >= bestD) continue
+      if (Math.abs(rx * dy - ry * dx) < e.k.radius * 1.15) { best = e; bestD = along }
+    }
+    for (const b of this.barrels) {
+      if (b.dead) continue
+      const rx = b.x - p.x, ry = b.y - p.y, along = rx * dx + ry * dy
+      if (0 < along && along < bestD && Math.abs(rx * dy - ry * dx) < 0.3) { best = b; bestD = along }
+    }
+    if (best) { best.hurt(dmg, this); this.hitmarkT = 0.12; this.play('hitmark', 0.5) }
+    else if (hitWall) {
+      const hx = p.x + dx * (wallD - 0.05), hy = p.y + dy * (wallD - 0.05)
+      this.particles.emit(hx, hy, 0.5 + p.pitch / this.RH * 0.6, 6, [255, 220, 150], 1.5, 0.35, 0.012, 5.0)
+    }
+  }
+  addFlash(x, y, radius, color, duration, intensity = 1.0) { this.flashes.push([x, y, radius, color, this.time + duration, duration, intensity]) }
+  damagePlayer(dmg, sx, sy) {
+    const p = this.player
+    if (this.state !== 'play' || this.opts.god) return
+    p.health -= dmg
+    this.dmgFlash = 0.7
+    this.shake = Math.max(this.shake, 0.35)
+    this.dmgDir = Math.atan2(sy - p.y, sx - p.x)
+    this.dmgDirT = this.time + 1.2
+    this.play('hurt', 0.9)
+    if (p.health <= 0) {
+      p.health = 0; this.state = 'dead'
+      this.play('death', 1.0)
+      this.hooks.setMusicVolume(0.15)
+      this.lockMouse(false)
+    }
+  }
+  onEnemyKilled(e) { this.kills += 1; this.totalKills += 1; this.score += e.k.score }
+  takePickup(pk) {
+    const p = this.player
+    if (pk.kind === 'medkit') { if (p.health >= 100) return; p.health = Math.min(100, p.health + 25); this.msg('+25 HEALTH', 1.5) }
+    else if (pk.kind === 'shells') { p.ammo.shells += 8; this.msg('+8 SHELLS', 1.5) }
+    else { p.ammo.cells += 20; this.msg('+20 PLASMA CELLS', 1.5) }
+    pk.taken = true
+    this.play('pickup', 0.7)
+  }
+  finishLevel() {
+    this.state = 'levelend'; this.levelEndT = 3.2
+    const bonus = Math.max(0, 500 - trunc(this.levelTime) * 5)
+    this.score += bonus + this.kills * 25
+    this.play('level', 0.8)
+    this.lockMouse(true)
+  }
+  // ---- draw (world into renderer.frame; the HUD is drawn by the shell at screen resolution)
+  dynLights() {
+    const p = this.player, lights = []
+    for (const [x, y, r, col, tEnd, dur, inten] of this.flashes) {
+      // Bug fix: the original only drops expired flashes inside update_play, so while paused / dead / level-clear the
+      // intensity turns negative and the frame fills with wrapped-around colours.  Same result as the original in play.
+      if (tEnd <= this.time) continue
+      const k = inten * (tEnd - this.time) / dur
+      lights.push([(x - p.x) ** 2 + (y - p.y) ** 2, [x, y, r, [col[0] * k, col[1] * k, col[2] * k]]])
+    }
+    for (const pr of this.projectiles) { const l = pr.light(); lights.push([(l[0] - p.x) ** 2 + (l[1] - p.y) ** 2, l]) }
+    lights.sort((a, b) => a[0] - b[0])
+    return lights.slice(0, 4).map(l => l[1])
+  }
+  drawWorld() {
+    const p = this.player, lv = this.level, rd = this.renderer, sh = this.shake, sp = this.sprites
+    const shakeY = Math.sin(this.time * 60) * sh * 12, shakeA = Math.sin(this.time * 47) * sh * 0.01
+    const cam = rd.makeCamera(p.x, p.y, p.angle + shakeA, p.pitch + shakeY, p.eyeZ)
+    const dyn = this.dynLights()
+    rd.render(cam, dyn)
+    const items = [], d2 = (x, y) => (x - p.x) ** 2 + (y - p.y) ** 2
+    for (const [tx, ty] of lv.torches) items.push([d2(tx, ty), sp.torch[pmod(trunc(this.time * 9 + tx * 3), 3)], tx, ty, 0.55, 0.32, 2.4, null])
+    for (const pk of this.pickups) if (!pk.taken) items.push([d2(pk.x, pk.y), sp[pk.kind][0], pk.x, pk.y, 0.5, 0.03 + 0.04 * (1 + Math.sin(this.time * 3 + pk.bob)), null, null])
+    for (const b of this.barrels) if (!b.dead) items.push([d2(b.x, b.y), sp.barrel[0], b.x, b.y, 0.78, 0.0, null, null])
+    for (const e of this.enemies) items.push([d2(e.x, e.y), e.sprite(sp), e.x, e.y, e.k.scale, e.zoff, null, e.flash > 0 ? TINT_HIT : null])
+    for (const pr of this.projectiles) items.push([d2(pr.x, pr.y), sp[pr.kind][0], pr.x, pr.y, 0.32, pr.z - 0.16, 1.35, null])
+    const [ex, ey] = lv.exit
+    items.push([d2(ex, ey), sp.portal[pmod(trunc(this.time * 10), 8)], ex, ey, 1.0, 0.0, 1.35, null])
+    items.sort((a, b) => b[0] - a[0])
+    for (const [dd, tex, x, y, scale, zoff, light, tint] of items) if (dd < 900) rd.drawSprite(cam, tex, x, y, scale, zoff, light, tint, dyn)
+    rd.drawParticles(cam, this.particles)
+    this.drawWeapon()
+  }
+  drawWeapon() {
+    const p = this.player, img = this.weaponImgs[p.weapon], RW = this.RW, RH = this.RH, RWref = RH * 16 / 9
+    const bx = Math.sin(p.bob * 0.5) * RWref * 0.018 + p.swayX
+    const by = Math.abs(Math.cos(p.bob * 0.5)) * RH * 0.03 + p.recoil * RH * 0.14 + p.swayY
+    const x = RW * 0.5 - img.w * 0.5 + bx + p.recoil * RWref * 0.02, y = RH - img.h + RH * 0.08 + by
+    const fb = this.renderer.frame
+    if (this.muzzleT > 0) {                              // BLEND_ADD
+      const fl = this.flashImg, [mx, my] = WEAPON_MUZZLE[p.weapon]
+      blit(fb, RW, RH, fl, trunc(x + img.w * mx - fl.w / 2), trunc(y + img.h * my - fl.h / 2), true)
+    }
+    blit(fb, RW, RH, img, trunc(x), trunc(y), false)
+  }
+}
+const TINT_HIT = [255, 255, 255, 0.55]
+function blit(fb, W, H, s, ox, oy, additive) {         // pygame blit onto an opaque surface (alpha blend or BLEND_ADD)
+  const sd = s.d
+  for (let y = Math.max(0, oy); y < Math.min(H, oy + s.h); y++) {
+    for (let x = Math.max(0, ox); x < Math.min(W, ox + s.w); x++) {
+      const si = ((y - oy) * s.w + (x - ox)) << 2, di = (y * W + x) << 2
+      if (additive) { fb[di] = fb[di] + sd[si]; fb[di + 1] = fb[di + 1] + sd[si + 1]; fb[di + 2] = fb[di + 2] + sd[si + 2]; continue }
+      const a = sd[si + 3]
+      if (a === 0) continue
+      for (let c = 0; c < 3; c++) { const dC = fb[di + c], sC = sd[si + c]; fb[di + c] = ((((sC - dC) * a + sC) >> 8) + dC) }
+    }
+  }
+}
+
+G.CD = { PyRandom, PCG64, seedSequence, vnoise, buildAtlases, buildSprites, drawWeapon, drawMuzzleFlash, smoothscale, Surf, makeSynth, SR,
+  generate, bakeLights, pyHashPair, pySetOrder, Level, Renderer, Game, Player, Enemy, Projectile, Particles, Pickup, Barrel, KINDS, WEAPONS, WEAPON_ORDER, DOOR,
+  TEX, positional, THEMES }
+})(typeof window !== 'undefined' ? window : globalThis)
+</script>
+<script>
+/* touch-kit.js — on-screen touch controls for keyboard/mouse web games. No dependencies.
+ * Inline it into a single-file game (inside a script tag) or load it next to the game.
+ *
+ *   const kit = TouchKit.create({
+ *     sticks: [
+ *       { id: 'move', side: 'left',  label: 'MOVE', keys: 'wasd' },            // 'wasd' | 'arrows' | {up,down,left,right} codes
+ *       { id: 'aim',  side: 'right', label: 'AIM',  onMove: (x, y, on) => {} } // analog -1..1, on=false when released
+ *     ],
+ *     buttons: [ { id: 'fire', label: 'FIRE', icon: '✦', key: 'Space' },      // key: KeyboardEvent.code to hold while pressed
+ *                { id: 'map', label: 'MAP', key: 'KeyM', place: 'top-right' } ],
+ *     landscape: true,        // ask to rotate when the phone is held upright
+ *   })
+ *   kit.show(false)           // hide in menus, kit.show(true) in gameplay (default: shown on touch devices)
+ *   kit.stick('aim')          // → { x, y, on }   kit.pressed('fire') → boolean
+ *
+ * Buttons without `key` can use onDown/onUp. Sticks with `keys` send keydown/keyup (8 directions) and still report analog x/y.
+ * Keys are dispatched as KeyboardEvents (key, code, keyCode, which) on document, so window/document listeners receive them.
+ * Everything else on the page keeps working: the kit only captures touches that start on its own zones/buttons.
+ */
+(function () {
+  'use strict'
+  if (window.TouchKit) return
+  const KEYS = { Space: [' ', 32], Enter: ['Enter', 13], Escape: ['Escape', 27], Tab: ['Tab', 9], ShiftLeft: ['Shift', 16],
+    ControlLeft: ['Control', 17], AltLeft: ['Alt', 18], ArrowLeft: ['ArrowLeft', 37], ArrowUp: ['ArrowUp', 38],
+    ArrowRight: ['ArrowRight', 39], ArrowDown: ['ArrowDown', 40], Backspace: ['Backspace', 8] }
+  const keyInfo = code => {
+    if (KEYS[code]) return KEYS[code]
+    if (/^Key[A-Z]$/.test(code)) return [code[3].toLowerCase(), code.charCodeAt(3)]
+    if (/^Digit\d$/.test(code)) return [code[5], code.charCodeAt(5)]
+    return [code, 0]
+  }
+  const held = new Map()                                   // code → count of sources holding it
+  function sendKey(type, code) {
+    const [key, kc] = keyInfo(code)
+    const ev = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true, composed: true })
+    try { Object.defineProperty(ev, 'keyCode', { get: () => kc }); Object.defineProperty(ev, 'which', { get: () => kc }) } catch (e) {}
+    const t = document.activeElement && document.activeElement !== document.body ? document.activeElement : document
+    t.dispatchEvent(ev)
+  }
+  function press(code) { const n = held.get(code) || 0; held.set(code, n + 1); if (n === 0) sendKey('keydown', code) }
+  function release(code) { const n = held.get(code) || 0; if (n <= 1) { held.delete(code); if (n === 1) sendKey('keyup', code) } else held.set(code, n - 1) }
+  function tapKey(code) { press(code); setTimeout(() => release(code), 80) }
+
+  const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
+  const CSS = `
+.tk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:600 11px/1 system-ui,-apple-system,'Segoe UI',sans-serif;
+  letter-spacing:.06em;color:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tk-root.tk-off{display:none}
+.tk-zone{position:absolute;bottom:0;top:22%;pointer-events:auto;touch-action:none}
+.tk-zone.l{left:0;width:42%}.tk-zone.r{right:0;width:42%}
+.tk-base{position:absolute;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;border:2px solid rgba(255,255,255,.28);
+  background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,.02) 70%);transition:opacity .15s;opacity:.55}
+.tk-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
+  background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.55);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.tk-base.on{opacity:.95}
+.tk-lab{position:absolute;left:0;right:0;top:50%;margin-top:-5px;text-align:center;opacity:.75;text-shadow:0 1px 2px #000;pointer-events:none}
+.tk-btns{position:absolute;display:flex;gap:12px;pointer-events:none}
+.tk-btns.br{right:calc(18px + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse;align-items:flex-end}
+.tk-btns.tr{right:calc(12px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));flex-direction:row-reverse}
+.tk-btns.tl{left:calc(12px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top))}
+.tk-btns.bl{left:calc(18px + env(safe-area-inset-left));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse}
+.tk-row{display:flex;gap:12px;flex-direction:row-reverse;align-items:flex-end}
+.tk-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
+  background:rgba(20,22,30,.42);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.tk-btn.s{width:48px;height:48px;font-size:9px}.tk-btn.l{width:84px;height:84px}
+.tk-btn i{font-style:normal;font-size:22px;line-height:1}.tk-btn.s i{font-size:17px}
+.tk-btn.on{background:rgba(255,255,255,.34);border-color:#fff;transform:scale(.94)}
+.tk-rot{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+  background:rgba(8,9,14,.94);color:#eee;font:500 16px/1.5 system-ui,sans-serif;text-align:center;pointer-events:auto;padding:24px}
+.tk-rot b{font-size:44px;display:block;animation:tkr 1.8s ease-in-out infinite}
+.tk-rot button{margin-top:6px;background:none;border:1px solid #666;color:#bbb;border-radius:20px;padding:8px 18px;font:inherit;font-size:13px}
+@keyframes tkr{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait){.tk-rot.need{display:flex}}
+`
+  // A tap on a kit button is followed by a compatibility `click` at the same spot ~100–300 ms later. If the button just
+  // opened a game overlay/menu under the finger, that click would hit it (and often close it). Swallow it.
+  let clickBlockUntil = 0
+  function suppressClick() { clickBlockUntil = Date.now() + 450 }
+  document.addEventListener('click', e => {
+    if (Date.now() < clickBlockUntil && !(e.target && e.target.closest && e.target.closest('.tk-root'))) { e.stopPropagation(); e.preventDefault() }
+  }, true)
+
+  function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e }
+
+  function create(opt) {
+    opt = opt || {}
+    if (!document.getElementById('tk-style')) { const st = el('style'); st.id = 'tk-style'; st.textContent = CSS; document.head.appendChild(st) }
+    const root = el('div', 'tk-root', document.body)
+    const api = { root, sticks: {}, buttons: {}, visible: false }
+
+    // ---- sticks: floating — the base appears where the thumb lands inside its half of the screen
+    for (const s of opt.sticks || []) {
+      const side = s.side === 'right' ? 'r' : 'l'
+      const zone = el('div', 'tk-zone ' + side, root)
+      if (s.zone) Object.assign(zone.style, s.zone)
+      const base = el('div', 'tk-base', zone), knob = el('div', 'tk-knob', base)
+      if (s.label) el('div', 'tk-lab', knob, s.label)
+      const R = s.radius || 52, dz = s.deadzone == null ? 0.3 : s.deadzone
+      const keys = s.keys === 'wasd' ? { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }
+        : s.keys === 'arrows' ? { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } : s.keys || null
+      const st = { x: 0, y: 0, on: false, pid: null, cx: 0, cy: 0, dirs: {} }
+      api.sticks[s.id || side] = st
+      const rest = () => {                                   // idle hint position; keeps clear of the bottom-right buttons
+        const zr = zone.getBoundingClientRect(); let x = side === 'l' ? 96 : zr.width - 96
+        if (side === 'r' && groups.br) { const gr = groups.br.getBoundingClientRect(); if (gr.width) x = Math.min(x, gr.left - zr.left - 80) }
+        base.style.left = x + 'px'; base.style.top = (zr.height - 110) + 'px'
+      }
+      const setDirs = (want) => {
+        if (!keys) return
+        for (const d of ['up', 'down', 'left', 'right']) {
+          if (want[d] && !st.dirs[d]) { st.dirs[d] = true; press(keys[d]) }
+          else if (!want[d] && st.dirs[d]) { st.dirs[d] = false; release(keys[d]) }
+        }
+      }
+      const move = (px, py) => {
+        let dx = px - st.cx, dy = py - st.cy; const d = Math.hypot(dx, dy)
+        if (d > R) { dx *= R / d; dy *= R / d }
+        knob.style.transform = `translate(${dx}px,${dy}px)`
+        st.x = dx / R; st.y = dy / R
+        const m = Math.hypot(st.x, st.y), a = Math.atan2(st.y, st.x)
+        const want = { up: false, down: false, left: false, right: false }
+        if (m > dz) { const oct = Math.round(a / (Math.PI / 4)); // 8 directions
+          want.right = [0, 1, -1].includes(oct); want.left = [4, -4, 3, -3].includes(oct); want.down = [1, 2, 3].includes(oct); want.up = [-1, -2, -3].includes(oct) }
+        setDirs(want)
+        if (s.onMove) s.onMove(st.x, st.y, true)
+      }
+      zone.addEventListener('pointerdown', e => {
+        if (st.pid !== null) return
+        e.preventDefault(); st.pid = e.pointerId; try { zone.setPointerCapture(e.pointerId) } catch (x) {}
+        const zr = zone.getBoundingClientRect(); st.cx = e.clientX; st.cy = e.clientY
+        base.style.left = (e.clientX - zr.left) + 'px'; base.style.top = (e.clientY - zr.top) + 'px'
+        base.classList.add('on'); st.on = true; move(e.clientX, e.clientY)
+        if (s.onStart) s.onStart()
+      })
+      zone.addEventListener('pointermove', e => { if (e.pointerId === st.pid) { e.preventDefault(); move(e.clientX, e.clientY) } })
+      const end = e => {
+        if (e.pointerId !== st.pid) return
+        st.pid = null; st.on = false; st.x = st.y = 0; knob.style.transform = ''; base.classList.remove('on'); setDirs({}); rest()
+        if (s.onMove) s.onMove(0, 0, false); if (s.onEnd) s.onEnd()
+      }
+      zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end)
+      st.reset = () => { if (st.pid !== null) end({ pointerId: st.pid }) }
+      requestAnimationFrame(rest); addEventListener('resize', rest)
+    }
+
+    // ---- buttons: grouped by place (default bottom-right cluster)
+    const groups = {}
+    for (const b of opt.buttons || []) {
+      const place = b.place || 'bottom-right', code = { 'bottom-right': 'br', 'top-right': 'tr', 'top-left': 'tl', 'bottom-left': 'bl' }[place] || 'br'
+      if (!groups[code]) groups[code] = el('div', 'tk-btns ' + code, root)
+      let parent = groups[code]
+      if (code === 'br' && b.row != null) { parent = groups['br' + b.row] || (groups['br' + b.row] = el('div', 'tk-row', groups.br)) }
+      const btn = el('div', 'tk-btn' + (b.size ? ' ' + b.size : ''), parent, (b.icon ? `<i>${b.icon}</i>` : '') + (b.label ? `<span>${b.label}</span>` : ''))
+      const bs = { down: false, pid: null, el: btn }
+      api.buttons[b.id || b.label] = bs
+      const down = e => {
+        e.preventDefault(); e.stopPropagation()
+        if (b.toggle) { bs.down = !bs.down; btn.classList.toggle('on', bs.down); if (b.key) (bs.down ? press : release)(b.key); (bs.down ? b.onDown : b.onUp) && (bs.down ? b.onDown : b.onUp)(); return }
+        if (bs.pid !== null) return
+        bs.pid = e.pointerId; try { btn.setPointerCapture(e.pointerId) } catch (x) {}
+        bs.down = true; btn.classList.add('on')
+        if (b.key) { if (b.tap) tapKey(b.key); else press(b.key) }
+        if (b.onDown) b.onDown()
+        if (navigator.vibrate && b.buzz !== false) try { navigator.vibrate(8) } catch (x) {}
+      }
+      const up = e => {
+        suppressClick()
+        if (b.toggle || e.pointerId !== bs.pid) return
+        bs.pid = null; bs.down = false; btn.classList.remove('on')
+        if (b.key && !b.tap) release(b.key)
+        if (b.onUp) b.onUp()
+      }
+      btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up)
+      btn.addEventListener('contextmenu', e => e.preventDefault())
+    }
+
+    // ---- portrait → ask to rotate (can be dismissed)
+    let rot = null, rotDismissed = false                      // once dismissed, show(true) must not bring the hint back
+    if (opt.landscape) {
+      rot = el('div', 'tk-rot', document.body, `<b>⟳</b><div>${opt.rotateText || '휴대폰을 가로로 돌려 주세요'}<br><small style="opacity:.6">Rotate your phone</small></div><button type="button">그래도 세로로 하기</button>`)
+      rot.querySelector('button').addEventListener('click', () => { rotDismissed = true; rot.classList.remove('need') })
+    }
+
+    // ---- page hygiene for touch play: no pinch/double-tap zoom, no pull-to-refresh, no long-press menu on the game
+    if (opt.preventGestures !== false) {
+      document.documentElement.style.overscrollBehavior = 'none'
+      document.addEventListener('gesturestart', e => e.preventDefault())
+      let lastT = 0
+      document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastT < 300 && !(e.target.closest && e.target.closest('input,textarea,select,a,button'))) e.preventDefault(); lastT = now }, { passive: false })
+    }
+
+    api.show = on => {
+      api.visible = on; root.classList.toggle('tk-off', !on); if (rot) rot.classList.toggle('need', on && !!opt.landscape && !rotDismissed)
+      if (!on) { for (const s of Object.values(api.sticks)) s.reset && s.reset(); for (const [code] of held) sendKey('keyup', code); held.clear()
+        for (const b of Object.values(api.buttons)) { b.down = false; b.pid = null; b.el.classList.remove('on') } }
+    }
+    api.stick = id => api.sticks[id] || { x: 0, y: 0, on: false }
+    api.pressed = id => !!(api.buttons[id] && api.buttons[id].down)
+    api.destroy = () => { api.show(false); root.remove(); if (rot) rot.remove() }
+    const mode = opt.show || 'auto'
+    api.show(mode === 'always' || (mode === 'auto' && isTouch()))
+    if (mode === 'auto' && !api.visible) addEventListener('touchstart', function once() { removeEventListener('touchstart', once); api.show(true) }, { passive: true })
+    return api
+  }
+
+  // Helpers for games that read the mouse: fire mouse events at a point (client coords).
+  function mouse(target, type, x, y, extra) {
+    const ev = new MouseEvent(type, Object.assign({ clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1 }, extra || {}))
+    ;(target || document.elementFromPoint(x, y) || document).dispatchEvent(ev)
+  }
+  // Resume every AudioContext the game creates, on the first real touch (iOS/Android need a user gesture).
+  function unlockAudio() {
+    const ctxs = new Set(), AC = window.AudioContext || window.webkitAudioContext
+    if (AC && !AC.__tk) { const W = function (...a) { const c = new AC(...a); ctxs.add(c); return c }; W.prototype = AC.prototype; W.__tk = true; window.AudioContext = W; if (window.webkitAudioContext) window.webkitAudioContext = W }
+    const go = () => { for (const c of ctxs) if (c.state === 'suspended') c.resume().catch(() => {}) }
+    addEventListener('pointerdown', go, true); addEventListener('touchend', go, true)
+  }
+  window.TouchKit = { create, press, release, tapKey, sendKey, mouse, unlockAudio, isTouch }
+})()
+</script>
+<script>
+/* CRIMSON DEPTHS - web port, browser shell: screen/HUD (main.py draw_*), WebAudio playback (audio.py Audio),
+ * desktop input (pointer-lock mouse look, WASD, Shift, LMB/Space, 1-3/wheel, Esc) and touch controls (touch-kit). */
+(function () {
+'use strict'
+const CD = window.CD, TAU = Math.PI * 2
+const Q = new URLSearchParams(location.search)
+const OPT = { hd: Q.has('hd'), fps: Q.has('fps'), god: Q.has('god'), nosound: Q.has('nosound'), autotest: parseFloat(Q.get('autotest')) || 0 }
+let RH = OPT.hd ? 270 : 225                              // internal render height (400x225 like the original; --hd = 270)
+const canvas = document.getElementById('screen'), ctx = canvas.getContext('2d', { alpha: false })
+const lookEl = document.getElementById('look'), fsBtn = document.getElementById('fs'), safeEl = document.getElementById('safe')
+const frameCanvas = document.createElement('canvas'), fctx = frameCanvas.getContext('2d')
+const mapCanvas = document.createElement('canvas'); mapCanvas.width = mapCanvas.height = 25
+const mctx = mapCanvas.getContext('2d'), mapImg = mctx.createImageData(25, 25)
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v
+const rgb = (c, a = 1) => a >= 1 ? `rgb(${c[0]},${c[1]},${c[2]})` : `rgba(${c[0]},${c[1]},${c[2]},${a})`
+
+// ------------------------------------------------------------ audio -------
+// audio.py Audio: 22050 Hz mono sounds, per-side volume like pygame Channel.set_volume(left, right), 40 channels.
+const Snd = {
+  ctx: null, master: null, raw: {}, buf: {}, music: null, musicSrc: null, musicGain: null, musicVol: null, voices: 0,
+  enabled: !OPT.nosound,
+  unlock() {
+    if (!this.enabled) return
+    try {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext
+        if (!AC) { this.enabled = false; return }
+        this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.connect(this.ctx.destination)
+        for (const k in this.raw) this.makeBuf(k)
+        if (this.music && !this.musicBuf) this.musicBuf = this.toBuffer(this.music)
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {})
+      if (this.musicVol !== null && !this.musicSrc) this.startMusic(this.musicVol)
+    } catch (e) { this.enabled = false }
+  },
+  toBuffer(f32) { const b = this.ctx.createBuffer(1, f32.length, CD.SR); b.getChannelData(0).set(f32); return b },
+  makeBuf(k) { if (this.ctx) this.buf[k] = this.toBuffer(this.raw[k]) },
+  add(k, f32) { this.raw[k] = f32; this.makeBuf(k) },
+  setMusic(f32) { this.music = f32; if (this.ctx) { this.musicBuf = this.toBuffer(f32); if (this.musicVol !== null && !this.musicSrc) this.startMusic(this.musicVol) } },
+  play(name, vol = 1.0, pan = 0.5) {
+    const c = this.ctx, b = this.buf[name]
+    if (!c || !b || c.state !== 'running' || this.voices >= 39) return   // 40 mixer channels, one is the music
+    const src = c.createBufferSource(), gl = c.createGain(), gr = c.createGain(), mg = c.createChannelMerger(2)
+    src.buffer = b
+    gl.gain.value = vol * Math.min(1.0, 2 * (1 - pan)); gr.gain.value = vol * Math.min(1.0, 2 * pan)
+    src.connect(gl); src.connect(gr); gl.connect(mg, 0, 0); gr.connect(mg, 0, 1); mg.connect(this.master)
+    this.voices++
+    src.onended = () => { this.voices--; src.disconnect(); mg.disconnect() }
+    src.start()
+  },
+  startMusic(vol) {                                     // (the original layered a new loop on every restart; one loop here)
+    this.musicVol = vol
+    if (this.musicSrc) { try { this.musicSrc.stop() } catch (e) {} this.musicSrc = null }
+    if (!this.ctx || !this.musicBuf) return
+    const src = this.ctx.createBufferSource(), g = this.ctx.createGain()
+    src.buffer = this.musicBuf; src.loop = true; g.gain.value = vol
+    src.connect(g); g.connect(this.master); src.start()
+    this.musicSrc = src; this.musicGain = g
+  },
+  setMusicVolume(vol) { this.musicVol = vol; if (this.musicGain) this.musicGain.gain.value = vol },
+  stopMusic() { this.musicVol = null; if (this.musicSrc) { try { this.musicSrc.stop() } catch (e) {} this.musicSrc = null } },
+}
+function synthAudio() {                                 // sounds + 24 s music loop, generated off the main thread when possible
+  if (!Snd.enabled) return
+  const core = document.getElementById('core').textContent
+  const glue = `;(function(){const s=self.CD.makeSynth();for(const [k,v] of s.bankGen())postMessage({k,v},[v.buffer]);` +
+    `const g=s.music();let r;while(!(r=g.next()).done);postMessage({k:'music',v:r.value},[r.value.buffer])})()`
+  let worker = null
+  try {
+    const url = URL.createObjectURL(new Blob([core, glue], { type: 'text/javascript' }))
+    worker = new Worker(url)
+    worker.onmessage = e => { if (e.data.k === 'music') { Snd.setMusic(e.data.v); worker.terminate() } else Snd.add(e.data.k, e.data.v) }
+    worker.onerror = e => { e.preventDefault(); worker.terminate(); worker = null; synthMainThread() }
+  } catch (e) { synthMainThread() }
+}
+function synthMainThread() {                            // fallback: small slices between frames
+  const s = CD.makeSynth(), bank = s.bankGen(), mus = s.music()
+  const step = () => {
+    const t0 = performance.now()
+    while (performance.now() - t0 < 8) {
+      const b = bank.next()
+      if (!b.done) { Snd.add(b.value[0], b.value[1]); continue }
+      const m = mus.next()
+      if (m.done) { Snd.setMusic(m.value); return }
+    }
+    setTimeout(step, 0)
+  }
+  setTimeout(step, 0)
+}
+
+// ------------------------------------------------------------ input -------
+const keys = new Set()
+let mouseDown = false, wheelAcc = 0, wheelT = 0, wheelBlock = 0
+let inputMode = window.matchMedia && matchMedia('(pointer: coarse)').matches ? 'touch' : 'mouse'   // switches on the next real input
+const touch = { lookId: null, lx: 0, ly: 0, dx: 0, dy: 0, fireId: null, fx: 0, fy: 0 }
+const TOUCH_LOOK_X = 2.5, TOUCH_LOOK_Y = 2.0          // touch px -> "mouse px" (0.006 rad and 1.2 px of pitch per px)
+let kit = null
+const locked = () => document.pointerLockElement === canvas
+
+let freeMouse = false                                   // pointer lock refused: keep playing with a visible cursor
+function lockFailed(err) {
+  if (err) window.__cd && (window.__cd.lockErr = String(err && err.name ? err.name + ': ' + err.message : err))
+  if (!game || game.state !== 'play' || inputMode !== 'mouse' || locked()) return
+  freeMouse = true
+  if (game.paused) { game.paused = false; syncKit() }
+}
+function lockMouse(on) {                                // main.py lock_mouse (desktop pointer lock only)
+  if (on) {
+    if (inputMode !== 'mouse' || locked()) return
+    if (!canvas.requestPointerLock) return lockFailed('unsupported')
+    const plain = () => {
+      try { const q = canvas.requestPointerLock(); if (q && q.catch) q.catch(lockFailed) } catch (e) { lockFailed(e) }
+    }
+    try {
+      const p = canvas.requestPointerLock({ unadjustedMovement: true })   // raw mouse like SDL's relative mode
+      if (p && p.catch) p.catch(e => { if (e && e.name === 'NotSupportedError') plain(); else lockFailed(e) })
+    } catch (e) { plain() }
+  } else if (locked()) document.exitPointerLock()
+}
+function setMode(m) {
+  if (m === inputMode) return
+  inputMode = m
+  if (m === 'touch') lockMouse(false)
+  syncKit()
+}
+function pauseGame() {
+  const g = game
+  if (!g || g.state !== 'play' || g.paused) return
+  g.paused = true; mouseDown = false; keys.clear()
+  lockMouse(false); syncKit()
+}
+function resumeGame() {
+  const g = game
+  if (!g || g.state !== 'play' || !g.paused) return
+  g.paused = false; lockMouse(true); syncKit()
+}
+function startOrRestart() {
+  if (!game) return
+  Snd.unlock()
+  if (game.state === 'title') game.start()
+  else if (game.state === 'dead') game.restart()
+  syncKit()
+}
+function toTitle() { game.newGame(); game.state = 'title'; game.paused = false; Snd.stopMusic(); syncKit() }
+
+const GAME_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'ShiftLeft', 'ShiftRight',
+  'Digit1', 'Digit2', 'Digit3', 'Escape', 'Enter', 'KeyR'])
+addEventListener('keydown', e => {
+  if (GAME_KEYS.has(e.code)) e.preventDefault()
+  if (e.isTrusted && inputMode !== 'mouse' && !(kit && kit.visible)) setMode('mouse')   // a real keyboard in the menus
+  Snd.unlock()
+  keys.add(e.code)
+  if (!game || e.repeat) return
+  const g = game
+  if (e.code === 'Escape') {
+    if (g.state === 'play') { if (!g.paused) pauseGame(); else if (inputMode === 'touch') resumeGame() }
+    else if (g.state === 'dead') toTitle()
+    return
+  }
+  if (g.state === 'title' && (e.code === 'Enter' || e.code === 'Space')) { setMode('mouse'); startOrRestart() }
+  if (g.state === 'dead' && e.code === 'KeyR') { setMode('mouse'); startOrRestart() }
+  if (g.state === 'play' && !g.paused) {
+    const i = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code)
+    if (i >= 0) g.selectWeapon(CD.WEAPON_ORDER[i])
+  }
+})
+addEventListener('keyup', e => { keys.delete(e.code) })
+addEventListener('blur', () => { keys.clear(); mouseDown = false; pauseGame() })
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { pauseGame(); if (Snd.ctx && Snd.ctx.state === 'running') Snd.ctx.suspend().catch(() => {}) }
+  else if (Snd.ctx && Snd.ctx.state === 'suspended' && Snd.musicVol !== null) Snd.ctx.resume().catch(() => {})
+})
+document.addEventListener('pointerlockchange', () => {       // Esc releases the lock in browsers: that is the pause key
+  if (locked()) { freeMouse = false; return }
+  mouseDown = false
+  if (game && game.state === 'play' && !game.paused && inputMode === 'mouse') pauseGame()
+})
+document.addEventListener('pointerlockerror', () => lockFailed('pointerlockerror'))
+
+canvas.addEventListener('pointerdown', e => {           // mouse clicks (MOUSEBUTTONDOWN) and taps on menus
+  Snd.unlock()
+  if (!game) return
+  const g = game
+  if (e.pointerType === 'mouse') {
+    setMode('mouse')
+    if (e.button === 0) mouseDown = true
+    if (g.state === 'title') startOrRestart()
+    else if (g.state === 'play' && g.paused) resumeGame()
+    else if (g.state === 'play' && !locked()) lockMouse(true)
+    return
+  }
+  e.preventDefault()
+  setMode('touch')
+  if (g.state === 'title') startOrRestart()
+  else if (g.state === 'play' && g.paused) resumeGame()
+  else if (g.state === 'dead' && g.time - deadAt > 0.8) startOrRestart()
+})
+addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && e.button === 0) mouseDown = false })
+canvas.addEventListener('pointermove', e => {
+  if (game && e.pointerType === 'mouse' && (locked() || freeMouse && game.state === 'play' && !game.paused)) {
+    const mx = e.movementX || 0, my = e.movementY || 0
+    if (Math.abs(mx) < 1000 && Math.abs(my) < 1000) { game.input.mx += mx; game.input.my += my }   // ignore rare lock-entry spikes
+  }
+})
+canvas.addEventListener('contextmenu', e => e.preventDefault())
+addEventListener('touchend', () => Snd.unlock(), true)   // iOS only unlocks audio inside touchend/click
+addEventListener('wheel', e => {                         // MOUSEWHEEL: next / previous weapon (also while paused, like the original)
+  if (!game || game.state !== 'play') return
+  e.preventDefault()
+  const now = performance.now(), d = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY
+  if (now < wheelBlock) return                          // one step per notch, even with smooth-scrolling wheels
+  if (now - wheelT > 250) wheelAcc = 0
+  wheelT = now; wheelAcc += d
+  if (Math.abs(wheelAcc) >= 50) { game.cycleWeapon(wheelAcc < 0 ? 1 : -1); wheelAcc = 0; wheelBlock = now + 120 }
+}, { passive: false })
+
+// touch: right-side drag = look (like the mouse), FIRE button also aims while held
+lookEl.addEventListener('pointerdown', e => {
+  e.preventDefault(); setMode('touch'); Snd.unlock()
+  if (touch.lookId !== null) return
+  touch.lookId = e.pointerId; touch.lx = e.clientX; touch.ly = e.clientY
+  try { lookEl.setPointerCapture(e.pointerId) } catch (x) {}
+})
+lookEl.addEventListener('pointermove', e => {
+  if (e.pointerId !== touch.lookId) return
+  e.preventDefault()
+  touch.dx += e.clientX - touch.lx; touch.dy += e.clientY - touch.ly; touch.lx = e.clientX; touch.ly = e.clientY
+})
+const lookEnd = e => { if (e.pointerId === touch.lookId) touch.lookId = null }
+lookEl.addEventListener('pointerup', lookEnd); lookEl.addEventListener('pointercancel', lookEnd)
+
+function makeKit() {
+  kit = TouchKit.create({
+    sticks: [{ id: 'move', side: 'left', label: 'MOVE' }],
+    buttons: [
+      { id: 'fire', label: 'FIRE', icon: '✦', size: 'l', row: 0 },
+      { id: 'weapon', label: 'WEAPON', icon: '⇄', row: 0, onDown: () => { if (game.state === 'play' && !game.paused) game.cycleWeapon(1) } },
+      { id: 'sprint', label: 'SPRINT', icon: '»', size: 's', row: 1, toggle: true },
+      { id: 'pause', label: 'PAUSE', icon: 'Ⅱ', size: 's', place: 'top-right', onDown: () => pauseGame() },
+    ],
+    landscape: true, show: 'never',
+  })
+  const fe = kit.buttons.fire.el
+  fe.addEventListener('pointerdown', e => { setMode('touch'); Snd.unlock(); touch.fireId = e.pointerId; touch.fx = e.clientX; touch.fy = e.clientY })
+  fe.addEventListener('pointermove', e => {
+    if (e.pointerId !== touch.fireId) return
+    touch.dx += e.clientX - touch.fx; touch.dy += e.clientY - touch.fy; touch.fx = e.clientX; touch.fy = e.clientY
+  })
+  const fireEnd = e => { if (e.pointerId === touch.fireId) touch.fireId = null }
+  fe.addEventListener('pointerup', fireEnd); fe.addEventListener('pointercancel', fireEnd)
+  kit.root.addEventListener('pointerdown', () => Snd.unlock())
+}
+function syncKit() {                                    // on-screen controls only while playing on a touch screen
+  if (!kit) return
+  const on = inputMode === 'touch' && !!game && (game.state === 'play' && !game.paused || game.state === 'levelend')
+  if (on !== kit.visible) {
+    kit.show(on)
+    if (on) dispatchEvent(new Event('resize'))           // the kit places its idle stick hint on resize; it was hidden until now
+    else touch.lookId = touch.fireId = null
+  }
+  lookEl.style.display = on ? 'block' : 'none'
+  const menu = inputMode === 'touch' && !!game && (game.state === 'title' || game.paused)
+  fsBtn.style.display = menu && fsSupported() ? 'block' : 'none'
+  layoutDirty = true
+}
+const fsSupported = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled)
+fsBtn.addEventListener('click', e => {
+  e.stopPropagation()
+  const d = document, el = d.documentElement
+  if (d.fullscreenElement || d.webkitFullscreenElement) { (d.exitFullscreen || d.webkitExitFullscreen).call(d) }
+  else {
+    const p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el, { navigationUI: 'hide' })
+    if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}) } catch (x) {} }).catch(() => {})
+  }
+})
+fsBtn.addEventListener('pointerdown', e => e.stopPropagation())
+
+function gatherInput(g) {
+  const inp = g.input, k = keys
+  let fwd = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0)
+  let strafe = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0)
+  inp.turn = (k.has('ArrowRight') ? 1 : 0) - (k.has('ArrowLeft') ? 1 : 0)
+  inp.sprint = k.has('ShiftLeft') || k.has('ShiftRight')
+  inp.fire = (mouseDown && (locked() || freeMouse)) || k.has('Space')
+  if (kit && kit.visible) {
+    const s = kit.stick('move')
+    if (s.on && Math.hypot(s.x, s.y) > 0.3) { fwd += -s.y; strafe += s.x }
+    if (kit.pressed('sprint')) inp.sprint = true
+    if (kit.pressed('fire')) inp.fire = true
+    inp.mx += touch.dx * TOUCH_LOOK_X; inp.my += touch.dy * TOUCH_LOOK_Y
+  }
+  touch.dx = touch.dy = 0
+  inp.fwd = fwd; inp.strafe = strafe
+}
+
+// ------------------------------------------------------------ layout ------
+let cssW = 0, cssH = 0, dpr = 1, view = { x: 0, y: 0, w: 0, h: 0 }, hud = { l: 0, t: 0, r: 0, b: 0 }, safe = { l: 0, t: 0, r: 0, b: 0 }
+let layoutDirty = true, vignette = null, imgData = null
+const touchUI = { br: null, tr: null }
+function layout() {
+  layoutDirty = false
+  cssW = Math.max(1, innerWidth); cssH = Math.max(1, innerHeight)
+  dpr = Math.min(window.devicePixelRatio || 1, 2)
+  const bw = Math.round(cssW * dpr), bh = Math.round(cssH * dpr)
+  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh }
+  const cs = getComputedStyle(safeEl)
+  safe = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 }
+  // Hor+ : same vertical view as the original 16:9 window, wider or narrower horizontally (clamped to 4:3 .. 2.4:1)
+  const A = clamp(cssW / cssH, 4 / 3, 2.4), RW = Math.round(RH * A), Aeff = RW / RH
+  if (game && game.RH !== RH) game.setRH(RH)
+  if (game && (game.RW !== RW || game.renderer.H !== RH)) game.resizeView(RW, Math.tan(35 * Math.PI / 180) * Aeff / (16 / 9))
+  if (cssW / cssH > Aeff) { view.h = cssH; view.w = cssH * Aeff; view.x = (cssW - view.w) / 2; view.y = 0 }
+  else { view.w = cssW; view.h = cssW / Aeff; view.x = 0; view.y = cssH / cssW > 1.2 ? Math.max(safe.t, Math.min((cssH - view.h) / 2, cssH * 0.08)) : (cssH - view.h) / 2 }
+  hud = { l: Math.max(view.x, safe.l), t: Math.max(view.y, safe.t), r: Math.min(view.x + view.w, cssW - safe.r), b: Math.min(view.y + view.h, cssH - safe.b) }
+  vignette = null
+  if (kit) {                                            // move-stick zone: below the minimap (landscape) or below the view (portrait),
+    const zone = kit.root.querySelector('.tk-zone.l')   // and lifted so its idle hint clears the health readout
+    const H = view.h, pad = Math.trunc(H * 0.03), fb = PF(Math.max(40, Math.trunc(H / 7)))
+    const portrait = cssH > cssW * 1.2
+    const top = portrait ? Math.round(view.y + view.h + 8) + 'px' : '30%'
+    const bottom = portrait ? '0px' : Math.max(0, Math.ceil(cssH - hud.b + pad + fontH(fb) - 46 + 6)) + 'px'
+    if (zone.style.top !== top || zone.style.bottom !== bottom) { zone.style.top = top; zone.style.bottom = bottom; dispatchEvent(new Event('resize')) }
+  }
+  if (kit && kit.visible) {
+    const rel = el => { if (!el) return null; const r = el.getBoundingClientRect(); return r.width ? { l: r.left, t: r.top, r: r.right, b: r.bottom } : null }
+    touchUI.br = rel(kit.root.querySelector('.tk-btns.br')); touchUI.tr = rel(kit.root.querySelector('.tk-btns.tr'))
+  } else touchUI.br = touchUI.tr = null
+}
+addEventListener('resize', () => { layoutDirty = true })
+addEventListener('orientationchange', () => { layoutDirty = true; setTimeout(() => { layoutDirty = true }, 300) })
+
+// ------------------------------------------------------------ drawing -----
+const PF = size => Math.floor(size * 0.6875)            // pygame.font.Font(None, size) renders FreeSansBold at 0.6875 * size px
+const FACE = '"FreeSans","Helvetica Neue",Helvetica,Arial,"Liberation Sans",sans-serif'
+const fontH = px => Math.round(px * 1.1 + 1)            // font.get_height()
+function setFont(px) { ctx.font = `bold ${px}px ${FACE}` }
+function text(s, x, y, px, col, alpha = 1) {            // blit a rendered string with its top-left at (x, y)
+  setFont(px); ctx.fillStyle = rgb(col, alpha); ctx.fillText(s, x, y + px * 0.9)
+}
+const tw = (s, px) => { setFont(px); return ctx.measureText(s).width }
+const fitPx = (lines, px, maxW) => lines.reduce((m, s) => { const w = tw(s, px); return w > maxW ? Math.min(m, Math.max(12, Math.floor(px * maxW / w))) : m }, px)
+function textCenter(s, px, col, y, shadow = true, area = null) {   // main.py text_center, shrinking / wrapping to fit narrow screens
+  const A = area || { x: 0, w: cssW }, maxW = A.w * 0.94
+  let w = tw(s, px)
+  if (w > maxW) { px = Math.max(12, Math.floor(px * maxW / w)); w = tw(s, px) }
+  let lines = [s]
+  if (w > maxW) {                                       // still too wide at 12 px: wrap on words
+    lines = []; let cur = ''
+    for (const word of s.split(' ')) { const t = cur ? cur + ' ' + word : word; if (tw(t, px) > maxW && cur) { lines.push(cur); cur = word } else cur = t }
+    if (cur) lines.push(cur)
+  }
+  lines.forEach((ln, i) => {
+    const lw = tw(ln, px), x = A.x + A.w / 2 - lw / 2, yy = y + i * fontH(px)
+    if (shadow) text(ln, x + 3, yy + 3, px, [0, 0, 0])
+    text(ln, x, yy, px, col)
+  })
+  return lines.length * fontH(px)
+}
+function makeVignette(W, H) {                           // main.py make_vignette: 12 stepped rings of growing alpha
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(W * dpr)); c.height = Math.max(1, Math.round(H * dpr))
+  const v = c.getContext('2d'); v.scale(dpr, dpr)
+  const m = Math.max(W, H), cx = W / 2, cy = H / 2, wd = m * 0.06 + 2
+  for (let i = 0; i < 12; i++) {
+    const r = m * (0.5 + i * 0.06), inner = r - wd, outer = i < 11 ? m * (0.5 + (i + 1) * 0.06) - wd : r
+    v.beginPath(); v.arc(cx, cy, outer, 0, TAU); v.arc(cx, cy, Math.max(0, inner), 0, TAU, true)
+    v.fillStyle = `rgba(0,0,0,${(i * 14) / 255})`; v.fill()
+  }
+  return c
+}
+let deadAt = 0
+function present(g) {
+  const W = view.w, H = view.h, rd = g.renderer
+  if (!imgData || imgData.data !== rd.frame) { imgData = new ImageData(rd.frame, rd.W, rd.H); frameCanvas.width = rd.W; frameCanvas.height = rd.H }
+  fctx.putImageData(imgData, 0, 0)
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cssW, cssH)
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(frameCanvas, view.x, view.y, W, H)       // pygame.transform.scale: nearest neighbour
+  if (!vignette) vignette = makeVignette(W, H)
+  ctx.drawImage(vignette, view.x, view.y, W, H)
+  ctx.save(); ctx.translate(view.x, view.y)
+  if (g.state === 'title') { ctx.restore(); drawTitle(g); return }
+  if (g.dmgFlash > 0) addRed(Math.trunc(120 * Math.min(1.0, g.dmgFlash)), W, H)
+  if (g.player.health < 30 && g.state === 'play') addRed(Math.trunc(40 + 30 * Math.sin(g.time * 6)), W, H)
+  ctx.restore()
+  drawHud(g)
+  const full = { x: 0, w: cssW }, Hs = cssH
+  const fb = PF(Math.max(40, Math.trunc(Hs / 7))), fm = PF(Math.max(28, Math.trunc(Hs / 16))), f = PF(Math.max(20, Math.trunc(Hs / 26)))
+  const touchUi = inputMode === 'touch'
+  if (g.state === 'dead') {
+    ctx.fillStyle = 'rgba(60,0,0,0.588)'; ctx.fillRect(0, 0, cssW, cssH)
+    textCenter('YOU DIED', fb, [230, 40, 40], Hs * 0.4, true, full)
+    textCenter(`Score ${g.score}   Kills ${g.totalKills}   Level ${g.levelNum}`, fm, [230, 200, 200], Hs * 0.55, true, full)
+    textCenter(touchUi ? 'Tap to restart' : 'Press R to restart   -   ESC for title screen', f, [200, 180, 180], Hs * 0.65, true, full)
+  } else if (g.state === 'levelend') {
+    ctx.fillStyle = 'rgba(0,0,30,0.47)'; ctx.fillRect(0, 0, cssW, cssH)
+    textCenter(`LEVEL ${g.levelNum} CLEARED`, fb, [140, 200, 255], Hs * 0.4, true, full)
+    textCenter(`Kills ${g.kills}/${g.enemies.length}   Time ${Math.trunc(g.levelTime)}s   Score ${g.score}`, fm, [220, 230, 255], Hs * 0.55, true, full)
+    textCenter('Descending...', f, [180, 190, 220], Hs * 0.65, true, full)
+  } else if (g.paused) {
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, cssW, cssH)
+    textCenter('PAUSED', fb, [220, 220, 220], Hs * 0.42, true, full)
+    textCenter(touchUi ? 'Tap to resume' : 'Click to resume', f, [200, 200, 200], Hs * 0.56, true, full)
+  }
+}
+function addRed(k, W, H) {                              // scr.fill((k, 0, 0), special_flags=BLEND_ADD)
+  if (k <= 0) return
+  ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgb(${k},0,0)`; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over'
+}
+function drawTitle(g) {
+  const W = cssW, H = cssH, full = { x: 0, w: W }
+  ctx.fillStyle = 'rgba(10,0,0,0.588)'; ctx.fillRect(0, 0, W, H)
+  const pulse = 0.85 + 0.15 * Math.sin(g.time * 2)
+  let big = PF(Math.trunc(H / 5))
+  const tw0 = tw('CRIMSON DEPTHS', big); if (tw0 > W * 0.92) big = Math.floor(big * W * 0.92 / tw0)
+  const x = W / 2 - tw('CRIMSON DEPTHS', big) / 2
+  for (const [dx, dy] of [[-3, 0], [3, 0], [0, -3], [0, 3]]) text('CRIMSON DEPTHS', x + dx, H * 0.22 + dy, big, [60, 0, 0])
+  text('CRIMSON DEPTHS', x, H * 0.22, big, [Math.trunc(220 * pulse), Math.trunc(30 * pulse), Math.trunc(30 * pulse)])
+  const f = PF(Math.max(20, Math.trunc(H / 26))), fm = PF(Math.max(28, Math.trunc(H / 16)))
+  textCenter('a procedural raycasting shooter - everything you see and hear is generated at runtime', f, [200, 170, 170], H * 0.42, true, full)
+  const touchUi = inputMode === 'touch'
+  if (Math.sin(g.time * 4) > -0.3) textCenter(touchUi ? 'TAP TO DESCEND' : 'CLICK TO DESCEND', fm, [255, 230, 200], H * 0.55, true, full)
+  const lines = touchUi
+    ? ['Left stick move   Drag right side to look   SPRINT toggles run', 'FIRE shoots (drag it to aim too)   WEAPON switches guns',
+      'II pauses   Turn the phone sideways', 'Reach the glowing portal on every floor']
+    : ['WASD move   Mouse look   Shift sprint', 'LMB / Space fire    1-3 or wheel: weapons', 'ESC pause   F11 fullscreen', 'Reach the glowing portal on every floor']
+  const lf = fitPx(lines, f, W * 0.94)                  // one size for the whole block
+  let y = H * 0.68
+  for (const ln of lines) y += Math.max(textCenter(ln, lf, [170, 160, 160], y, true, full), fontH(lf) * 1.2)
+}
+function drawHud(g) {
+  const p = g.player, W = view.w, H = view.h, ox = view.x, oy = view.y
+  const f = PF(Math.max(20, Math.trunc(H / 26))), fm = PF(Math.max(28, Math.trunc(H / 16))), fb = PF(Math.max(40, Math.trunc(H / 7)))
+  const fh = fontH(f)
+  // HUD box inside the view and the safe area
+  const L = hud.l, T = hud.t, R = hud.r, B = hud.b, pad = Math.trunc(H * 0.03)
+  // crosshair
+  const cx = ox + Math.trunc(W / 2), cy = oy + Math.trunc(H / 2), gap = 6 + Math.trunc(p.recoil * 10)
+  ctx.fillStyle = 'rgb(240,240,240)'
+  ctx.fillRect(cx - gap - 8, cy, 9, 2); ctx.fillRect(cx + gap, cy, 9, 2); ctx.fillRect(cx, cy - gap - 8, 2, 9); ctx.fillRect(cx, cy + gap, 2, 9)
+  if (g.hitmarkT > 0) {
+    ctx.strokeStyle = 'rgb(255,60,60)'; ctx.lineWidth = 3; ctx.beginPath()
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ctx.moveTo(cx + sx * 6, cy + sy * 6); ctx.lineTo(cx + sx * 14, cy + sy * 14) }
+    ctx.stroke()
+  }
+  // damage direction (as in the original: 0 rad = to the right of the crosshair)
+  if (g.dmgDir !== null && g.dmgDirT > g.time) {
+    const rel = g.dmgDir - p.angle, a = Math.trunc(200 * (g.dmgDirT - g.time) / 1.2)
+    const ex = cx + Math.cos(rel) * W * 0.18, ey = cy + Math.sin(rel) * H * 0.3
+    ctx.fillStyle = `rgba(255,40,40,${a / 255})`; ctx.beginPath(); ctx.moveTo(ex, ey)
+    ctx.lineTo(ex - Math.cos(rel + 0.5) * 30, ey - Math.sin(rel + 0.5) * 30); ctx.lineTo(ex - Math.cos(rel - 0.5) * 30, ey - Math.sin(rel - 0.5) * 30); ctx.fill()
+  }
+  const kitOn = kit && kit.visible
+  // health (bottom-left)
+  const hp = Math.max(0, p.health), hcol = [Math.trunc(255 * (1 - hp / 100)), Math.trunc(220 * hp / 100), 40]
+  const hs = String(hp), hsw = tw(hs, fb), bw = Math.trunc(W * 0.18), fbh = fontH(fb), hx = L + pad
+  text(hs, hx, B - pad - fbh, fb, hcol)
+  ctx.fillStyle = 'rgb(40,40,40)'; ctx.fillRect(hx + hsw + 14, B - pad - 22, bw, 14)
+  ctx.fillStyle = rgb(hcol); ctx.fillRect(hx + hsw + 14, B - pad - 22, Math.trunc(bw * hp / 100), 14)
+  text('HEALTH', hx + hsw + 14, B - pad - 22 - fh, f, [200, 200, 200])
+  // weapon / ammo (bottom-right; on touch screens it sits above the button cluster)
+  const w = CD.WEAPONS[p.weapon], ammo = w.ammo === null ? 'INF' : String(p.ammo[w.ammo]), asw = tw(ammo, fb)
+  let ar = R - pad, ab = B - pad
+  if (kitOn && touchUI.br && touchUI.br.t < ab && touchUI.br.l < ar) ab = Math.min(ab, touchUI.br.t - 10)
+  text(ammo, ar - asw, ab - fbh, fb, [230, 200, 90])
+  const lab = w.label, s3 = `shells ${p.ammo.shells}   cells ${p.ammo.cells}`
+  text(lab, ar - asw - 14 - tw(lab, f), ab - 22 - fh, f, [220, 220, 220])
+  text(s3, ar - asw - 14 - tw(s3, f), ab - 20, f, [170, 170, 170])
+  // top-right stats (left of the pause button on touch screens)
+  const alive = g.enemies.reduce((n, e) => n + (e.state !== 'dead' ? 1 : 0), 0)
+  let sr = R - pad
+  if (kitOn && touchUI.tr && touchUI.tr.b > T + pad) sr = Math.min(sr, touchUI.tr.l - 10)
+  ;[`LEVEL ${g.levelNum}`, `ENEMIES ${alive} left`, `SCORE ${g.score}`].forEach((ln, i) => text(ln, sr - tw(ln, f), T + pad + i * fh * 1.1, f, [220, 220, 220]))
+  if (OPT.fps) { const s = `${Math.round(g.fps)} fps`; text(s, sr - tw(s, f), T + pad + 3.5 * fh, f, [120, 255, 120]) }
+  drawMinimap(g, L + pad, T + pad, H)
+  // messages
+  let y = oy + H * 0.12
+  for (const [t, tEnd] of g.messages) {
+    const a = Math.min(1.0, (tEnd - g.time) / 0.6)
+    if (a > 0) text(t, ox + W / 2 - tw(t, fm) / 2, y, fm, [255, 240, 200], a)
+    y += fontH(fm) * 1.1
+  }
+}
+function drawMinimap(g, x0, y0, H) {                    // main.py draw_minimap: 25x25 cells around the player, explored cells only
+  const lv = g.level, p = g.player, cs = Math.max(4, Math.trunc(H / 110)), R = 12, n = 25, size = n * cs
+  const cx = Math.trunc(p.x), cy = Math.trunc(p.y), mx0 = cx - R, my0 = cy - R, d = mapImg.data
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const wx = mx0 + i, wy = my0 + j, o = (j * n + i) * 4
+    let c = [0, 0, 0]
+    if (wx >= 0 && wy >= 0 && wx < lv.w && wy < lv.h) {
+      const k = wx * lv.h + wy
+      if (lv.explored[k]) { const v = lv.grid[k]; c = v === CD.DOOR ? [230, 200, 50] : v !== 0 ? [170, 70, 70] : [36, 36, 44] }
+    }
+    d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255
+  }
+  mctx.putImageData(mapImg, 0, 0)
+  ctx.imageSmoothingEnabled = false; ctx.globalAlpha = 200 / 255
+  ctx.drawImage(mapCanvas, x0, y0, size, size); ctx.globalAlpha = 1
+  ctx.strokeStyle = 'rgb(120,110,110)'; ctx.lineWidth = 1; ctx.strokeRect(x0 - 0.5, y0 - 0.5, size + 1, size + 1)
+  const toPx = (wx, wy) => [x0 + (wx - mx0) * cs, y0 + (wy - my0) * cs]
+  ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, size, size); ctx.clip()
+  const dot = (x, y, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(Math.trunc(x), Math.trunc(y), r, 0, TAU); ctx.fill() }
+  for (const e of g.enemies) {
+    if (e.state === 'idle' || e.state === 'dead') continue
+    const ix = Math.trunc(e.x), iy = Math.trunc(e.y)
+    if (lv.inBounds(ix, iy) && lv.explored[ix * lv.h + iy]) { const [px, py] = toPx(e.x, e.y); dot(px, py, Math.max(2, cs >> 1), 'rgb(255,60,60)') }
+  }
+  const [ex, ey] = lv.exit
+  if (lv.explored[Math.trunc(ex) * lv.h + Math.trunc(ey)]) { const [px, py] = toPx(ex, ey); dot(px, py, Math.max(3, Math.trunc(cs * 2 / 3)), 'rgb(120,170,255)') }
+  const [px, py] = toPx(p.x, p.y), a = p.angle
+  ctx.fillStyle = 'rgb(90,255,90)'; ctx.beginPath()
+  ctx.moveTo(px + Math.cos(a) * cs * 1.5, py + Math.sin(a) * cs * 1.5)
+  ctx.lineTo(px + Math.cos(a + 2.5) * cs * 0.9, py + Math.sin(a + 2.5) * cs * 0.9)
+  ctx.lineTo(px + Math.cos(a - 2.5) * cs * 0.9, py + Math.sin(a - 2.5) * cs * 0.9); ctx.fill()
+  ctx.restore()
+}
+function drawLoading(msg) {
+  layout(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cssW, cssH)
+  const px = Math.max(12, PF(Math.max(28, Math.trunc(cssH / 16))))
+  textCenter('CRIMSON DEPTHS', px, [200, 40, 40], cssH * 0.42, true)
+  textCenter(msg, Math.max(12, PF(Math.max(20, Math.trunc(cssH / 26)))), [170, 160, 160], cssH * 0.52, true)
+}
+
+// ------------------------------------------------------------ main --------
+let game = null, last = 0, frames = 0, acc = 0
+const hooks = {
+  play: (n, v, p) => Snd.play(n, v, p), startMusic: v => Snd.startMusic(v), setMusicVolume: v => Snd.setMusicVolume(v),
+  lockMouse: on => lockMouse(on),
+}
+function init() {
+  makeKit()
+  game = new CD.Game({ RH, god: OPT.god, autotest: OPT.autotest }, hooks, {})
+  const origDamage = game.damagePlayer.bind(game)
+  game.damagePlayer = (d, x, y) => { const was = game.state; origDamage(d, x, y); if (was === 'play' && game.state === 'dead') { deadAt = game.time; syncKit() } }
+  const origFinish = game.finishLevel.bind(game)
+  game.finishLevel = () => { origFinish(); syncKit() }
+  window.__cd = { game, kit, snd: Snd, touch, opt: OPT, stats: { fps: 0, ms: 0 }, get view() { return view } }
+  layoutDirty = true
+  synthAudio()
+  last = performance.now()
+  requestAnimationFrame(frame)
+}
+// Slow phone safety net: if a frame's work stays above 22 ms (under ~45 fps) for a few seconds of play,
+// render fewer lines (225 -> 180 -> 150).  Touch play only; never raised again during the session.
+const perf = { samples: [], t: 0 }
+function adaptResolution(g, ms, now) {
+  if (inputMode !== 'touch' || g.state !== 'play' || g.paused || RH <= 150) { perf.samples.length = 0; perf.t = now; return }
+  perf.samples.push(ms)
+  if (now - perf.t < 3000) return
+  const s = perf.samples.slice().sort((a, b) => a - b), med = s[s.length >> 1]
+  perf.samples.length = 0; perf.t = now
+  if (s.length >= 30 && med > 22) { RH = RH > 180 ? 180 : 150; layoutDirty = true; window.__cd.stats.rh = RH }
+}
+let prevState = null
+function frame(now) {
+  requestAnimationFrame(frame)
+  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now
+  const g = game
+  if (g.state !== prevState) { prevState = g.state; syncKit() }
+  if (layoutDirty) layout()
+  const t0 = performance.now()
+  if (g.state === 'play' && !g.paused) gatherInput(g)
+  else { g.input.mx = g.input.my = 0; touch.dx = touch.dy = 0 }
+  if (!window.__cd.freeze) g.update(dt)                 // (freeze: test hook for deterministic screenshots)
+  g.drawWorld()
+  present(g)
+  const ms = performance.now() - t0
+  window.__cd.stats.ms = window.__cd.stats.ms * 0.9 + ms * 0.1
+  adaptResolution(g, ms, now)
+  frames++; acc += dt
+  if (acc >= 0.5) { g.fps = frames / acc; window.__cd.stats.fps = g.fps; frames = 0; acc = 0 }
+  if (OPT.autotest && g.time >= OPT.autotest && !window.__cd.done) {
+    window.__cd.done = `autotest done: ${g.time.toFixed(1)}s, fps ${g.fps.toFixed(1)}, kills ${g.kills}, health ${g.player.health}, state ${g.state}`
+    console.log(window.__cd.done)
+  }
+}
+drawLoading('generating textures, sprites and the first floor...')
+requestAnimationFrame(() => setTimeout(init, 0))
+})()
+</script>
+</body>
+</html>

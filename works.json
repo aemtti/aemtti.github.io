@@ -627,6 +627,18 @@
      "thumb": "thumbs/small-projects--claude-self-portrait.jpg"
     }
    ]
+  },
+  {
+   "slug": "crimson-depths",
+   "title": "크림슨 뎁스",
+   "en": "Crimson Depths",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "텍스처·소리·던전 모두 코드로 생성되는 레이캐스팅 FPS (파이썬 원작의 웹판)",
+   "mobile": "왼쪽 스틱 이동 · 오른쪽 드래그 시점 · FIRE·WEAPON·SPRINT 버튼",
+   "desktop": "클릭해 마우스 고정 · WASD · 마우스 시점 · 좌클릭 발사 · 1-3 무기",
+   "url": "play/crimson-depths/",
+   "thumb": "thumbs/crimson-depths.jpg"
   }
  ]
 }
