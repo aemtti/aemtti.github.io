@@ -52,6 +52,78 @@
    "desktop": "클릭해서 재생 · 장 버튼으로 이동",
    "url": "play/showreel/",
    "thumb": "thumbs/showreel.jpg"
+  },
+  {
+   "slug": "lumen-observatory",
+   "title": "LUMEN · 빛의 관측소",
+   "en": "Lumen Observatory",
+   "kind": "toy",
+   "orientation": "any",
+   "needs": "webgpu",
+   "desc": "유리를 지나는 빛을 여섯 가지 렌더링 방식으로 추적하는 WebGPU 광학 실험실",
+   "mobile": "한 손가락 드래그로 시점 회전 · 두 손가락으로 확대 · 버튼으로 모드 전환",
+   "desktop": "드래그 회전 · 휠 확대 · Space 일시정지 · L 조명 도구",
+   "url": "play/lumen-observatory/",
+   "thumb": "thumbs/lumen-observatory.jpg"
+  },
+  {
+   "slug": "chatgpt-playground",
+   "title": "작은 정원",
+   "en": "ChatGPT Playground",
+   "kind": "collection",
+   "desc": "ChatGPT와 함께 만든 정원 연작 — 별빛을 심는 정원, 오디오 엽서, 가상의 도감과 현장 기록",
+   "url": "play/chatgpt-playground/",
+   "thumb": "thumbs/chatgpt-playground.jpg",
+   "items": [
+    {
+     "slug": "chatgpt-playground/quiet-garden",
+     "title": "여백의 정원",
+     "en": "Garden of Blank Space",
+     "kind": "toy",
+     "orientation": "any",
+     "desc": "숨을 고르고, 빈 곳을 눌러 별빛을 심는 작은 인터랙티브 정원",
+     "mobile": "빈 곳을 눌러 별빛 심기 · 구슬을 눌러 호흡 안내",
+     "desktop": "빈 곳 클릭으로 별빛 심기 · 구슬 클릭으로 호흡 안내",
+     "url": "play/chatgpt-playground/quiet-garden/",
+     "thumb": "thumbs/chatgpt-playground--quiet-garden.jpg"
+    },
+    {
+     "slug": "chatgpt-playground/glass-garden-postcard",
+     "title": "유리 정원의 오디오 엽서",
+     "en": "Glass Garden Audio Postcard",
+     "kind": "music",
+     "orientation": "any",
+     "desc": "유리 정원의 왈츠와 반응형 파형을 담은 41초짜리 오디오비주얼 엽서",
+     "mobile": "버튼을 눌러 재생 · 막대를 눌러 이동",
+     "desktop": "클릭 또는 Space로 재생 · 막대로 이동",
+     "url": "play/chatgpt-playground/glass-garden-postcard/",
+     "thumb": "thumbs/chatgpt-playground--glass-garden-postcard.jpg"
+    },
+    {
+     "slug": "chatgpt-playground/impossible-objects",
+     "title": "존재하지 않는 물건 도감",
+     "en": "Catalogue of Objects That Don't Exist",
+     "kind": "art",
+     "orientation": "any",
+     "desc": "사라진 적이 없어서 발견할 수 없었던 일곱 물건의 짧은 기록",
+     "mobile": "위로 넘겨 읽기 · 번호를 눌러 이동",
+     "desktop": "스크롤해서 읽기 · 번호 클릭으로 이동",
+     "url": "play/chatgpt-playground/impossible-objects/",
+     "thumb": "thumbs/chatgpt-playground--impossible-objects.jpg"
+    },
+    {
+     "slug": "chatgpt-playground/garden-anthropology",
+     "title": "작은 정원의 인류학",
+     "en": "An Anthropology of the Small Garden",
+     "kind": "art",
+     "orientation": "any",
+     "desc": "AI에게 컴퓨터 속 방과 시간을 빌려준 한 세션을 돌아보는 짧은 현장 기록",
+     "mobile": "위로 넘겨 읽기 · 목차를 눌러 이동",
+     "desktop": "스크롤해서 읽기 · 목차 클릭으로 이동",
+     "url": "play/chatgpt-playground/garden-anthropology/",
+     "thumb": "thumbs/chatgpt-playground--garden-anthropology.jpg"
+    }
+   ]
   }
  ]
 }

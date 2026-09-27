@@ -1,0 +1,9 @@
+1:"$Sreact.fragment"
+2:I[10227,["/play/chatgpt-playground/quiet-garden/_next/static/chunks/0eog50~01kpo8.js"],"ClientPageRoot"]
+3:I[31713,["/play/chatgpt-playground/quiet-garden/_next/static/chunks/0eog50~01kpo8.js","/play/chatgpt-playground/quiet-garden/_next/static/chunks/11f4.ysrc49u3.js"],"default"]
+6:I[6391,["/play/chatgpt-playground/quiet-garden/_next/static/chunks/0eog50~01kpo8.js"],"OutletBoundary"]
+7:"$Sreact.suspense"
+0:{"rsc":["$","$1","c",{"children":[["$","$L2",null,{"Component":"$3","serverProvidedParams":{"searchParams":{},"params":{},"promises":["$@4","$@5"]}}],[["$","script","script-0",{"src":"/play/chatgpt-playground/quiet-garden/_next/static/chunks/11f4.ysrc49u3.js","async":true}]],["$","$L6",null,{"children":["$","$7",null,{"name":"Next.MetadataOutlet","children":"$@8"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"wHNEc21kQsi1xvtF2jzOH"}
+4:{}
+5:"$0:rsc:props:children:0:props:serverProvidedParams:params"
+8:null
