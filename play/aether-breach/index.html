@@ -1,0 +1,2107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#02080f">
+<title>AETHER // BREACH</title>
+<style>
+html,body{margin:0;height:100%;background:#02080f;overflow:hidden;overscroll-behavior:none;touch-action:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#game{position:absolute;left:0;top:0;display:block;background:#02080f;outline:none;touch-action:none}
+</style>
+</head>
+<body>
+<canvas id="game" tabindex="0" aria-label="AETHER // BREACH"></canvas>
+<script id="core">
+/* =============================================================================================
+ * AETHER // BREACH — JavaScript web port of the Python / pygame-ce / NumPy arena FPS (../main.py).
+ * core: DOM-free. Python-compatible random, a pygame-ce compatible rasterizer for the procedural
+ * art, the arena (world.py), the NumPy ray caster (renderer.py) and the game rules (main.py).
+ * The platform script below adds canvas output, UI (ui.py), WebAudio (audio.py) and input.
+ * ============================================================================================= */
+'use strict'
+const TAU = Math.PI * 2, fr = Math.fround
+// Python float/int modulo (result takes the sign of the divisor)
+function pmod(a, b) { let m = a % b; if (m !== 0 && ((b < 0) !== (m < 0))) m += b; return m === 0 ? 0 : m }
+// math.hypot as CPython 3.10 computes it (so simulations stay in lock-step with the original)
+const _f64 = new Float64Array(1), _u32 = new Uint32Array(_f64.buffer), T27 = 134217729
+function hypot(a, b) {
+  a = Math.abs(a); b = Math.abs(b)
+  const max = a > b ? a : b
+  if (max === Infinity) return Infinity
+  if (a !== a || b !== b) return NaN
+  if (max === 0) return 0
+  _f64[0] = max; const e = ((_u32[1] >>> 20) & 0x7ff) - 1022, scale = Math.pow(2, -e)
+  let csum = 1, frac = 0, x, t, hi, lo, old
+  for (let k = 0; k < 2; k++) {
+    x = (k ? b : a) * scale; t = x * T27; hi = t - (t - x); lo = x - hi
+    x = hi * hi; old = csum; csum += x; frac += (old - csum) + x
+    x = 2 * hi * lo; old = csum; csum += x; frac += (old - csum) + x
+    x = lo * lo; old = csum; csum += x; frac += (old - csum) + x
+  }
+  const h = Math.sqrt(csum - 1 + frac)
+  x = h; t = x * T27; hi = t - (t - x); lo = x - hi
+  x = -hi * hi; old = csum; csum += x; frac += (old - csum) + x
+  x = -2 * hi * lo; old = csum; csum += x; frac += (old - csum) + x
+  x = -lo * lo; old = csum; csum += x; frac += (old - csum) + x
+  x = csum - 1 + frac
+  return (h + x / (2 * h)) / scale
+}
+
+// ---------- random.Random (MT19937 with CPython seeding, random(), randrange(), uniform()) ----------
+class PyRandom {
+  constructor(seed) { this.mt = new Uint32Array(624); this.mti = 624; this.seed(seed === undefined ? Date.now() : seed) }
+  seed(n) {
+    n = Math.abs(Math.trunc(n))
+    const key = [], mt = this.mt, N = 624
+    do { key.push(n % 4294967296); n = Math.floor(n / 4294967296) } while (n > 0)
+    mt[0] = 19650218
+    for (let i = 1; i < N; i++) { const p = mt[i - 1] ^ (mt[i - 1] >>> 30); mt[i] = (Math.imul(1812433253, p) + i) >>> 0 }
+    let i = 1, j = 0
+    for (let k = Math.max(N, key.length); k; k--) {
+      const p = mt[i - 1] ^ (mt[i - 1] >>> 30)
+      mt[i] = (((mt[i] ^ Math.imul(p, 1664525)) >>> 0) + key[j] + j) >>> 0
+      i++; j++
+      if (i >= N) { mt[0] = mt[N - 1]; i = 1 }
+      if (j >= key.length) j = 0
+    }
+    for (let k = N - 1; k; k--) {
+      const p = mt[i - 1] ^ (mt[i - 1] >>> 30)
+      mt[i] = (((mt[i] ^ Math.imul(p, 1566083941)) >>> 0) - i) >>> 0
+      i++
+      if (i >= N) { mt[0] = mt[N - 1]; i = 1 }
+    }
+    mt[0] = 0x80000000; this.mti = N
+  }
+  u32() {
+    const mt = this.mt
+    if (this.mti >= 624) {
+      let kk = 0, y
+      for (; kk < 227; kk++) { y = (mt[kk] & 0x80000000) | (mt[kk + 1] & 0x7fffffff); mt[kk] = mt[kk + 397] ^ (y >>> 1) ^ ((y & 1) ? 0x9908b0df : 0) }
+      for (; kk < 623; kk++) { y = (mt[kk] & 0x80000000) | (mt[kk + 1] & 0x7fffffff); mt[kk] = mt[kk - 227] ^ (y >>> 1) ^ ((y & 1) ? 0x9908b0df : 0) }
+      y = (mt[623] & 0x80000000) | (mt[0] & 0x7fffffff); mt[623] = mt[396] ^ (y >>> 1) ^ ((y & 1) ? 0x9908b0df : 0)
+      this.mti = 0
+    }
+    let y = mt[this.mti++]
+    y ^= y >>> 11; y ^= (y << 7) & 0x9d2c5680; y ^= (y << 15) & 0xefc60000; y ^= y >>> 18
+    return y >>> 0
+  }
+  random() { const a = this.u32() >>> 5, b = this.u32() >>> 6; return (a * 67108864 + b) * (1 / 9007199254740992) }
+  randbelow(n) { if (!n) return 0; const k = 32 - Math.clz32(n); let r = this.u32() >>> (32 - k); while (r >= n) r = this.u32() >>> (32 - k); return r }
+  randrange(a, b) { if (b === undefined) { b = a; a = 0 } return a + this.randbelow(b - a) }
+  uniform(a, b) { return a + (b - a) * this.random() }
+}
+
+// ---------- pygame-ce compatible software raster (pygame.draw.* rules, SRCALPHA blits) ----------
+const pg = (() => {
+  class Surface {
+    constructor(w, h, alpha = false) {
+      this.w = w; this.h = h; this.alpha = alpha
+      this.d = new Uint8ClampedArray(w * h * 4); this.u = new Uint32Array(this.d.buffer)
+      if (!alpha) this.u.fill(0xff000000)
+    }
+  }
+  const pack = (s, c) => (((s.alpha ? (c.length > 3 ? c[3] : 255) : 255) << 24) | (c[2] << 16) | (c[1] << 8) | c[0]) >>> 0
+  function hl(s, x1, x2, y, v) {
+    if (y < 0 || y >= s.h) return
+    if (x1 > x2) { const t = x1; x1 = x2; x2 = t }
+    if (x1 < 0) x1 = 0
+    if (x2 >= s.w) x2 = s.w - 1
+    if (x1 <= x2) s.u.fill(v, y * s.w + x1, y * s.w + x2 + 1)
+  }
+  function vl(s, x, y1, y2, v) {
+    if (x < 0 || x >= s.w) return
+    if (y1 > y2) { const t = y1; y1 = y2; y2 = t }
+    if (y1 < 0) y1 = 0
+    if (y2 >= s.h) y2 = s.h - 1
+    for (let y = y1; y <= y2; y++) s.u[y * s.w + x] = v
+  }
+  function pt(s, x, y, v) { if (x >= 0 && y >= 0 && x < s.w && y < s.h) s.u[y * s.w + x] = v }
+  function box(s, v, x, y, w, h) {
+    const x0 = Math.max(0, x), x1 = Math.min(s.w, x + w), y0 = Math.max(0, y), y1 = Math.min(s.h, y + h)
+    if (x0 < x1) for (let yy = y0; yy < y1; yy++) s.u.fill(v, yy * s.w + x0, yy * s.w + x1)
+  }
+  function fill(s, c) { s.u.fill(pack(s, c)) }
+  function rect(s, c, r, width = 0) {
+    const v = pack(s, c), [x, y, w, h] = r.map(Math.trunc)
+    if (width < 0) return
+    if (width === 0 || width > w / 2 || width > h / 2) return box(s, v, x, y, w, h)
+    box(s, v, x, y, w, width); box(s, v, x, y + h - width, w, width)
+    box(s, v, x, y, width, h); box(s, v, x + w - width, y, width, h)
+  }
+  function bresenham(x1, y1, x2, y2, plot) {
+    const dx = Math.abs(x2 - x1), sx = x1 < x2 ? 1 : -1, dy = Math.abs(y2 - y1), sy = y1 < y2 ? 1 : -1
+    let err = ((dx > dy ? dx : -dy) / 2) | 0
+    while (x1 !== x2 || y1 !== y2) {
+      plot(x1, y1)
+      const e2 = err
+      if (e2 > -dx) { err -= dy; x1 += sx }
+      if (e2 < dy) { err += dx; y1 += sy }
+    }
+    plot(x2, y2)
+  }
+  function seg(s, v, x1, y1, x2, y2, width) {
+    if (width < 1) return
+    if (width === 1) {
+      if (x1 === x2 && y1 === y2) return pt(s, x1, y1, v)
+      if (y1 === y2) return hl(s, x1, x2, y1, v)
+      if (x1 === x2) return vl(s, x1, y1, y2, v)
+      return bresenham(x1, y1, x2, y2, (x, y) => pt(s, x, y, v))
+    }
+    // thick lines: every Bresenham point grows into an axis-aligned span of `width` pixels
+    const half = width >> 1, extra = 1 - (width % 2)
+    if (x1 === x2 && y1 === y2) return hl(s, x1 - half + extra, x1 + half, y1, v)
+    if (Math.abs(x1 - x2) <= Math.abs(y1 - y2)) bresenham(x1, y1, x2, y2, (x, y) => hl(s, x - half + extra, x + half, y, v))
+    else bresenham(x1, y1, x2, y2, (x, y) => vl(s, x, y - half + extra, y + half, v))
+  }
+  function line(s, c, a, b, width = 1) { seg(s, pack(s, c), Math.trunc(a[0]), Math.trunc(a[1]), Math.trunc(b[0]), Math.trunc(b[1]), width) }
+  function lines(s, c, closed, pts, width = 1) {
+    const v = pack(s, c), P = pts.map(p => [Math.trunc(p[0]), Math.trunc(p[1])])
+    for (let i = 1; i < P.length; i++) seg(s, v, P[i - 1][0], P[i - 1][1], P[i][0], P[i][1], width)
+    if (closed && P.length > 2) seg(s, v, P[P.length - 1][0], P[P.length - 1][1], P[0][0], P[0][1], width)
+  }
+  function filltri(s, v, pts) {                                // pygame-ce draw_filltri (3-point polygons)
+    let [[p0x, p0y], [p1x, p1y], [p2x, p2y]] = pts.map(p => [Math.trunc(p[0]), Math.trunc(p[1])])
+    if (p1y < p0y) [p1x, p1y, p0x, p0y] = [p0x, p0y, p1x, p1y]
+    if (p2y < p1y) { [p1x, p1y, p2x, p2y] = [p2x, p2y, p1x, p1y]; if (p1y < p0y) [p1x, p1y, p0x, p0y] = [p0x, p0y, p1x, p1y] }
+    if (p0y === p1y && p1y === p2y && p0x === p1x && p1x !== p2x) [p1x, p1y, p2x, p2y] = [p2x, p2y, p1x, p1y]
+    const d1 = fr((p2x - p0x) / ((p2y - p0y) + 1e-17)), d2 = fr((p1x - p0x) / ((p1y - p0y) + 1e-17)), d3 = fr((p2x - p1x) / ((p2y - p1y) + 1e-17))
+    for (let y = p0y; y <= p2y; y++) {
+      const x1 = p0x + Math.trunc(fr((y - p0y) * d1))
+      const x2 = y < p1y ? p0x + Math.trunc(fr((y - p0y) * d2)) : p1x + Math.trunc(fr((y - p1y) * d3))
+      hl(s, x1, x2, y, v)
+    }
+  }
+  function polygon(s, c, pts, width = 0) {
+    if (width) return lines(s, c, true, pts, width)
+    if (pts.length === 3) return filltri(s, pack(s, c), pts)
+    const v = pack(s, c), xs = pts.map(p => Math.trunc(p[0])), ys = pts.map(p => Math.trunc(p[1])), n = xs.length
+    let miny = ys[0], maxy = ys[0]
+    for (let i = 1; i < n; i++) { if (ys[i] < miny) miny = ys[i]; if (ys[i] > maxy) maxy = ys[i] }
+    if (miny === maxy) return hl(s, Math.min(...xs), Math.max(...xs), miny, v)
+    const xi = []
+    for (let y = miny; y <= maxy; y++) {
+      xi.length = 0
+      for (let i = 0; i < n; i++) {
+        const ip = i ? i - 1 : n - 1
+        let y1 = ys[ip], y2 = ys[i], x1, x2
+        if (y1 < y2) { x1 = xs[ip]; x2 = xs[i] }
+        else if (y1 > y2) { y2 = ys[ip]; y1 = ys[i]; x2 = xs[ip]; x1 = xs[i] }
+        else continue
+        if ((y >= y1 && y < y2) || (y === maxy && y2 === maxy)) {
+          const t = fr((y - y1) * (x2 - x1) / (y2 - y1))
+          xi.push((xi.length % 2 === 0 ? Math.floor(t) : Math.ceil(t)) + x1)
+        }
+      }
+      xi.sort((a, b) => a - b)
+      for (let i = 0; i + 1 < xi.length; i += 2) hl(s, xi[i], xi[i + 1], y, v)
+    }
+    for (let i = 0; i < n; i++) {
+      const ip = i ? i - 1 : n - 1, y = ys[i]
+      if (miny < y && ys[ip] === y && y < maxy) hl(s, xs[i], xs[ip], y, v)
+    }
+  }
+  function discSpans(x0, y0, r, span) {                   // pygame-ce draw_circle_filled (diameter 2r)
+    let f = 1 - r, ddx = 0, ddy = -2 * r, x = 0, y = r
+    while (x < y) {
+      if (f >= 0) { y--; ddy += 2; f += ddy }
+      x++; ddx += 2; f += ddx + 1
+      if (f >= 0) { span(x0 - x, x0 + x - 1, y0 + y - 1); span(x0 - x, x0 + x - 1, y0 - y) }
+      span(x0 - y, x0 + y - 1, y0 + x - 1); span(x0 - y, x0 + y - 1, y0 - x)
+    }
+  }
+  function circle(s, c, center, radius, width = 0) {
+    const v = pack(s, c), x0 = Math.trunc(center[0]), y0 = Math.trunc(center[1])
+    radius = Math.trunc(radius)
+    if (radius < 1 || width < 0) return
+    if (width === 0 || width >= radius) return discSpans(x0, y0, radius, (a, b, y) => hl(s, a, b, y, v))
+    if (width === 1) {                                       // draw_circle_bresenham_thin
+      let f = 1 - radius, ddx = 0, ddy = -2 * radius, x = 0, y = radius
+      while (x < y) {
+        if (f >= 0) { y--; ddy += 2; f += ddy }
+        x++; ddx += 2; f += ddx + 1
+        pt(s, x0 + x - 1, y0 + y - 1, v); pt(s, x0 - x, y0 + y - 1, v); pt(s, x0 + x - 1, y0 - y, v); pt(s, x0 - x, y0 - y, v)
+        pt(s, x0 + y - 1, y0 + x - 1, v); pt(s, x0 + y - 1, y0 - x, v); pt(s, x0 - y, y0 + x - 1, v); pt(s, x0 - y, y0 - x, v)
+      }
+      return
+    }
+    // thick ring: the ellipse ring on the circle's square (pygame-ce's own ring differs by a diagonal pixel at most)
+    ellipseRing(s, v, x0 - radius, y0 - radius, radius * 2, radius * 2, width - 1)
+  }
+  function ellipse(s, c, r, width = 0) {
+    const v = pack(s, c)
+    let [x0, y0, w, h] = r.map(Math.trunc)
+    if (width < 0) return
+    if (width === 0 || width > w / 2 || width > h / 2) {    // draw_ellipse_filled
+      if (w === 1) return seg(s, v, x0, y0, x0, y0 + h - 1, 1)
+      if (h === 1) return hl(s, x0, x0 + w - 1, y0, v)
+      x0 += w >> 1; y0 += h >> 1
+      const xo = (w + 1) % 2, yo = (h + 1) % 2
+      w >>= 1; h >>= 1
+      let x = 0, y = h, d1 = (h * h) - (w * w * h) + (0.25 * w * w), dx = 2 * h * h * x, dy = 2 * w * w * y
+      while (dx < dy) {
+        hl(s, x0 - x, x0 + x - xo, y0 - y, v); hl(s, x0 - x, x0 + x - xo, y0 + y - yo, v)
+        if (d1 < 0) { x++; dx += 2 * h * h; d1 += dx + h * h }
+        else { x++; y--; dx += 2 * h * h; dy -= 2 * w * w; d1 += dx - dy + h * h }
+      }
+      let d2 = (h * h) * ((x + 0.5) * (x + 0.5)) + (w * w) * ((y - 1) * (y - 1)) - (w * w * h * h)
+      while (y >= 0) {
+        hl(s, x0 - x, x0 + x - xo, y0 - y, v); hl(s, x0 - x, x0 + x - xo, y0 + y - yo, v)
+        if (d2 > 0) { y--; dy -= 2 * w * w; d2 += w * w - dy }
+        else { y--; x++; dx += 2 * h * h; dy -= 2 * w * w; d2 += dx - dy + w * w }
+      }
+      return
+    }
+    ellipseRing(s, v, x0, y0, w, h, width - 1)
+  }
+  function ellipseRing(s, v, x0, y0, w, h, t) {                // pygame-ce draw_ellipse_thickness
+    x0 += w >> 1; y0 += h >> 1
+    const xo = (w + 1) % 2, yo = (h + 1) % 2
+    w >>= 1; h >>= 1
+    const wi = w - t, hi = h - t
+    let line = true, x = 0, y = h, xi = 0, yi = hi
+    let d1 = (h * h) - (w * w * h) + (0.25 * w * w), d1i = (hi * hi) - (wi * wi * hi) + (0.25 * wi * wi), d2i = 0
+    let dx = 0, dy = 2 * w * w * y, dxi = 0, dyi = 2 * wi * wi * yi
+    const draw = () => {
+      if (line) { hl(s, x0 - x, x0 + x - xo, y0 - y, v); hl(s, x0 - x, x0 + x - xo, y0 + y - yo, v) }
+      else {
+        hl(s, x0 - x, x0 - xi, y0 - y, v); hl(s, x0 - x, x0 - xi, y0 + y - yo, v)
+        hl(s, x0 + x - xo, x0 + xi - xo, y0 - y, v); hl(s, x0 + x - xo, x0 + xi - xo, y0 + y - yo, v)
+      }
+    }
+    const stepInner = () => {
+      if (dxi < dyi) {
+        while (d1i < 0) { xi++; dxi += 2 * hi * hi; d1i += dxi + hi * hi }
+        xi++; yi--; dxi += 2 * hi * hi; dyi -= 2 * wi * wi; d1i += dxi - dyi + hi * hi
+        return true
+      }
+      return false
+    }
+    while (dx < dy) {
+      draw()
+      if (d1 < 0) { x++; dx += 2 * h * h; d1 += dx + h * h }
+      else {
+        x++; y--; dx += 2 * h * h; dy -= 2 * w * w; d1 += dx - dy + h * h
+        if (line && y < h - t) line = false
+        if (!line) stepInner()
+      }
+    }
+    let d2 = (h * h) * ((x + 0.5) * (x + 0.5)) + (w * w) * ((y - 1) * (y - 1)) - (w * w * h * h)
+    while (y >= 0) {
+      draw()
+      if (d2 > 0) { y--; dy -= 2 * w * w; d2 += w * w - dy }
+      else { y--; x++; dx += 2 * h * h; dy -= 2 * w * w; d2 += dx - dy + w * w }
+      if (line && y < h - t) line = false
+      if (!line && !stepInner() && yi >= 0) {
+        if (d2i === 0) d2i = (hi * hi) * ((xi + 0.5) * (xi + 0.5)) + (wi * wi) * ((yi - 1) * (yi - 1)) - (wi * wi * hi * hi)
+        if (d2i > 0) { yi--; dyi -= 2 * wi * wi; d2i += wi * wi - dyi }
+        else { yi--; xi++; dxi += 2 * hi * hi; dyi -= 2 * wi * wi; d2i += dxi - dyi + wi * wi }
+      }
+    }
+  }
+  function arc(s, c, r, a0, a1, width = 1) {                   // angle-masked elliptic ring (close fit of pygame-ce's arc)
+    const v = pack(s, c), [x, y, w, h] = r.map(Math.trunc)
+    width = Math.min(width, Math.min(w, h) >> 1)
+    const cx = x + (w >> 1), cy = y + (h >> 1), r1 = w >> 1, r2 = h >> 1, i1 = r1 - width - 1, i2 = r2 - width - 0.5
+    for (let py = y; py <= y + h; py++) for (let px = x; px <= x + w; px++) {
+      const dx = px - cx, dy = py - cy
+      if (dx * dx / (r1 * r1) + dy * dy / (r2 * r2) > 1) continue
+      if (i1 > 0 && i2 > 0 && dx * dx / (i1 * i1) + dy * dy / (i2 * i2) <= 1) continue
+      let a = Math.atan2(-dy, dx)
+      while (a < a0) a += TAU
+      if (a <= a1) pt(s, px, py, v)
+    }
+  }
+  // Surface.blit for a per-pixel-alpha source (pygame ALPHA_BLEND: copies onto fully transparent pixels)
+  function blit(dst, src, x, y) {
+    x = Math.trunc(x); y = Math.trunc(y)
+    const x0 = Math.max(0, x), y0 = Math.max(0, y), x1 = Math.min(dst.w, x + src.w), y1 = Math.min(dst.h, y + src.h)
+    const du = dst.u, su = src.u
+    for (let yy = y0; yy < y1; yy++) {
+      let di = yy * dst.w + x0, si = (yy - y) * src.w + (x0 - x)
+      for (let xx = x0; xx < x1; xx++, di++, si++) {
+        const s = su[si], sa = s >>> 24, d = du[di]
+        let da = dst.alpha ? d >>> 24 : 255
+        if (dst.alpha && !da) { du[di] = s; continue }
+        if (!sa) continue
+        const sr = s & 255, sg = (s >>> 8) & 255, sb = (s >>> 16) & 255
+        let dr = d & 255, dg = (d >>> 8) & 255, db = (d >>> 16) & 255
+        dr = (((sr - dr) * sa + sr) >> 8) + dr; dg = (((sg - dg) * sa + sg) >> 8) + dg; db = (((sb - db) * sa + sb) >> 8) + db
+        if (dst.alpha) da = sa + da - ((sa * da / 255) | 0)
+        du[di] = ((da << 24) | (db << 16) | (dg << 8) | dr) >>> 0
+      }
+    }
+  }
+  function addFill(s, c) {                                       // fill(..., special_flags=BLEND_RGBA_ADD)
+    const d = s.d
+    for (let i = 0; i < d.length; i += 4) { d[i] += c[0]; d[i + 1] += c[1]; d[i + 2] += c[2]; d[i + 3] += c[3] || 0 }
+  }
+  return { Surface, pack, fill, rect, line, lines, polygon, circle, ellipse, arc, blit, addFill, discSpans, hl }
+})()
+
+// ---------- world.py ----------
+const SIZE = 32, SPAWN = [16.0, 28.2], EXIT = [16.0, 3.4]
+const ENEMY_SPAWNS = [[8.5, 13.5], [23.5, 13.5], [12.5, 17.5], [20.5, 17.5], [16.0, 11.5], [7.5, 7.5], [24.5, 7.5],
+  [3.5, 18.5], [28.5, 18.5], [12.5, 23.5], [20.5, 23.5]]
+const ARENA = (() => {
+  const g = Array.from({ length: SIZE }, () => new Array(SIZE).fill(0)), inr = (v, a, b) => v >= a && v < b
+  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++)
+    if (x < 2 || y < 2 || x >= SIZE - 2 || y >= SIZE - 2) g[y][x] = (x + y) % 5 === 0 ? 2 : 1
+  for (let y = 5; y < 27; y++) if (!inr(y, 11, 15) && !inr(y, 21, 25)) g[y][5] = g[y][26] = 1
+  for (let x = 5; x < 27; x++) if (!inr(x, 14, 18)) { g[5][x] = x % 3 === 0 ? 2 : 1; g[26][x] = x === 13 || x === 18 ? 2 : 1 }
+  for (const [x, y] of [[9, 10], [21, 10], [9, 20], [21, 20]]) for (let ox = 0; ox < 2; ox++) for (let oy = 0; oy < 2; oy++) g[y + oy][x + ox] = 3
+  for (const x of [2, 29]) for (const y of [7, 8, 16, 17, 25]) g[y][x] = 2
+  return g
+})()
+const GRID = Int32Array.from(ARENA.flat())
+function solid(x, y) { const ix = Math.floor(x), iy = Math.floor(y); return ix < 0 || iy < 0 || ix >= SIZE || iy >= SIZE || GRID[iy * SIZE + ix] !== 0 }
+function canStand(x, y, r = 0.2) { return !(solid(x - r, y - r) || solid(x + r, y - r) || solid(x - r, y + r) || solid(x + r, y + r)) }
+function move(e, dx, dy, r = 0.2) {                      // substeps keep dash collision reliable on slow frames
+  const steps = Math.max(1, Math.trunc(Math.max(Math.abs(dx), Math.abs(dy)) / 0.12) + 1)
+  for (let i = 0; i < steps; i++) {
+    if (canStand(e.x + dx / steps, e.y, r)) e.x += dx / steps
+    if (canStand(e.x, e.y + dy / steps, r)) e.y += dy / steps
+  }
+}
+function visible(ax, ay, bx, by) {
+  const steps = Math.max(1, Math.trunc(hypot(bx - ax, by - ay) * 12))
+  for (let i = 1; i <= steps; i++) if (solid(ax + (bx - ax) * i / steps, ay + (by - ay) * i / steps)) return false
+  return true
+}
+function route(ax, ay, bx, by) {                           // four-way A*, heap ordered like Python's (priority, (x, y)) tuples
+  const sx = Math.trunc(ax), sy = Math.trunc(ay), gx = Math.trunc(bx), gy = Math.trunc(by)
+  if (sx === gx && sy === gy) return [[bx, by]]
+  const key = (x, y) => x * 4096 + y, less = (a, b) => a[0] !== b[0] ? a[0] < b[0] : a[1] !== b[1] ? a[1] < b[1] : a[2] < b[2]
+  const heap = [[0, sx, sy]], costs = new Map([[key(sx, sy), 0]]), prev = new Map()
+  const push = n => { heap.push(n); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (!less(heap[i], heap[p])) break; [heap[i], heap[p]] = [heap[p], heap[i]]; i = p } }
+  const pop = () => {
+    const top = heap[0], last = heap.pop()
+    if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && less(heap[l], heap[m])) m = l; if (r < heap.length && less(heap[r], heap[m])) m = r; if (m === i) break; [heap[i], heap[m]] = [heap[m], heap[i]]; i = m } }
+    return top
+  }
+  while (heap.length) {
+    const [, cx, cy] = pop()
+    if (cx === gx && cy === gy) {
+      const path = []; let k = key(cx, cy), x = cx, y = cy
+      while (!(x === sx && y === sy)) { path.push([x + 0.5, y + 0.5]); const p = prev.get(k); x = p[0]; y = p[1]; k = key(x, y) }
+      return path.reverse()
+    }
+    for (const [ox, oy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const nx = cx + ox, ny = cy + oy
+      if (solid(nx, ny)) continue
+      const cost = costs.get(key(cx, cy)) + 1, nk = key(nx, ny)
+      if (cost < (costs.has(nk) ? costs.get(nk) : 99999)) {
+        costs.set(nk, cost); prev.set(nk, [cx, cy])
+        push([cost + Math.abs(nx - gx) + Math.abs(ny - gy), nx, ny])
+      }
+    }
+  }
+  return []
+}
+class Player {
+  constructor(x = SPAWN[0], y = SPAWN[1]) {
+    this.x = x; this.y = y; this.angle = -Math.PI / 2; this.pitch = 0; this.health = 100; this.shield = 75
+    this.hurt_time = -99; this.dash_cooldown = 0; this.dash_time = 0; this.dash_vector = [0, 0]
+  }
+}
+const MAX_HEALTH = { drone: 72, stalker: 110, guardian: 1200 }, SPEED = { drone: 1.0, stalker: 1.65, guardian: 0.5 }
+class Enemy {
+  constructor(x, y, kind = 'drone', o = {}) {
+    this.x = x; this.y = y; this.kind = kind; this.health = o.health ?? 72; this.cooldown = o.cooldown ?? 1.5
+    this.flash = 0; this.age = 0; this.route_timer = 0; this.path = []; this.seed = o.seed ?? 0
+  }
+  get max_health() { return MAX_HEALTH[this.kind] }
+  get speed() { return SPEED[this.kind] }
+}
+class Projectile { constructor(x, y, vx, vy, damage = 14, life = 5) { Object.assign(this, { x, y, vx, vy, damage, life, kind: 'bolt' }) } }
+class Particle { constructor(x, y, z, vx, vy, vz, life, color, size = 0.035, total = 1) { Object.assign(this, { x, y, z, vx, vy, vz, life, color, size, total }) } }
+class Pickup { constructor(x, y, kind, age = 0) { Object.assign(this, { x, y, kind, age }) } }
+
+// ---------- renderer.py: procedural textures, sky, sprites, weapons + the ray caster ----------
+const CYAN = [92, 246, 232], RED = [255, 91, 111], GOLD = [255, 195, 102], WHITE = [226, 244, 246], INK = [8, 17, 27]
+const FOV = 78 * (Math.PI / 180)
+function glow(surface, color, center, radius, strength = 1) {
+  radius = Math.max(2, Math.trunc(radius))
+  const halo = new pg.Surface(radius * 2 + 2, radius * 2 + 2, true)
+  for (let i = 12; i > 0; i--) {
+    const r = Math.max(1, Math.trunc(radius * i / 12)), a = Math.trunc((1 - i / 13) ** 2 * 28 * strength)
+    pg.circle(halo, [color[0], color[1], color[2], a], [radius + 1, radius + 1], r)
+  }
+  pg.blit(surface, halo, Math.trunc(center[0]) - radius - 1, Math.trunc(center[1]) - radius - 1)
+  return halo
+}
+function poly(surface, color, points, outline = null, width = 1) {
+  pg.polygon(surface, color, points)
+  if (outline) pg.polygon(surface, outline, points, width)
+}
+const ASSETS = (() => {                                    // resolution-independent art, generated once
+  let cache = null
+  return () => cache || (cache = { textures: makeTextures(), floor: makeFloor(), sprites: makeSprites(), weapons: { rifle: makeWeapon('rifle'), scatter: makeWeapon('scatter') } })
+})()
+function makeTextures() {
+  const textures = [new pg.Surface(128, 128)], rng = new PyRandom(6)
+  textures[0].u.fill(0xff000000)
+  for (const style of [1, 2, 3]) {
+    const s = new pg.Surface(128, 128)
+    pg.fill(s, style !== 3 ? [26, 39, 53] : [31, 40, 52])
+    const accent = style !== 2 ? [57, 224, 213] : [240, 140, 77]
+    pg.rect(s, [10, 20, 31], [7, 10, 114, 106])
+    pg.rect(s, [48, 63, 73], [8, 11, 112, 104], 1)
+    pg.rect(s, [20, 31, 44], [15, 18, 98, 88])
+    for (const y of [2, 5, 119, 123]) pg.line(s, [57, 74, 86], [0, y], [127, y])
+    for (const x of [3, 124]) { pg.line(s, [8, 18, 28], [x, 0], [x, 127], 2); pg.line(s, accent, [x, 12], [x, 100], 1) }
+    if (style === 2) {
+      pg.rect(s, [11, 29, 35], [29, 20, 70, 81])
+      for (let y = 26; y < 97; y += 6) { pg.line(s, [63, 79, 83], [35, y], [91, y], 2); pg.line(s, accent, [35, y], [49 + y % 31, y], 1) }
+      pg.rect(s, accent, [17, 23, 4, 75]); pg.rect(s, accent, [108, 23, 3, 75])
+    } else if (style === 3) {
+      for (const x of [29, 94]) { pg.rect(s, [10, 21, 33], [x - 5, 10, 13, 102]); pg.rect(s, accent, [x, 10, 3, 102]); pg.rect(s, [160, 255, 245], [x, 12, 1, 96]) }
+      poly(s, [43, 56, 70], [[42, 34], [84, 34], [84, 77], [64, 96], [42, 77]], [64, 84, 97])
+      pg.rect(s, accent, [55, 52, 17, 4])
+    } else {
+      poly(s, [31, 45, 60], [[20, 27], [83, 27], [106, 50], [106, 91], [20, 91]], [49, 64, 78])
+      for (let y = 46; y < 74; y += 4) pg.line(s, [10, 20, 32], [32, y], [75, y], 2)
+      pg.rect(s, accent, [24, 21, 24, 2]); pg.rect(s, [94, 108, 116], [88, 76, 11, 4])
+      for (let i = 0; i < 4; i++) pg.line(s, [139, 117, 69], [82 + i * 6, 100], [86 + i * 6, 94], 2)
+    }
+    for (const x of [12, 115]) for (const y of [14, 110]) pg.circle(s, [82, 98, 108], [x, y], 1)
+    for (let i = 0; i < 65; i++) {
+      const x = rng.randrange(10, 118), y = rng.randrange(12, 114)
+      pg.line(s, [42, 54, 64], [x, y], [x + rng.randrange(1, 4), y])
+    }
+    textures.push(s)
+  }
+  return textures
+}
+function makeFloor() {
+  const s = new pg.Surface(128, 128)
+  pg.fill(s, [27, 39, 49])
+  pg.rect(s, [10, 22, 31], [1, 1, 126, 126], 2)
+  pg.rect(s, [37, 54, 64], [4, 4, 120, 120], 1)
+  for (const x of [11, 116]) for (const y of [11, 116]) pg.rect(s, [73, 92, 99], [x, y, 2, 2])
+  for (let i = 0; i < 6; i++) pg.line(s, [32, 46, 57], [84 + i * 4, 93], [84 + i * 4, 110])
+  return s
+}
+function makeSky(h) {
+  const w = 2048, s = new pg.Surface(w, h)
+  for (let y = 0; y < h; y++) { const t = y / h; pg.line(s, [Math.trunc(6 + t * 8), Math.trunc(10 + t * 13), Math.trunc(23 + t * 20)], [0, y], [w, y]) }
+  const rng = new PyRandom(70)
+  for (let i = 0; i < 380; i++) {
+    const x = rng.randrange(w), y = rng.randrange(Math.trunc(h * 0.64)), c = rng.randrange(50, 135)
+    pg.circle(s, [c, c, Math.min(190, c + 35)], [x, y], 1)
+  }
+  glow(s, [54, 81, 168], [1580, 83], 95, 1.5)
+  pg.circle(s, [50, 55, 90], [1580, 83], 34)
+  pg.circle(s, [117, 104, 135], [1580, 83], 34, 1)
+  pg.circle(s, [12, 19, 36], [1570, 77], 30)
+  pg.ellipse(s, [102, 118, 151], [1525, 72, 110, 23], 1)
+  for (let x = 0; x < w; x += 20) {
+    const height = rng.randrange(18, 78), width = rng.randrange(10, 24), top = Math.trunc(h * 0.51) - height
+    pg.rect(s, [8, 17, 29], [x, top, width, height + 40])
+    pg.line(s, [29, 57, 68], [x, top], [x + width, top])
+    if (height > 65) pg.line(s, [51, 99, 116], [x + (width >> 1), top], [x + (width >> 1), top - 13])
+    for (let yy = top + 8; yy < Math.trunc(h * 0.54); yy += 7)
+      for (let xx = x + 3; xx < x + width - 2; xx += 5)
+        if (rng.random() < 0.4) pg.rect(s, [40, 76, 88], [xx, yy, 1, 2])
+  }
+  return s
+}
+function makeSprites() {
+  const result = {}
+  for (const kind of ['drone', 'stalker', 'guardian']) {
+    const frames = []
+    for (let frame = 0; frame < 4; frame++) {
+      const s = new pg.Surface(192, 240, true)
+      let color = kind !== 'stalker' ? RED : GOLD
+      if (kind === 'guardian') color = [205, 127, 255]
+      const bob = Math.trunc(Math.sin(frame * Math.PI / 2) * 3)
+      glow(s, color, [96, 105 + bob], 82, 1.25)
+      pg.ellipse(s, [4, 8, 17, 95], [29, 218, 134, 14])
+      for (const side of [-1, 1]) {
+        const pts = vals => vals.map(([x, y]) => [96 + side * x, y + bob])
+        poly(s, [26, 35, 51], pts([[29, 60], [62, 71], [76, 104], [64, 130], [41, 117]]), [118, 122, 139], 2)
+        poly(s, [68, 72, 90], pts([[34, 63], [61, 74], [67, 88], [39, 83]]))
+        poly(s, color, pts([[61, 87], [68, 96], [65, 115], [60, 111]]))
+        poly(s, [15, 22, 36], pts([[44, 120], [62, 124], [69, 165], [49, 170], [42, 151]]), [82, 89, 108], 2)
+        pg.line(s, color, [96 + side * 54, 139 + bob], [96 + side * 58, 158 + bob], 3)
+        if (kind !== 'drone') {
+          poly(s, [34, 41, 58], pts([[10, 141], [31, 143], [36, 181], [25, 215], [8, 215], [14, 176]]), [106, 106, 124], 2)
+          poly(s, color, pts([[18, 166], [27, 165], [26, 183], [20, 188]]))
+        } else {
+          poly(s, [58, 64, 84], pts([[13, 144], [34, 143], [25, 173], [15, 176]]), [99, 111, 131], 1)
+          glow(s, color, [96 + side * 21, 177 + bob], 21)
+          poly(s, color, pts([[15, 173], [25, 173], [20, 199 + frame * 3]]))
+        }
+      }
+      poly(s, [16, 26, 41], [[67, 72 + bob], [125, 72 + bob], [138, 114 + bob], [119, 149 + bob], [73, 149 + bob], [55, 114 + bob]], [121, 129, 151], 2)
+      poly(s, [51, 62, 79], [[68, 75 + bob], [96, 84 + bob], [124, 75 + bob], [119, 100 + bob], [74, 100 + bob]])
+      pg.circle(s, [6, 12, 25], [96, 111 + bob], 22)
+      pg.circle(s, color, [96, 111 + bob], 19, 2)
+      glow(s, color, [96, 111 + bob], 38, 1.5)
+      poly(s, color, [[96, 98 + bob], [108, 111 + bob], [96, 124 + bob], [84, 111 + bob]])
+      pg.circle(s, [255, 239, 220], [96, 111 + bob], 5)
+      poly(s, [24, 32, 48], [[77, 42 + bob], [114, 42 + bob], [121, 61 + bob], [110, 79 + bob], [82, 79 + bob], [71, 61 + bob]], [146, 148, 162], 2)
+      pg.line(s, color, [79, 60 + bob], [112, 60 + bob], 5)
+      pg.line(s, [255, 245, 238], [85, 60 + bob], [106, 60 + bob], 2)
+      if (kind === 'guardian') {
+        for (const side of [-1, 1]) poly(s, [64, 44, 83], [[96 + side * 57, 68], [96 + side * 83, 26], [96 + side * 73, 101]], color, 2)
+        pg.arc(s, color, [45, 5, 102, 88], 0.1, Math.PI - 0.1, 3)
+      }
+      frames.push(s)
+    }
+    result[kind] = frames
+  }
+  for (const [kind, color] of [['health', [92, 255, 165]], ['shield', CYAN], ['bolt', RED], ['reactor', CYAN], ['exit', CYAN]]) {
+    const s = new pg.Surface(192, 240, true), ca = a => [color[0], color[1], color[2], a]
+    glow(s, color, [96, 120], 88, 1.8)
+    if (kind === 'health' || kind === 'shield') {
+      poly(s, [12, 31, 41], [[96, 66], [143, 112], [96, 158], [49, 112]], color, 3)
+      poly(s, ca(60), [[96, 75], [134, 112], [96, 150], [57, 112]])
+      if (kind === 'health') { pg.rect(s, color, [88, 91, 16, 43]); pg.rect(s, color, [74, 105, 44, 16]) }
+      else poly(s, color, [[80, 95], [111, 95], [109, 121], [96, 133], [82, 121]], [210, 255, 255], 2)
+      pg.ellipse(s, ca(90), [62, 183, 68, 14], 2)
+    } else if (kind === 'bolt') {
+      pg.circle(s, color, [96, 120], 22); pg.circle(s, [255, 244, 224], [96, 120], 10)
+    } else if (kind === 'reactor') {
+      poly(s, [16, 32, 49], [[35, 199], [96, 172], [157, 199], [157, 217], [96, 238], [35, 217]], [58, 91, 106], 2)
+      pg.ellipse(s, color, [40, 187, 112, 30], 3)
+      pg.ellipse(s, color, [40, 29, 112, 30], 3)
+      pg.line(s, ca(90), [63, 49], [63, 193], 2)
+      pg.line(s, ca(90), [129, 49], [129, 193], 2)
+      poly(s, [26, 78, 85], [[96, 60], [124, 116], [96, 170], [68, 116]], color, 2)
+      poly(s, [100, 253, 232], [[96, 60], [96, 170], [68, 116]])
+      pg.line(s, [220, 255, 255], [96, 65], [96, 162], 3)
+      for (const y of [78, 158]) pg.ellipse(s, ca(130), [52, y, 88, 17], 1)
+    } else {
+      pg.ellipse(s, color, [40, 20, 112, 206], 5)
+      pg.ellipse(s, [210, 255, 250], [47, 27, 98, 192], 2)
+      for (let y = 37; y < 210; y += 10) pg.line(s, ca(70), [68, y], [125, y], 1)
+    }
+    result[kind] = [s]
+  }
+  return result
+}
+function makeWeapon(kind) {
+  const s = new pg.Surface(650, 450, true), scatter = kind === 'scatter', accent = scatter ? GOLD : CYAN
+  // Perspective: the muzzle's vanishing point is close to the reticle.
+  poly(s, [15, 21, 32], [[305, 260], [399, 234], [556, 404], [538, 450], [360, 450], [322, 359]], [59, 72, 88], 3)
+  poly(s, [25, 38, 49], [[471, 319], [511, 330], [647, 411], [650, 450], [566, 450], [467, 373]], [65, 84, 94], 2)
+  for (let i = 0; i < 5; i++) pg.line(s, [47, 62, 73], [520 + i * 17, 370 + i * 8], [501 + i * 20, 403 + i * 9], 5)
+  // Magazine, receiver, and heavy chamfered side plate.
+  poly(s, [23, 31, 43], [[290, 217], [418, 229], [461, 351], [421, 405], [343, 362]], [74, 88, 102], 2)
+  poly(s, [46, 59, 72], [[286, 156], [394, 161], [510, 281], [460, 333], [336, 294], [272, 212]], [123, 142, 152], 2)
+  poly(s, [21, 32, 45], [[285, 180], [347, 191], [463, 305], [449, 327], [339, 290], [273, 211]], [58, 81, 92], 2)
+  poly(s, [66, 80, 94], [[292, 155], [377, 155], [434, 213], [346, 199]], [140, 160, 167], 2)
+  poly(s, [17, 26, 37], [[365, 225], [405, 236], [463, 288], [431, 295]], [82, 101, 116], 2)
+  for (let i = 0; i < 6; i++) pg.line(s, [7, 17, 28], [350 + i * 12, 217 + i * 9], [341 + i * 12, 231 + i * 9], 5)
+  // Long, tapered barrel.
+  poly(s, [47, 65, 79], [[217, 110], [251, 105], [346, 184], [287, 197], [208, 134]], [123, 146, 157], 2)
+  poly(s, [21, 35, 49], [[208, 134], [225, 133], [305, 205], [287, 214]], [75, 100, 116], 2)
+  poly(s, [84, 101, 112], [[217, 109], [252, 105], [270, 123], [231, 127]])
+  for (let i = 0; i < 5; i++) pg.line(s, [10, 24, 35], [244 + i * 13, 132 + i * 11], [228 + i * 13, 139 + i * 11], 4)
+  // Muzzle shroud.
+  poly(s, [19, 29, 40], [[200, 101], [230, 90], [255, 105], [254, 129], [226, 144], [202, 131]], [118, 146, 156], 2)
+  poly(s, [7, 15, 25], [[200, 101], [229, 93], [233, 116], [204, 126]], [50, 75, 90], 2)
+  pg.line(s, accent, [204, 103], [225, 98], 2)
+  if (scatter) {
+    poly(s, [32, 45, 60], [[238, 148], [269, 132], [326, 187], [294, 213]], [140, 157, 161], 2)
+    for (let i = 0; i < 4; i++) pg.line(s, accent, [263 + i * 10, 160 + i * 9], [247 + i * 10, 168 + i * 9], 3)
+  }
+  // Emissive energy conduits and small status display.
+  pg.line(s, accent, [253, 123], [329, 184], 4)
+  pg.line(s, [221, 255, 246], [253, 123], [329, 184], 1)
+  poly(s, [7, 24, 31], [[375, 189], [403, 194], [440, 231], [411, 229]], accent, 1)
+  for (let i = 0; i < 4; i++) pg.line(s, accent, [385 + i * 7, 199 + i * 6], [393 + i * 7, 201 + i * 6], 3)
+  pg.line(s, accent, [356, 280], [417, 302], 3)
+  for (const [x, y] of [[285, 164], [336, 279], [450, 313], [401, 234]]) { pg.circle(s, [145, 163, 171], [x, y], 3); pg.circle(s, [18, 26, 39], [x, y], 1) }
+  // Low-profile illuminated sight.
+  poly(s, [29, 40, 54], [[277, 153], [277, 128], [307, 124], [330, 144], [330, 172]], [123, 147, 159], 2)
+  poly(s, [13, 57, 67, 190], [[283, 135], [304, 132], [322, 147], [306, 153]], accent, 1)
+  pg.line(s, accent, [303, 132], [303, 139], 2)
+  // Gloved support hand.
+  poly(s, [27, 38, 48], [[314, 287], [345, 283], [387, 318], [384, 351], [342, 361], [307, 330]], [67, 83, 94], 2)
+  for (let i = 0; i < 4; i++) pg.line(s, [69, 85, 94], [321 + i * 9, 294 + i * 6], [314 + i * 9, 321 + i * 6], 4)
+  poly(s, [14, 25, 36], [[329, 350], [372, 341], [408, 425], [392, 450], [310, 450]], [58, 78, 88], 2)
+  pg.line(s, accent, [329, 379], [370, 370], 4)
+  return s
+}
+
+const F = { k0065: fr(0.065), k105: fr(1.05), k012: fr(0.12), k075: fr(0.75), k0055: fr(0.055), k14: fr(1.4), k0035: fr(0.035),
+  k067: fr(0.67), k09: fr(0.9), k115: fr(1.15), k02: fr(0.2), k078: fr(0.78), k08: fr(0.8), k058: fr(0.58), k165: fr(1.65),
+  k008: fr(0.08), k015: fr(0.15), k01: fr(0.1), k1e8: fr(1e-8) }
+class Renderer {
+  // w x h world view. The original is 16:9 (512x288 / 640x360); other aspect ratios keep the vertical field of view
+  // (wider screens see more to the sides) and narrow ones keep the 78 degree horizontal field of view.
+  constructor(w, h) {
+    this.w = w; this.h = h
+    this.proj = Math.min(w, h * 16 / 9) / (2 * Math.tan(FOV / 2))
+    this.pitchUnit = this.proj * 2 * Math.tan(FOV / 2) * 9 / 16 / 360   // = h / 360 on a 16:9 view, as in main.py
+    const fproj = fr(this.proj), half = fr(w / (2 * this.proj))
+    this.camera_x = new Float32Array(w)
+    for (let i = 0; i < w; i++) this.camera_x[i] = fr(fr(fr(i + 0.5) / fproj) - half)
+    const A = ASSETS()
+    this.tex = A.textures.map(t => t.u); this.floorTex = A.floor.u; this.sprites = A.sprites
+    this.sky = makeSky(h).u
+    this.vignette = new Float32Array(w * h)
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const d = ((x - w / 2) / (w * 0.67)) ** 2 + ((y - h / 2) / (h * 0.8)) ** 2
+      this.vignette[y * w + x] = Math.min(1, Math.max(0.52, 1 - d * 0.38))
+    }
+    this.depth = new Float32Array(w).fill(100); this.horizon = h / 2
+    this.sides = new Uint8Array(w); this.types = new Int32Array(w); this.hitU = new Float32Array(w)
+    this.rx = new Float32Array(w); this.ry = new Float32Array(w)
+    this.image = { w, h, d: new Uint8ClampedArray(w * h * 4) }; this.buf = new Uint32Array(this.image.d.buffer)
+  }
+  cast(player) {
+    const w = this.w, cx = this.camera_x, dx = fr(Math.cos(player.angle)), dy = fr(Math.sin(player.angle))
+    const px = player.x, py = player.y, fpx = fr(px), fpy = fr(py), mx0 = Math.trunc(px), my0 = Math.trunc(py)
+    for (let i = 0; i < w; i++) {
+      const rx = fr(dx - fr(dy * cx[i])), ry = fr(dy + fr(dx * cx[i]))
+      this.rx[i] = rx; this.ry[i] = ry
+      const ddx = fr(1 / Math.max(Math.abs(rx), F.k1e8)), ddy = fr(1 / Math.max(Math.abs(ry), F.k1e8))
+      const sx = rx < 0 ? -1 : 1, sy = ry < 0 ? -1 : 1
+      let mx = mx0, my = my0
+      let tx = fr(fr(rx < 0 ? px - mx : mx + 1 - px) * ddx), ty = fr(fr(ry < 0 ? py - my : my + 1 - py) * ddy)
+      let depth = 60, side = 0, type = 0
+      for (let k = 0; k < 65; k++) {
+        const horizontal = tx < ty
+        let dist
+        if (horizontal) { mx += sx; dist = tx; tx = fr(tx + ddx) } else { my += sy; dist = ty; ty = fr(ty + ddy) }
+        const cell = GRID[Math.min(SIZE - 1, Math.max(0, my)) * SIZE + Math.min(SIZE - 1, Math.max(0, mx))]
+        if (cell > 0) { depth = dist; side = horizontal ? 0 : 1; type = cell; break }
+      }
+      this.sides[i] = side; this.types[i] = type
+      const hv = side ? fr(fpx + fr(depth * rx)) : fr(fpy + fr(depth * ry))
+      this.hitU[i] = hv - Math.floor(hv)
+      this.depth[i] = depth > F.k008 ? depth : F.k008
+    }
+  }
+  world(game) {
+    const p = game.player, w = this.w, h = this.h, out = this.buf, rxs = this.rx, rys = this.ry
+    const horizon = this.horizon = h * 0.5 + p.pitch, vg = this.vignette     // vignette is applied as pixels are written
+    this.cast(p)
+    // sky: a 2048 px panorama that scrolls with the view angle and pitch
+    const sky = this.sky, offset = Math.trunc(p.angle / (2 * Math.PI) * 2048), shift = Math.trunc(horizon - h * 0.46)
+    const floorStart = Math.max(0, Math.min(h, Math.trunc(horizon) + 1))
+    for (let y = 0; y < floorStart; y++) {
+      const sr = Math.min(h - 1, Math.max(0, y - shift)) * 2048
+      let sc = pmod(offset, 2048), o = y * w
+      for (let x = 0; x < w; x++, o++) {
+        const c = sky[sr + sc], k = vg[o]
+        out[o] = 0xff000000 | (fr(((c >>> 16) & 255) * k) | 0) << 16 | (fr(((c >>> 8) & 255) * k) | 0) << 8 | (fr((c & 255) * k) | 0)
+        if (++sc === 2048) sc = 0
+      }
+    }
+    // true perspective floor sampling; thin emissive strips guide the route
+    const fh = fr(horizon), k055 = fr(this.proj * 0.55), fpx = fr(p.x), fpy = fr(p.y), ft = this.floorTex
+    for (let y = floorStart; y < h; y++) {
+      let m = fr(y - fh); if (m < 1) m = 1
+      const fd = fr(k055 / m)
+      let light = fr(F.k105 / fr(1 + fr(fd * F.k0065))); if (light < F.k012) light = F.k012; else if (light > 1) light = 1
+      let ff = fr(fd / 55); if (ff > F.k075) ff = F.k075
+      const inv = 1 - ff, fogR = 9 * ff, fogG = 21 * ff, fogB = 33 * ff
+      let o = y * w
+      for (let x = 0; x < w; x++, o++) {
+        const fx = fr(fpx + fr(fd * rxs[x])), fy = fr(fpy + fr(fd * rys[x]))
+        const t = ft[(((fy * 128) | 0) & 127) * 128 + (((fx * 128) | 0) & 127)]    // == int(v * 128) % 128
+        let r, g, b
+        const d16 = Math.abs(fx - 16), dash = fr(fy * F.k14)
+        if ((d16 < F.k0055 || (Math.abs(d16 - F.k14) < F.k0035 && fy > 23)) && dash - Math.floor(dash) < F.k067) { r = fr(92 * light) * F.k09; g = fr(246 * light) * F.k09; b = fr(232 * light) * F.k09 }
+        else { r = (t & 255) * light; g = ((t >>> 8) & 255) * light; b = ((t >>> 16) & 255) * light }
+        // soft light pools underneath the energy pylons
+        let q = (fx - 16) * (fx - 16) + (fy - 7.5) * (fy - 7.5)
+        if (q < 64) { const il = Math.exp(-q * 0.36) * 0.3; r += il * 25; g += il * 115; b += il * 120 }
+        q = (fx - 8) * (fx - 8) + (fy - 16) * (fy - 16)
+        if (q < 64) { const il = Math.exp(-q * 0.36) * 0.3; r += il * 25; g += il * 115; b += il * 120 }
+        q = (fx - 24) * (fx - 24) + (fy - 16) * (fy - 16)
+        if (q < 64) { const il = Math.exp(-q * 0.36) * 0.3; r += il * 25; g += il * 115; b += il * 120 }
+        r = r * inv + fogR; g = g * inv + fogG; b = b * inv + fogB
+        const k = vg[o]
+        out[o] = 0xff000000 | (fr((b > 255 ? 255 : b | 0) * k) | 0) << 16 | (fr((g > 255 ? 255 : g | 0) * k) | 0) << 8 | (fr((r > 255 ? 255 : r | 0) * k) | 0)
+      }
+    }
+    // textured wall strips, shaded by distance and orientation (emissive markings stay lit)
+    const fproj = fr(this.proj), tex = this.tex
+    for (let x = 0; x < w; x++) {
+      const d = this.depth[x], type = this.types[x]
+      const top = fr(fh - fr(fr(fproj * (type === 3 ? 2.25 : F.k165)) / d)), bottom = fr(fh + fr(k055 / d)), span = fr(bottom - top)
+      const y0 = Math.max(0, Math.ceil(top)), y1 = Math.min(h - 1, Math.floor(bottom))
+      if (y0 > y1) continue
+      let u = this.hitU[x] * 128; u = u > 127 ? 127 : Math.trunc(u)
+      let shade = fr(F.k115 / fr(1 + fr(d * F.k0065))); if (shade < F.k02) shade = F.k02; else if (shade > 1) shade = 1
+      if (this.sides[x]) shade = fr(shade * F.k078)
+      const lit = shade > F.k08 ? shade : F.k08
+      let fog = fr(d / 65); if (fog > F.k058) fog = F.k058
+      const inv = 1 - fog, fogR = 9 * fog, fogG = 21 * fog, fogB = 33 * fog, T = tex[type]
+      for (let y = y0; y <= y1; y++) {
+        let v = fr(fr(y - top) / span) * 128; v = v < 0 ? 0 : v > 127 ? 127 : Math.trunc(v)
+        const t = T[v * 128 + u], tr = t & 255, tg = (t >>> 8) & 255, tb = (t >>> 16) & 255
+        const k = (tg > 130 || tr > 180) ? lit : shade
+        const r = tr * k * inv + fogR, g = tg * k * inv + fogG, b = tb * k * inv + fogB, o = y * w + x, vk = vg[o]
+        out[o] = 0xff000000 | (fr((b > 255 ? 255 : b | 0) * vk) | 0) << 16 | (fr((g > 255 ? 255 : g | 0) * vk) | 0) << 8 | (fr((r > 255 ? 255 : r | 0) * vk) | 0)
+      }
+    }
+    this.drawObjects(game)
+    return this.image
+  }
+  project(player, x, y, z = 0.5) {
+    const dx = x - player.x, dy = y - player.y
+    const forward = dx * Math.cos(player.angle) + dy * Math.sin(player.angle)
+    const right = -dx * Math.sin(player.angle) + dy * Math.cos(player.angle)
+    if (forward <= 0.12) return null
+    return [this.w / 2 + right / forward * this.proj, this.horizon - (z - 0.55) * this.proj / forward, forward]
+  }
+  billboard(player, sprite, x, y, height, z = 0, flash = false) {
+    const pr = this.project(player, x, y, z)
+    if (!pr) return
+    const [center, base, depth] = pr
+    const sh = Math.min(1400, Math.trunc(this.proj * height / depth))
+    if (sh < 2) return
+    const sw = Math.max(1, Math.trunc(sh * sprite.w / sprite.h))
+    const left = Math.trunc(center - sw / 2), top = Math.trunc(base - sh)
+    if (left > this.w || left + sw < 0) return
+    // pygame.transform.scale (SDL nearest, 16.16 fixed point) + blit, drawn only where no wall is closer
+    const incx = Math.floor(sprite.w * 65536 / sw), incy = Math.floor(sprite.h * 65536 / sh)
+    const start = Math.max(0, left), end = Math.min(this.w, left + sw), ya = Math.max(0, top), yb = Math.min(this.h, top + sh)
+    const su = sprite.u, out = this.buf, W = this.w, fd = fr(depth)
+    for (let x = start; x < end; x++) {
+      if (!(fr(this.depth[x] + F.k015) > fd)) continue
+      const sx = ((incx >>> 1) + (x - left) * incx) >>> 16
+      for (let y = ya; y < yb; y++) {
+        const s = su[(((incy >>> 1) + (y - top) * incy) >>> 16) * sprite.w + sx], sa = s >>> 24
+        if (!sa) continue
+        let sr = s & 255, sg = (s >>> 8) & 255, sb = (s >>> 16) & 255
+        if (flash) { sr = Math.min(255, sr + 125); sg = Math.min(255, sg + 160); sb = Math.min(255, sb + 160) }
+        const o = y * W + x, d = out[o]
+        let dr = d & 255, dg = (d >>> 8) & 255, db = (d >>> 16) & 255
+        dr = (((sr - dr) * sa + sr) >> 8) + dr; dg = (((sg - dg) * sa + sg) >> 8) + dg; db = (((sb - db) * sa + sb) >> 8) + db
+        out[o] = 0xff000000 | db << 16 | dg << 8 | dr
+      }
+    }
+  }
+  drawObjects(game) {
+    const objects = [[16, 7.5, 'reactor', 1.95, 0, 0, false], [8, 16, 'reactor', 1.35, 0, 0, false], [24, 16, 'reactor', 1.35, 0, 0, false]]
+    if (game.extraction) objects.push([16, 3.4, 'exit', 2.0, 0, 0, false])
+    for (const e of game.enemies) objects.push([e.x, e.y, e.kind, e.kind === 'guardian' ? 2.0 : 1.15, 0.02, Math.trunc(e.age * 7) % 4, e.flash > 0])
+    for (const k of game.pickups) objects.push([k.x, k.y, k.kind, 0.65, 0.03 + Math.sin(k.age * 3) * 0.07, 0, false])
+    for (const b of game.projectiles) objects.push([b.x, b.y, 'bolt', 0.30, 0.4, 0, false])
+    const p = game.player, d2 = o => (o[0] - p.x) ** 2 + (o[1] - p.y) ** 2
+    objects.sort((a, b) => d2(b) - d2(a))
+    for (const [x, y, kind, height, z, frame, flash] of objects) this.billboard(p, this.sprites[kind][frame], x, y, height, z, flash)
+    const target = { w: this.w, h: this.h, alpha: false, u: this.buf }
+    for (const q of game.particles) {
+      const pt = this.project(p, q.x, q.y, q.z)
+      if (!pt) continue
+      const [x, y, distance] = pt
+      if (x >= 0 && x < this.w && fr(distance) < fr(this.depth[Math.trunc(x)] + F.k01)) {
+        const r = Math.max(1, Math.min(12, Math.trunc(this.proj * q.size / distance)))
+        const k = Math.min(1, q.life / Math.max(0.1, q.total) * 2)
+        const v = (0xff000000 | Math.trunc(q.color[2] * k) << 16 | Math.trunc(q.color[1] * k) << 8 | Math.trunc(q.color[0] * k)) >>> 0
+        pg.discSpans(Math.trunc(x), Math.trunc(y), r, (a, b, yy) => pg.hl(target, a, b, yy, v))
+      }
+    }
+  }
+}
+
+// ---------- main.py: the game rules (drawing and input live in the platform script) ----------
+const NULL_AUDIO = { play() {}, toggle() { return false }, enabled: false, ready: false }
+class Game {
+  constructor({ renderer = null, audio = NULL_AUDIO, rng = new PyRandom(), highQuality = false } = {}) {
+    this.renderer = renderer; this.audio = audio; this.rng = rng; this.high_quality = highQuality
+    this.onCapture = () => {}
+    this.running = true; this.state = 'menu'; this.menu_time = 0
+    this.show_map = false; this.show_fps = false; this.fps = 60
+    this.reset(); this.to_menu()
+  }
+  get capacity() { return this.weapon === 'rifle' ? 30 : 8 }
+  get reload_duration() { return this.weapon === 'rifle' ? 1.35 : 1.8 }
+  get reload_progress() { return 1 - this.reload_time / this.reload_duration }
+  get proj() { return this.renderer ? this.renderer.proj : 512 / (2 * Math.tan(FOV / 2)) }
+  reset() {
+    this.player = new Player()
+    this.enemies = []; this.projectiles = []; this.particles = []
+    this.pickups = [new Pickup(12.5, 24.0, 'health'), new Pickup(19.5, 24.0, 'shield'), new Pickup(3.5, 13.0, 'health'), new Pickup(28.5, 13.0, 'shield')]
+    this.time = 0; this.score = this.kills = this.wave = this.combo = 0; this.combo_timer = 0; this.wave_delay = 0
+    this.extraction = false; this.weapon = 'rifle'; this.ammo = { rifle: 30, scatter: 8 }
+    this.fire_cooldown = this.reload_time = this.switch_time = 0
+    this.recoil = this.muzzle = this.hit_marker = this.damage_flash = 0; this.shake = 0
+    this.walk_phase = this.moving = 0; this.banner = this.banner_sub = ''; this.banner_timer = 0
+    this.spawn_wave()
+  }
+  capture_mouse(on) { this.onCapture(on) }
+  start() { this.reset(); this.state = 'playing'; this.capture_mouse(true); this.audio.play('wave') }
+  to_menu() {
+    this.state = 'menu'
+    this.player.x = 16; this.player.y = 22.8; this.player.angle = -Math.PI / 2 + 0.13; this.player.pitch = 0
+    this.capture_mouse(false)
+  }
+  announce(title, subtitle = '', duration = 3.0) { this.banner = title; this.banner_sub = subtitle; this.banner_timer = duration }
+  spawn_wave() {
+    this.wave += 1
+    let count
+    if (this.wave === 1) { count = 5; this.announce('BREACH INITIATED', 'ELIMINATE SECURITY  /  KEEP MOVING') }
+    else if (this.wave === 2) { count = 8; this.announce('SECURITY ESCALATION', 'STALKERS INBOUND  /  USE YOUR DASH'); this.audio.play('wave') }
+    else { count = 6; this.announce('AEGIS HAS AWAKENED', 'DESTROY THE REACTOR GUARDIAN', 3.8); this.audio.play('wave') }
+    const p = this.player
+    for (let i = 0; i < count; i++) {
+      let [x, y] = ENEMY_SPAWNS[i % ENEMY_SPAWNS.length]
+      // Never materialize a reinforcement directly on the player.
+      if (hypot(x - p.x, y - p.y) < 4) {
+        let best = ENEMY_SPAWNS[0], bd = -1
+        for (const pt of ENEMY_SPAWNS) { const d = hypot(pt[0] - p.x, pt[1] - p.y); if (d > bd) { bd = d; best = pt } }
+        [x, y] = best
+      }
+      const kind = this.wave >= 2 && i % 3 !== 0 ? 'stalker' : 'drone'
+      const enemy = new Enemy(x, y, kind, { cooldown: 2 + i * 0.18, seed: this.rng.random() * TAU })
+      enemy.health = enemy.max_health
+      this.enemies.push(enemy)
+      this.burst(x, y, 0.5, CYAN, 14)
+    }
+    if (this.wave === 3) { const boss = new Enemy(16, 8.5, 'guardian', { cooldown: 3 }); boss.health = boss.max_health; this.enemies.push(boss) }
+    p.shield = Math.min(75, p.shield + 25)
+  }
+  burst(x, y, z, color, count = 12, scale = 1) {
+    const rng = this.rng
+    for (let i = 0; i < count; i++) {
+      const a = rng.uniform(0, TAU), speed = rng.uniform(0.3, 2.2) * scale, duration = rng.uniform(0.25, 0.7)
+      const vz = rng.uniform(0.4, 2.2), size = rng.uniform(0.014, 0.045) * scale
+      this.particles.push(new Particle(x, y, z, Math.cos(a) * speed, Math.sin(a) * speed, vz, duration, color, size, duration))
+    }
+    if (this.particles.length > 450) this.particles = this.particles.slice(-450)
+  }
+  switch_weapon(kind) {
+    if (kind !== this.weapon) {
+      this.weapon = kind; this.reload_time = 0; this.switch_time = 0.24
+      this.fire_cooldown = Math.max(this.fire_cooldown, 0.25); this.audio.play('reload')
+    }
+  }
+  reload() {
+    if (this.reload_time <= 0 && this.ammo[this.weapon] < this.capacity) { this.reload_time = this.reload_duration; this.audio.play('reload') }
+  }
+  shoot() {
+    if (this.fire_cooldown > 0 || this.reload_time > 0 || this.switch_time > 0) return false
+    if (this.ammo[this.weapon] <= 0) { this.reload(); return false }
+    const scatter = this.weapon === 'scatter'
+    this.ammo[this.weapon] -= 1
+    this.fire_cooldown = scatter ? 0.68 : 0.12
+    this.muzzle = 0.065
+    this.recoil = Math.min(1.5, this.recoil + (scatter ? 1.3 : 0.65))
+    this.shake = Math.max(this.shake, scatter ? 4.0 : 1.8)
+    this.audio.play(this.weapon)
+    const damage = new Map(), p = this.player
+    for (let n = 0; n < (scatter ? 9 : 1); n++) {
+      const spread = scatter ? this.rng.uniform(-0.080, 0.080) : this.rng.uniform(-0.004, 0.004)
+      const angle = p.angle + spread, dx = Math.cos(angle), dy = Math.sin(angle)
+      let victim = null, nearest = 32
+      for (const e of this.enemies) {
+        const ex = e.x - p.x, ey = e.y - p.y, distance = ex * dx + ey * dy, across = Math.abs(ex * dy - ey * dx)
+        const radius = e.kind === 'guardian' ? 0.58 : 0.31, targetZ = 0.55 + p.pitch * distance / this.proj
+        const top = e.kind === 'guardian' ? 1.85 : 1.10
+        if (distance > 0 && distance < nearest && across < radius && targetZ > 0.12 && targetZ < top)
+          if (visible(p.x, p.y, e.x, e.y)) { victim = e; nearest = distance }
+      }
+      if (victim) {
+        const falloff = scatter ? Math.max(0.35, 1 - nearest / 19) : 1
+        damage.set(victim, (damage.get(victim) || 0) + (scatter ? 22 * falloff : 27))
+      } else {
+        // Surface impacts follow the same world geometry as the shots.
+        for (let step = 1; step < 210; step++) {
+          const distance = step * 0.13, x = p.x + dx * distance, y = p.y + dy * distance
+          if (solid(x, y)) { this.burst(x - dx * 0.10, y - dy * 0.10, Math.max(0.05, Math.min(1.45, 0.55 + p.pitch * distance / this.proj)), GOLD, 2); break }
+        }
+      }
+    }
+    for (const [victim, amount] of damage) this.hit(victim, amount)
+    return true
+  }
+  hit(enemy, damage) {
+    const idx = this.enemies.indexOf(enemy)
+    if (idx < 0) return
+    enemy.health -= damage; enemy.flash = 0.10; this.hit_marker = 0.13
+    this.audio.play('hit', 0.65)
+    this.burst(enemy.x, enemy.y, 0.65, GOLD, 7)
+    if (enemy.health <= 0) {
+      this.enemies.splice(this.enemies.indexOf(enemy), 1)
+      this.kills += 1
+      this.combo = this.combo_timer > 0 ? this.combo + 1 : 1
+      this.combo_timer = 4
+      const base = enemy.kind === 'guardian' ? 2000 : enemy.kind === 'stalker' ? 150 : 100
+      this.score += base * Math.min(this.combo, 5)
+      this.audio.play('kill')
+      this.burst(enemy.x, enemy.y, 0.7, RED, enemy.kind !== 'guardian' ? 36 : 100, 1.5)
+      this.shake = Math.max(this.shake, enemy.kind === 'guardian' ? 5 : 2)
+      if (this.kills % 3 === 0) this.pickups.push(new Pickup(enemy.x, enemy.y, this.player.health < 75 ? 'health' : 'shield'))
+    }
+  }
+  hurt(amount) {
+    const p = this.player
+    if (p.dash_time > 0) return
+    const absorbed = Math.min(p.shield, amount * 0.8)
+    p.shield -= absorbed; p.health -= amount - absorbed; p.hurt_time = this.time
+    this.damage_flash = 0.34; this.shake = Math.max(this.shake, 5)
+    this.audio.play('hurt')
+    if (p.health <= 0) { p.health = 0; this.state = 'dead'; this.capture_mouse(false) }
+  }
+  dash(forward, strafe) {
+    const p = this.player
+    if (p.dash_cooldown > 0) return
+    if (Math.abs(forward) + Math.abs(strafe) === 0) forward = 1
+    const length = hypot(forward, strafe)
+    p.dash_vector = [(Math.cos(p.angle) * forward - Math.sin(p.angle) * strafe) / length, (Math.sin(p.angle) * forward + Math.cos(p.angle) * strafe) / length]
+    p.dash_time = 0.18; p.dash_cooldown = 2.6
+    this.audio.play('dash')
+  }
+  update(dt, forward = 0, strafe = 0, firing = false) {
+    this.time += dt
+    const p = this.player, rng = this.rng
+    for (const name of ['fire_cooldown', 'switch_time', 'muzzle', 'hit_marker', 'damage_flash', 'banner_timer', 'combo_timer']) this[name] = Math.max(0, this[name] - dt)
+    this.recoil *= Math.exp(-dt * 14)
+    this.shake *= Math.exp(-dt * 15)
+    p.dash_cooldown = Math.max(0, p.dash_cooldown - dt)
+    if (this.reload_time > 0) {
+      this.reload_time = Math.max(0, this.reload_time - dt)
+      if (this.reload_time === 0) { this.ammo[this.weapon] = this.capacity; this.audio.play('reload') }
+    }
+    if (this.time - p.hurt_time > 5) p.shield = Math.min(75, p.shield + dt * 10)
+    this.moving += (Math.min(1, Math.abs(forward) + Math.abs(strafe)) - this.moving) * Math.min(1, dt * 12)
+    this.walk_phase += dt * (this.moving > 0.1 ? 10 : 1.8)
+    if (p.dash_time > 0) {
+      const duration = Math.min(dt, p.dash_time)
+      move(p, p.dash_vector[0] * 14 * duration, p.dash_vector[1] * 14 * duration)
+      p.dash_time = Math.max(0, p.dash_time - dt)
+    } else if (forward || strafe) {
+      const speed = 3.8 * dt / hypot(forward, strafe)
+      move(p, (Math.cos(p.angle) * forward - Math.sin(p.angle) * strafe) * speed, (Math.sin(p.angle) * forward + Math.cos(p.angle) * strafe) * speed)
+    }
+    if (firing) this.shoot()
+    for (const e of this.enemies.slice()) {
+      e.age += dt; e.flash = Math.max(0, e.flash - dt); e.cooldown -= dt; e.route_timer -= dt
+      const dist = hypot(p.x - e.x, p.y - e.y), sight = visible(e.x, e.y, p.x, p.y)
+      let target = [p.x, p.y]
+      if (!sight) {
+        if (e.route_timer <= 0) { e.path = route(e.x, e.y, p.x, p.y); e.route_timer = 0.8 + rng.random() * 0.25 }
+        if (e.path.length) {
+          if (hypot(e.path[0][0] - e.x, e.path[0][1] - e.y) < 0.22) e.path.shift()
+          if (e.path.length) target = e.path[0]
+        }
+      }
+      const desired = e.kind === 'stalker' ? 3 : e.kind === 'drone' ? 5.0 : 7
+      if (!sight || dist > desired) {
+        const dx = target[0] - e.x, dy = target[1] - e.y, length = Math.max(0.1, hypot(dx, dy))
+        move(e, dx / length * e.speed * dt, dy / length * e.speed * dt, 0.25)
+      } else if (dist < 2.0 && e.kind !== 'guardian') {
+        move(e, (e.x - p.x) / Math.max(dist, 0.1) * dt, (e.y - p.y) / Math.max(dist, 0.1) * dt, 0.25)
+      } else if (sight && e.kind !== 'guardian') {
+        const direction = Math.atan2(p.y - e.y, p.x - e.x) + Math.PI / 2, sway = Math.sin(e.age * 1.2 + e.seed) * dt * 0.6
+        move(e, Math.cos(direction) * sway, Math.sin(direction) * sway, 0.25)
+      }
+      if (sight && dist < 19 && e.cooldown <= 0) {
+        const angle = Math.atan2(p.y - e.y, p.x - e.x)
+        const offsets = e.kind === 'guardian' ? [-0.22, -0.11, 0, 0.11, 0.22] : [rng.uniform(-0.055, 0.055)]
+        const speed = e.kind === 'stalker' ? 5.8 : 4.5
+        for (const offset of offsets) {
+          const a = angle + offset
+          this.projectiles.push(new Projectile(e.x + Math.cos(a) * 0.35, e.y + Math.sin(a) * 0.35, Math.cos(a) * speed, Math.sin(a) * speed, e.kind === 'guardian' ? 19 : 13))
+        }
+        e.cooldown = (e.kind === 'guardian' ? 1.5 : e.kind === 'stalker' ? 1.8 : 2.25) + rng.random() * 0.5
+        this.audio.play('enemy', Math.max(0.1, 1 - dist / 20))
+      }
+      if (dist < 0.55 && e.cooldown < 0.5) { this.hurt(12); e.cooldown = 1 }
+    }
+    for (const bolt of this.projectiles.slice()) {
+      bolt.life -= dt
+      const steps = Math.max(1, Math.trunc(hypot(bolt.vx, bolt.vy) * dt / 0.12) + 1)
+      let remove = bolt.life <= 0
+      for (let i = 0; i < steps; i++) {
+        bolt.x += bolt.vx * dt / steps; bolt.y += bolt.vy * dt / steps
+        if (solid(bolt.x, bolt.y)) { this.burst(bolt.x, bolt.y, 0.55, RED, 3); remove = true; break }
+        if (hypot(bolt.x - p.x, bolt.y - p.y) < 0.29) { this.hurt(bolt.damage); remove = true; break }
+      }
+      if (remove) this.projectiles.splice(this.projectiles.indexOf(bolt), 1)
+    }
+    for (const pickup of this.pickups.slice()) {
+      pickup.age += dt
+      if (hypot(pickup.x - p.x, pickup.y - p.y) < 0.65) {
+        if (pickup.kind === 'health' && p.health < 100) p.health = Math.min(100, p.health + 35)
+        else if (pickup.kind === 'shield' && p.shield < 75) p.shield = Math.min(75, p.shield + 40)
+        else continue
+        this.audio.play('pickup'); this.burst(pickup.x, pickup.y, 0.3, CYAN, 12)
+        this.pickups.splice(this.pickups.indexOf(pickup), 1)
+      }
+    }
+    const alive = []
+    for (const q of this.particles) {
+      q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt; q.vz -= dt * 5
+      if (q.z < 0.03) { q.z = 0.03; q.vz = Math.abs(q.vz) * 0.35 }
+      if (q.life > 0) alive.push(q)
+    }
+    this.particles = alive
+    if (!this.enemies.length && !this.extraction && this.state === 'playing') {
+      if (this.wave_delay === 0) {
+        if (this.wave >= 3) {
+          this.extraction = true; this.projectiles.length = 0
+          this.announce('THE REACTOR IS YOURS', 'FOLLOW THE CYAN LINE NORTH  /  REACH THE GATE', 5)
+          this.audio.play('wave')
+        } else {
+          this.wave_delay = 4
+          this.announce('SECTOR CLEARED', 'REINFORCEMENTS ARRIVING  /  RELOAD & REGROUP')
+          p.health = Math.min(100, p.health + 20)
+        }
+      } else {
+        this.wave_delay = Math.max(0.001, this.wave_delay - dt)
+        if (this.wave_delay <= 0.001) { this.wave_delay = 0; this.spawn_wave() }
+      }
+    }
+    if (this.extraction && hypot(p.x - EXIT[0], p.y - EXIT[1]) < 1 && this.state === 'playing') {
+      this.score += Math.max(0, 5000 - Math.trunc(this.time * 10))
+      this.state = 'victory'; this.capture_mouse(false); this.audio.play('wave')
+    }
+  }
+}
+const CORE = { TAU, fr, pmod, hypot, PyRandom, pg, SIZE, SPAWN, EXIT, ENEMY_SPAWNS, ARENA, GRID, solid, canStand, move, visible, route,
+  Player, Enemy, Projectile, Particle, Pickup, CYAN, RED, GOLD, WHITE, INK, FOV, glow, poly, ASSETS, makeSky, Renderer, Game, NULL_AUDIO }
+if (typeof window === 'undefined') globalThis.CORE = CORE
+</script>
+<script id="touch-kit">
+/* touch-kit.js — on-screen touch controls for keyboard/mouse web games. No dependencies.
+ * Inline it into a single-file game (inside a script tag) or load it next to the game.
+ *
+ *   const kit = TouchKit.create({
+ *     sticks: [
+ *       { id: 'move', side: 'left',  label: 'MOVE', keys: 'wasd' },            // 'wasd' | 'arrows' | {up,down,left,right} codes
+ *       { id: 'aim',  side: 'right', label: 'AIM',  onMove: (x, y, on) => {} } // analog -1..1, on=false when released
+ *     ],
+ *     buttons: [ { id: 'fire', label: 'FIRE', icon: '✦', key: 'Space' },      // key: KeyboardEvent.code to hold while pressed
+ *                { id: 'map', label: 'MAP', key: 'KeyM', place: 'top-right' } ],
+ *     landscape: true,        // ask to rotate when the phone is held upright
+ *   })
+ *   kit.show(false)           // hide in menus, kit.show(true) in gameplay (default: shown on touch devices)
+ *   kit.stick('aim')          // → { x, y, on }   kit.pressed('fire') → boolean
+ *
+ * Buttons without `key` can use onDown/onUp. Sticks with `keys` send keydown/keyup (8 directions) and still report analog x/y.
+ * Keys are dispatched as KeyboardEvents (key, code, keyCode, which) on document, so window/document listeners receive them.
+ * Everything else on the page keeps working: the kit only captures touches that start on its own zones/buttons.
+ */
+(function () {
+  'use strict'
+  if (window.TouchKit) return
+  const KEYS = { Space: [' ', 32], Enter: ['Enter', 13], Escape: ['Escape', 27], Tab: ['Tab', 9], ShiftLeft: ['Shift', 16],
+    ControlLeft: ['Control', 17], AltLeft: ['Alt', 18], ArrowLeft: ['ArrowLeft', 37], ArrowUp: ['ArrowUp', 38],
+    ArrowRight: ['ArrowRight', 39], ArrowDown: ['ArrowDown', 40], Backspace: ['Backspace', 8] }
+  const keyInfo = code => {
+    if (KEYS[code]) return KEYS[code]
+    if (/^Key[A-Z]$/.test(code)) return [code[3].toLowerCase(), code.charCodeAt(3)]
+    if (/^Digit\d$/.test(code)) return [code[5], code.charCodeAt(5)]
+    return [code, 0]
+  }
+  const held = new Map()                                   // code → count of sources holding it
+  function sendKey(type, code) {
+    const [key, kc] = keyInfo(code)
+    const ev = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true, composed: true })
+    try { Object.defineProperty(ev, 'keyCode', { get: () => kc }); Object.defineProperty(ev, 'which', { get: () => kc }) } catch (e) {}
+    const t = document.activeElement && document.activeElement !== document.body ? document.activeElement : document
+    t.dispatchEvent(ev)
+  }
+  function press(code) { const n = held.get(code) || 0; held.set(code, n + 1); if (n === 0) sendKey('keydown', code) }
+  function release(code) { const n = held.get(code) || 0; if (n <= 1) { held.delete(code); if (n === 1) sendKey('keyup', code) } else held.set(code, n - 1) }
+  function tapKey(code) { press(code); setTimeout(() => release(code), 80) }
+
+  const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
+  const CSS = `
+.tk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:600 11px/1 system-ui,-apple-system,'Segoe UI',sans-serif;
+  letter-spacing:.06em;color:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tk-root.tk-off{display:none}
+.tk-zone{position:absolute;bottom:0;top:22%;pointer-events:auto;touch-action:none}
+.tk-zone.l{left:0;width:42%}.tk-zone.r{right:0;width:42%}
+.tk-base{position:absolute;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;border:2px solid rgba(255,255,255,.28);
+  background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,.02) 70%);transition:opacity .15s;opacity:.55}
+.tk-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
+  background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.55);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.tk-base.on{opacity:.95}
+.tk-lab{position:absolute;left:0;right:0;top:50%;margin-top:-5px;text-align:center;opacity:.75;text-shadow:0 1px 2px #000;pointer-events:none}
+.tk-btns{position:absolute;display:flex;gap:12px;pointer-events:none}
+.tk-btns.br{right:calc(18px + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse;align-items:flex-end}
+.tk-btns.tr{right:calc(12px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));flex-direction:row-reverse}
+.tk-btns.tl{left:calc(12px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top))}
+.tk-btns.bl{left:calc(18px + env(safe-area-inset-left));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse}
+.tk-row{display:flex;gap:12px;flex-direction:row-reverse;align-items:flex-end}
+.tk-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
+  background:rgba(20,22,30,.42);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.tk-btn.s{width:48px;height:48px;font-size:9px}.tk-btn.l{width:84px;height:84px}
+.tk-btn i{font-style:normal;font-size:22px;line-height:1}.tk-btn.s i{font-size:17px}
+.tk-btn.on{background:rgba(255,255,255,.34);border-color:#fff;transform:scale(.94)}
+.tk-rot{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+  background:rgba(8,9,14,.94);color:#eee;font:500 16px/1.5 system-ui,sans-serif;text-align:center;pointer-events:auto;padding:24px}
+.tk-rot b{font-size:44px;display:block;animation:tkr 1.8s ease-in-out infinite}
+.tk-rot button{margin-top:6px;background:none;border:1px solid #666;color:#bbb;border-radius:20px;padding:8px 18px;font:inherit;font-size:13px}
+@keyframes tkr{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait){.tk-rot.need{display:flex}}
+`
+  // A tap on a kit button is followed by a compatibility `click` at the same spot ~100–300 ms later. If the button just
+  // opened a game overlay/menu under the finger, that click would hit it (and often close it). Swallow it.
+  let clickBlockUntil = 0
+  function suppressClick() { clickBlockUntil = Date.now() + 450 }
+  document.addEventListener('click', e => {
+    if (Date.now() < clickBlockUntil && !(e.target && e.target.closest && e.target.closest('.tk-root'))) { e.stopPropagation(); e.preventDefault() }
+  }, true)
+
+  function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e }
+
+  function create(opt) {
+    opt = opt || {}
+    if (!document.getElementById('tk-style')) { const st = el('style'); st.id = 'tk-style'; st.textContent = CSS; document.head.appendChild(st) }
+    const root = el('div', 'tk-root', document.body)
+    const api = { root, sticks: {}, buttons: {}, visible: false }
+
+    // ---- sticks: floating — the base appears where the thumb lands inside its half of the screen
+    for (const s of opt.sticks || []) {
+      const side = s.side === 'right' ? 'r' : 'l'
+      const zone = el('div', 'tk-zone ' + side, root)
+      if (s.zone) Object.assign(zone.style, s.zone)
+      const base = el('div', 'tk-base', zone), knob = el('div', 'tk-knob', base)
+      if (s.label) el('div', 'tk-lab', knob, s.label)
+      const R = s.radius || 52, dz = s.deadzone == null ? 0.3 : s.deadzone
+      const keys = s.keys === 'wasd' ? { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }
+        : s.keys === 'arrows' ? { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } : s.keys || null
+      const st = { x: 0, y: 0, on: false, pid: null, cx: 0, cy: 0, dirs: {} }
+      api.sticks[s.id || side] = st
+      const rest = () => {                                   // idle hint position; keeps clear of the bottom-right buttons
+        const zr = zone.getBoundingClientRect(); let x = side === 'l' ? 96 : zr.width - 96
+        if (side === 'r' && groups.br) { const gr = groups.br.getBoundingClientRect(); if (gr.width) x = Math.min(x, gr.left - zr.left - 80) }
+        base.style.left = x + 'px'; base.style.top = (zr.height - 110) + 'px'
+      }
+      const setDirs = (want) => {
+        if (!keys) return
+        for (const d of ['up', 'down', 'left', 'right']) {
+          if (want[d] && !st.dirs[d]) { st.dirs[d] = true; press(keys[d]) }
+          else if (!want[d] && st.dirs[d]) { st.dirs[d] = false; release(keys[d]) }
+        }
+      }
+      const move = (px, py) => {
+        let dx = px - st.cx, dy = py - st.cy; const d = Math.hypot(dx, dy)
+        if (d > R) { dx *= R / d; dy *= R / d }
+        knob.style.transform = `translate(${dx}px,${dy}px)`
+        st.x = dx / R; st.y = dy / R
+        const m = Math.hypot(st.x, st.y), a = Math.atan2(st.y, st.x)
+        const want = { up: false, down: false, left: false, right: false }
+        if (m > dz) { const oct = Math.round(a / (Math.PI / 4)); // 8 directions
+          want.right = [0, 1, -1].includes(oct); want.left = [4, -4, 3, -3].includes(oct); want.down = [1, 2, 3].includes(oct); want.up = [-1, -2, -3].includes(oct) }
+        setDirs(want)
+        if (s.onMove) s.onMove(st.x, st.y, true)
+      }
+      zone.addEventListener('pointerdown', e => {
+        if (st.pid !== null) return
+        e.preventDefault(); st.pid = e.pointerId; try { zone.setPointerCapture(e.pointerId) } catch (x) {}
+        const zr = zone.getBoundingClientRect(); st.cx = e.clientX; st.cy = e.clientY
+        base.style.left = (e.clientX - zr.left) + 'px'; base.style.top = (e.clientY - zr.top) + 'px'
+        base.classList.add('on'); st.on = true; move(e.clientX, e.clientY)
+        if (s.onStart) s.onStart()
+      })
+      zone.addEventListener('pointermove', e => { if (e.pointerId === st.pid) { e.preventDefault(); move(e.clientX, e.clientY) } })
+      const end = e => {
+        if (e.pointerId !== st.pid) return
+        st.pid = null; st.on = false; st.x = st.y = 0; knob.style.transform = ''; base.classList.remove('on'); setDirs({}); rest()
+        if (s.onMove) s.onMove(0, 0, false); if (s.onEnd) s.onEnd()
+      }
+      zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end)
+      st.reset = () => { if (st.pid !== null) end({ pointerId: st.pid }) }
+      requestAnimationFrame(rest); addEventListener('resize', rest)
+    }
+
+    // ---- buttons: grouped by place (default bottom-right cluster)
+    const groups = {}
+    for (const b of opt.buttons || []) {
+      const place = b.place || 'bottom-right', code = { 'bottom-right': 'br', 'top-right': 'tr', 'top-left': 'tl', 'bottom-left': 'bl' }[place] || 'br'
+      if (!groups[code]) groups[code] = el('div', 'tk-btns ' + code, root)
+      let parent = groups[code]
+      if (code === 'br' && b.row != null) { parent = groups['br' + b.row] || (groups['br' + b.row] = el('div', 'tk-row', groups.br)) }
+      const btn = el('div', 'tk-btn' + (b.size ? ' ' + b.size : ''), parent, (b.icon ? `<i>${b.icon}</i>` : '') + (b.label ? `<span>${b.label}</span>` : ''))
+      const bs = { down: false, pid: null, el: btn }
+      api.buttons[b.id || b.label] = bs
+      const down = e => {
+        e.preventDefault(); e.stopPropagation()
+        if (b.toggle) { bs.down = !bs.down; btn.classList.toggle('on', bs.down); if (b.key) (bs.down ? press : release)(b.key); (bs.down ? b.onDown : b.onUp) && (bs.down ? b.onDown : b.onUp)(); return }
+        if (bs.pid !== null) return
+        bs.pid = e.pointerId; try { btn.setPointerCapture(e.pointerId) } catch (x) {}
+        bs.down = true; btn.classList.add('on')
+        if (b.key) { if (b.tap) tapKey(b.key); else press(b.key) }
+        if (b.onDown) b.onDown()
+        if (navigator.vibrate && b.buzz !== false) try { navigator.vibrate(8) } catch (x) {}
+      }
+      const up = e => {
+        suppressClick()
+        if (b.toggle || e.pointerId !== bs.pid) return
+        bs.pid = null; bs.down = false; btn.classList.remove('on')
+        if (b.key && !b.tap) release(b.key)
+        if (b.onUp) b.onUp()
+      }
+      btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up)
+      btn.addEventListener('contextmenu', e => e.preventDefault())
+    }
+
+    // ---- portrait → ask to rotate (can be dismissed)
+    let rot = null, rotDismissed = false                      // once dismissed, show(true) must not bring the hint back
+    if (opt.landscape) {
+      rot = el('div', 'tk-rot', document.body, `<b>⟳</b><div>${opt.rotateText || '휴대폰을 가로로 돌려 주세요'}<br><small style="opacity:.6">Rotate your phone</small></div><button type="button">그래도 세로로 하기</button>`)
+      rot.querySelector('button').addEventListener('click', () => { rotDismissed = true; rot.classList.remove('need') })
+    }
+
+    // ---- page hygiene for touch play: no pinch/double-tap zoom, no pull-to-refresh, no long-press menu on the game
+    if (opt.preventGestures !== false) {
+      document.documentElement.style.overscrollBehavior = 'none'
+      document.addEventListener('gesturestart', e => e.preventDefault())
+      let lastT = 0
+      document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastT < 300 && !(e.target.closest && e.target.closest('input,textarea,select,a,button'))) e.preventDefault(); lastT = now }, { passive: false })
+    }
+
+    api.show = on => {
+      api.visible = on; root.classList.toggle('tk-off', !on); if (rot) rot.classList.toggle('need', on && !!opt.landscape && !rotDismissed)
+      if (!on) { for (const s of Object.values(api.sticks)) s.reset && s.reset(); for (const [code] of held) sendKey('keyup', code); held.clear()
+        for (const b of Object.values(api.buttons)) { b.down = false; b.pid = null; b.el.classList.remove('on') } }
+    }
+    api.stick = id => api.sticks[id] || { x: 0, y: 0, on: false }
+    api.pressed = id => !!(api.buttons[id] && api.buttons[id].down)
+    api.destroy = () => { api.show(false); root.remove(); if (rot) rot.remove() }
+    const mode = opt.show || 'auto'
+    api.show(mode === 'always' || (mode === 'auto' && isTouch()))
+    if (mode === 'auto' && !api.visible) addEventListener('touchstart', function once() { removeEventListener('touchstart', once); api.show(true) }, { passive: true })
+    return api
+  }
+
+  // Helpers for games that read the mouse: fire mouse events at a point (client coords).
+  function mouse(target, type, x, y, extra) {
+    const ev = new MouseEvent(type, Object.assign({ clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1 }, extra || {}))
+    ;(target || document.elementFromPoint(x, y) || document).dispatchEvent(ev)
+  }
+  // Resume every AudioContext the game creates, on the first real touch (iOS/Android need a user gesture).
+  function unlockAudio() {
+    const ctxs = new Set(), AC = window.AudioContext || window.webkitAudioContext
+    if (AC && !AC.__tk) { const W = function (...a) { const c = new AC(...a); ctxs.add(c); return c }; W.prototype = AC.prototype; W.__tk = true; window.AudioContext = W; if (window.webkitAudioContext) window.webkitAudioContext = W }
+    const go = () => { for (const c of ctxs) if (c.state === 'suspended') c.resume().catch(() => {}) }
+    addEventListener('pointerdown', go, true); addEventListener('touchend', go, true)
+  }
+  window.TouchKit = { create, press, release, tapKey, sendKey, mouse, unlockAudio, isTouch }
+})()
+</script>
+<script id="platform">
+/* =============================================================================================
+ * platform: canvas output, ui.py (menus, HUD, map, results), audio.py (WebAudio), input.
+ * Desktop keeps the original 1280x720 layout (letterboxed 16:9, pointer lock, keyboard + mouse).
+ * Touch devices get a full-screen view, the same HUD re-arranged for a phone, and on-screen controls.
+ * ============================================================================================= */
+'use strict'
+;(() => {
+const { TAU, pmod, PyRandom, pg, ARENA, SIZE, CYAN, RED, GOLD, WHITE, INK, ASSETS, Renderer, Game } = CORE
+const canvas = document.getElementById('game')
+const ctx = canvas.getContext('2d', { alpha: false })
+const worldCanvas = document.createElement('canvas'), wctx = worldCanvas.getContext('2d')
+let worldImage = null
+
+// ---------- small canvas helpers in the original's pixel conventions ----------
+const COL = {}
+const css = c => COL[c] || (COL[c] = c.length > 3 ? `rgba(${c[0]},${c[1]},${c[2]},${(c[3] / 255).toFixed(4)})` : `rgb(${c[0]},${c[1]},${c[2]})`)
+const SANS = 'Bahnschrift, "Segoe UI", "DejaVu Sans", Roboto, "Helvetica Neue", Arial, sans-serif'
+const MONO = 'Consolas, "DejaVu Sans Mono", Menlo, "Roboto Mono", "Courier New", monospace'
+const pad = (n, w) => String(Math.max(0, n)).padStart(w, '0')
+// pygame's SysFont('bahnschrift', bold=True) finds no bold file and emboldens the regular face (FreeType):
+// heavier strokes and floor(size / 10) px extra advance per glyph. Reproduce that where Bahnschrift is installed.
+const HAS_BAHNSCHRIFT = (() => { const c = document.createElement('canvas').getContext('2d'), t = 'mmmmmmmmmmlliWW'
+  c.font = '72px monospace'; const a = c.measureText(t).width; c.font = '72px Bahnschrift, monospace'; return c.measureText(t).width !== a })()
+const SPACING = 'letterSpacing' in ctx
+const HAS_CONSOLAS = (() => { const c = document.createElement('canvas').getContext('2d'), t = 'mmmmmmmmmmlliWW'
+  c.font = '72px serif'; const a = c.measureText(t).width; c.font = '72px Consolas, serif'; return c.measureText(t).width !== a })()
+function text(str, x, y, size = 20, color = WHITE, bold = false, mono = false, anchor = 'topleft') {
+  const synth = bold && !mono && HAS_BAHNSCHRIFT, extra = synth ? Math.floor(size / 10) : 0
+  ctx.font = `${bold && !synth ? 'bold ' : ''}${size}px ${mono ? MONO : SANS}`
+  if (synth && SPACING) ctx.letterSpacing = extra + 'px'
+  else if (mono && HAS_CONSOLAS && SPACING) ctx.letterSpacing = (Math.round(size * 0.5498) - size * 0.5498).toFixed(3) + 'px'   // hinted whole-pixel advances
+  const w = ctx.measureText(str).width
+  const left = anchor === 'topright' ? x - w : anchor === 'midtop' || anchor === 'midbottom' ? x - w / 2 : x
+  const top = anchor === 'midbottom' ? y - size : y, base = top + Math.round(size * 0.8)   // pygame: rect top + ascent (~0.8 em)
+  ctx.fillStyle = css(color)
+  ctx.fillText(str, left, base)
+  if (synth) { ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, extra * 0.8); ctx.lineJoin = 'round'; ctx.strokeText(str, left, base) }
+  if ((synth || mono) && SPACING) ctx.letterSpacing = '0px'
+  return [left, top, w, size]
+}
+const label = (str, x, y, color = CYAN, size = 14) => text(str, x, y, size, color, false, true)
+function rect(color, x, y, w, h) { ctx.fillStyle = css(color); ctx.fillRect(x, y, w, h) }
+function fillPoly(color, pts) {
+  ctx.fillStyle = css(color); ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1])
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1])
+  ctx.closePath(); ctx.fill()
+}
+function disc(color, cx, cy, r) {                        // pygame.draw.circle (filled), exact pixel spans
+  ctx.fillStyle = css(color)
+  pg.discSpans(Math.trunc(cx), Math.trunc(cy), r, (a, b, y) => ctx.fillRect(Math.min(a, b), y, Math.abs(b - a) + 1, 1))
+}
+function ring(color, cx, cy, r, w) { ctx.strokeStyle = css(color); ctx.lineWidth = w; ctx.beginPath(); ctx.arc(cx, cy, r - w / 2, 0, TAU); ctx.stroke() }
+function aline(color, x1, y1, x2, y2, width) {           // axis-aligned pygame.draw.line with its width rule
+  x1 = Math.trunc(x1); y1 = Math.trunc(y1); x2 = Math.trunc(x2); y2 = Math.trunc(y2)
+  const half = width >> 1, extra = width > 1 ? 1 - (width % 2) : 0, lo = width > 1 ? -half + extra : 0, hi = width > 1 ? half : 0
+  ctx.fillStyle = css(color)
+  if (x1 === x2) ctx.fillRect(x1 + lo, Math.min(y1, y2), hi - lo + 1, Math.abs(y2 - y1) + 1)
+  else ctx.fillRect(Math.min(x1, x2), y1 + lo, Math.abs(x2 - x1) + 1, hi - lo + 1)
+}
+function sline(color, x1, y1, x2, y2, width) { ctx.strokeStyle = css(color); ctx.lineWidth = width; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke() }
+function surfaceCanvas(s) {
+  const c = document.createElement('canvas'); c.width = s.w; c.height = s.h
+  c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(s.d), s.w, s.h), 0, 0)
+  return c
+}
+const glowCache = {}
+function glowCanvas(color, radius, strength) {           // renderer.glow halo, rendered once
+  const key = color + '|' + radius + '|' + strength
+  if (!glowCache[key]) { const tmp = new pg.Surface(radius * 2 + 2, radius * 2 + 2, true); glowCache[key] = surfaceCanvas(CORE.glow(tmp, color, [radius + 1, radius + 1], radius, strength)) }
+  return glowCache[key]
+}
+
+// ---------- ui.py ----------
+const ui = { buttons: {} }
+function panel(x, y, w, h, color = [8, 20, 31, 215], edge = [46, 68, 81]) {
+  fillPoly(color, [[x, y], [x + w - 12, y], [x + w, y + 12], [x + w, y + h], [x + 12, y + h], [x, y + h - 12]])
+  rect(edge, x + 1, y, w - 12, 1)
+}
+function inside(p, r) { return p && p[0] >= r[0] && p[0] < r[0] + r[2] && p[1] >= r[1] && p[1] < r[1] + r[3] }
+function button(name, txt, r, primary = false, subtitle = null, size = 22) {
+  const [x, y, w, h] = r, R = x + w + 1, B = y + h + 1, hovered = inside(input.mouse, r) && !touchMode
+  ui.buttons[name] = r
+  let color = primary ? CYAN : [37, 59, 72]
+  if (hovered || input.pressed === name) color = primary ? [178, 255, 240] : [58, 86, 100]
+  fillPoly(color, [[x, y], [R - 14, y], [R, y + 14], [R, B], [x + 14, B], [x, B - 14]])
+  const ty = touchMode ? y + Math.round((h - size) / 2) - 1 : y + 19
+  text(txt, x + 25, ty, size, primary ? INK : WHITE, true)
+  text('>', R - 28, ty, size, primary ? INK : CYAN, false, true)
+  if (subtitle) label(subtitle, x, y + h + 16, [112, 141, 151], touchMode ? 13 : 14)
+}
+function chip(name, txt, x, y, w, h = 48, on = true) {   // small toggle button for touch menus
+  ui.buttons[name] = [x, y, w, h]
+  const pressed = input.pressed === name
+  fillPoly(pressed ? [58, 86, 100] : [22, 38, 50, 230], [[x, y], [x + w - 10, y], [x + w, y + 10], [x + w, y + h], [x + 10, y + h], [x, y + h - 10]])
+  rect(on ? CYAN : [70, 96, 108], x, y + h - 3, w - 10, 3)
+  text(txt, x + w / 2, y + (h - 14) / 2 - 1, 14, on ? WHITE : [140, 170, 180], false, true, 'midtop')
+}
+let shadeCanvas = null
+function menuShade(W, H) {                                  // per-column alpha exactly as ui.menu
+  if (!shadeCanvas) {
+    shadeCanvas = document.createElement('canvas'); shadeCanvas.width = 1280; shadeCanvas.height = 1
+    const c = shadeCanvas.getContext('2d'), img = c.createImageData(1280, 1)
+    for (let x = 0; x < 1280; x++) { img.data.set([4, 12, 22, Math.trunc(235 * Math.max(0.07, 1 - x / 1230) ** 0.65)], x * 4) }
+    c.putImageData(img, 0, 0)
+  }
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(shadeCanvas, 0, 0, W, H)
+}
+function menu() {                                           // ui.menu (desktop, 1280x720)
+  const g = game
+  ui.buttons = {}
+  menuShade(1280, 720)
+  aline(CYAN, 64, 61, 101, 61, 3)
+  label('N O C T U R N E   /   I N T E R A C T I V E', 116, 53, [164, 191, 201])
+  text('VOL. 01  /  WEB EDITION', 1215, 54, 13, [132, 163, 174], false, true, 'topright')
+  label('S I N G L E - P L A Y E R   A R E N A   F P S', 68, 157, CYAN)
+  text('AETHER', 59, 188, 108, WHITE, true)
+  text('// BREACH', 65, 292, 72, CYAN, true)
+  rect(RED, 68, 389, 5, 42)
+  text('The city went silent.', 88, 386, 22, WHITE)
+  text('Make an entrance.', 88, 415, 22, [137, 162, 175])
+  button('start', 'INITIATE BREACH', [68, 488, 337, 64], true, '[ ENTER ]  DEPLOY TO THE ATRIUM')
+  button('quit', 'EXIT', [422, 488, 128, 64])
+  text('01  /  THE ATRIUM', 1212, 560, 24, WHITE, true, false, 'topright')
+  text('THREE WAVES. ONE WAY OUT.', 1212, 594, 13, CYAN, false, true, 'topright')
+  aline([44, 66, 78], 68, 631, 1212, 631, 1)
+  const controls = [['W A S D', 'MOVE'], ['MOUSE', 'AIM / FIRE'], ['SHIFT', 'DASH'], ['1 / 2', 'WEAPONS'], ['R', 'RELOAD']]
+  controls.forEach(([key, action], i) => { label(key, 68 + i * 204, 654, WHITE); label(action, 68 + i * 204, 677, [107, 138, 153]) })
+  text('M  AUDIO  ' + (audio.enabled ? 'ON' : 'OFF'), 1212, 656, 12, CYAN, false, true, 'topright')
+  text('F11  FULLSCREEN', 1212, 679, 12, [107, 138, 153], false, true, 'topright')
+}
+function objective(g) {
+  if (g.extraction) return ['REACTOR SECURED', 'REACH THE NORTH GATE']
+  if (g.wave === 3) return ['FINAL WAVE  /  03', 'DESTROY THE GUARDIAN']
+  return [`SECURITY WAVE  /  ${pad(g.wave, 2)}`, 'CLEAR THE ATRIUM']
+}
+const clock = t => `${pad(Math.trunc(Math.trunc(t) / 60), 2)}:${pad(Math.trunc(t) % 60, 2)}`
+function hud() {                                            // ui.hud (desktop, 1280x720)
+  const g = game, p = g.player
+  ui.buttons = {}
+  panel(30, 25, 264, 69); rect(CYAN, 30, 25, 3, 69)
+  label('A E T H E R  //  B R E A C H', 48, 38)
+  text('THE ATRIUM', 47, 58, 23, WHITE, true)
+  panel(449, 25, 382, 65)
+  const [lab, obj] = objective(g)
+  text(lab, 640, 36, 12, CYAN, false, true, 'midtop')
+  text(obj, 640, 54, 20, WHITE, true, false, 'midtop')
+  text(pad(g.score, 6), 1216, 28, 32, WHITE, true, true, 'topright')
+  text('SCORE  /  ' + `${pad(g.kills, 2)} ELIMINATIONS`, 1216, 66, 12, [140, 170, 180], false, true, 'topright')
+  if (g.combo >= 2 && g.combo_timer > 0) text(`${g.combo}x CHAIN`, 1216, 93, 18, GOLD, true, false, 'topright')
+  compass(p, 640, 108, 3, 101)
+  // (crosshair and reload bar are drawn in view space, see viewOverlay)
+  panel(30, 603, 353, 88)
+  label('VITALS', 48, 617, [125, 159, 173])
+  text(pad(Math.ceil(p.health), 3), 47, 632, 39, p.health > 25 ? WHITE : RED, true, true)
+  label('+', 133, 650, RED)
+  for (let i = 0; i < 20; i++) rect(i < p.health / 5 ? CYAN : [27, 44, 55], 169 + i * 9, 649, 6, 13)
+  label(`SHIELD  ${pad(Math.trunc(p.shield), 2)}`, 169, 622, [115, 167, 190])
+  rect([29, 48, 64], 169, 640, 177, 3); rect([98, 173, 221], 169, 640, Math.trunc(177 * p.shield / 75), 3)
+  panel(400, 639, 198, 52)
+  const fraction = 1 - Math.min(1, p.dash_cooldown / 2.6)
+  label('SHIFT', 417, 650, fraction === 1 ? CYAN : [107, 139, 149])
+  label(fraction === 1 ? 'DASH READY' : `${p.dash_cooldown.toFixed(1)}s`, 475, 650, WHITE)
+  rect([26, 46, 58], 417, 675, 162, 3); rect(CYAN, 417, 675, Math.trunc(162 * fraction), 3)
+  panel(1003, 596, 247, 95)
+  const accent = g.weapon === 'rifle' ? CYAN : GOLD, count = g.ammo[g.weapon]
+  label(g.weapon === 'rifle' ? '01  /  ARC CARBINE' : '02  /  ION SHOTGUN', 1023, 610, accent)
+  text(pad(count, 2), 1020, 628, 46, count > 0 ? WHITE : RED, true, true)
+  text(`/ ${pad(g.capacity, 2)}`, 1092, 650, 22, [116, 150, 165], false, true)
+  label('R  RELOAD', 1153, 652, accent)
+  banner(g, 640, 173, 37, 14)
+  if (g.time < 12) text('WASD MOVE  /  SHIFT DASH  /  1-2 SWITCH  /  ESC PAUSE', 640, 702, 11, [133, 165, 176], false, true, 'midbottom')
+  else text(`${pad(g.enemies.length, 2)} HOSTILES  /  ${clock(g.time)}  /  TAB MAP`, 640, 702, 11, [133, 165, 176], false, true, 'midbottom')
+  if (g.show_map) minimap(31, 141, 6)
+  if (g.show_fps) label(`${Math.round(g.fps)} FPS`, 32, 110, CYAN)
+  bossBar(g, 640, 130, 451, 378)
+}
+function compass(p, cx, y, scale, markY) {                  // minimal diamond compass along the center top
+  const heading = pmod(p.angle * 180 / Math.PI + 90, 360)
+  for (const [angle, name] of [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W']]) {
+    const relative = pmod(angle - heading + 180, 360) - 180
+    if (Math.abs(relative) < 58) text(name, cx + relative * scale, y, 13, name === 'N' ? CYAN : [117, 146, 161], false, true, 'midtop')
+  }
+  fillPoly(CYAN, [[cx - 3, markY], [cx + 4, markY], [cx, markY + 4]])
+}
+function bossBar(g, cx, y, x0, w) {
+  const boss = g.enemies.find(e => e.kind === 'guardian')
+  if (!boss) return
+  text('A E G I S  /  REACTOR GUARDIAN', cx, y, 13, [208, 157, 255], false, true, 'midtop')
+  rect([31, 29, 51], x0, y + 21, w, 5); rect([200, 130, 255], x0, y + 21, Math.trunc(w * boss.health / boss.max_health), 5)
+}
+function banner(g, cx, y, big, small, maxRight = Infinity, minLeft = -Infinity) {
+  if (g.banner_timer <= 0) return
+  if (maxRight < Infinity) {                                  // touch layouts: keep clear of the ammo panel
+    ctx.font = `bold ${big}px ${SANS}`; let w = ctx.measureText(g.banner).width * 1.12
+    ctx.font = `${small}px ${MONO}`; w = Math.max(w, ctx.measureText(g.banner_sub).width) + 8
+    cx = Math.max(minLeft + w / 2, Math.min(cx, maxRight - w / 2))
+  }
+  ctx.globalAlpha = Math.min(255, Math.trunc(g.banner_timer * 220)) / 255
+  text(g.banner, cx, y, big, WHITE, true, false, 'midtop')
+  text(g.banner_sub, cx, y + Math.round(big * 1.35), small, CYAN, false, true, 'midtop')
+  ctx.globalAlpha = 1
+}
+function minimap(x0, y0, cell) {                             // ui.minimap: 6 px per tile on desktop
+  const g = game, ox = x0 + 9, oy = y0 + 35
+  panel(x0, y0, SIZE * cell + 16, SIZE * cell + 39, [5, 17, 27, 235])
+  label('TACTICAL / LIVE', x0 + 13, y0 + 12, CYAN, cell < 6 ? 13 : 14)
+  ctx.fillStyle = css([40, 65, 79])
+  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (ARENA[y][x]) ctx.fillRect(ox + x * cell, oy + y * cell, cell - 1, cell - 1)
+  for (const e of g.enemies) disc(RED, ox + e.x * cell, oy + e.y * cell, Math.max(2, cell >> 1))
+  const p = g.player, c = [Math.trunc(ox + p.x * cell), Math.trunc(oy + p.y * cell)]
+  disc(CYAN, c[0], c[1], cell < 6 ? 3 : 4)
+  sline(CYAN, c[0], c[1], c[0] + Math.cos(p.angle) * 10, c[1] + Math.sin(p.angle) * 10, 2)
+  if (g.extraction) ring(GOLD, ox + 16 * cell, oy + 3.4 * cell, 5, 2)
+}
+function stats(g, cx, y, s) {                               // results panel of ui.modal
+  panel(cx - 293 * s, y, 586 * s, 115 * s)
+  for (const [dx, value, name] of [[-210, pad(g.score, 6), 'SCORE'], [0, String(g.kills), 'ELIMINATIONS'], [195, clock(g.time), 'RUN TIME']]) {
+    text(value, cx + dx * s, y + 22 * s, Math.round(37 * s), WHITE, true, true, 'midtop')
+    text(name, cx + dx * s, y + 76 * s, Math.max(12, Math.round(12 * s)), CYAN, false, true, 'midtop')
+  }
+}
+function modal() {                                          // ui.modal (desktop, 1280x720)
+  const g = game
+  ui.buttons = {}
+  rect([3, 10, 21, 213], 0, 0, 1280, 720)
+  if (g.state === 'paused') {
+    text('SIGNAL PAUSED', 640, 145, 56, WHITE, true, false, 'midtop')
+    text('Take a breath. The city can wait.', 640, 218, 21, [135, 166, 178], false, false, 'midtop')
+    button('resume', 'RESUME', [465, 292, 350, 62], true)
+    button('restart', 'RESTART RUN', [465, 373, 350, 62])
+    button('menu', 'MAIN MENU', [465, 454, 350, 62])
+    text('ESC RESUME  /  M AUDIO  /  F11 FULLSCREEN  /  F3 FPS', 640, 566, 14, CYAN, false, true, 'midtop')
+    text('WASD move  |  Mouse aim + fire  |  Shift dash  |  R reload  |  1 / 2 weapons', 640, 602, 16, [136, 165, 177], false, false, 'midtop')
+    text('F2  RENDER QUALITY: ' + (g.high_quality ? 'HIGH' : 'BALANCED'), 640, 643, 13, CYAN, false, true, 'midtop')
+  } else {
+    const won = g.state === 'victory'
+    text(won ? 'TRANSMISSION COMPLETE' : 'SIGNAL LOST', 640, 135, 49, won ? CYAN : RED, true, false, 'midtop')
+    text(won ? 'You gave the city its heartbeat back.' : 'The Atrium claimed another runner. Go again.', 640, 211, 22, WHITE, false, false, 'midtop')
+    stats(g, 640, 276, 1)
+    button('restart', 'RUN IT BACK', [465, 434, 350, 64], true)
+    button('menu', 'MAIN MENU', [465, 518, 350, 62])
+    text('ENTER TO REDEPLOY', 640, 620, 13, [136, 165, 177], false, true, 'midtop')
+  }
+}
+
+// ---------- touch layouts (phones and tablets): same art and fonts, re-arranged, no text below 13 units ----------
+function kitBox(group) {                                    // on-screen button cluster in HUD units
+  const el = kit && kit.root.querySelector('.tk-btns.' + group)
+  if (!el || !kit.visible) return null
+  const r = el.getBoundingClientRect(), k = 1 / L.U
+  if (!r.width) return null
+  return { left: (r.left - L.left) * k, top: (r.top - L.top) * k, right: (r.right - L.left) * k, bottom: (r.bottom - L.top) * k }
+}
+function hudTouch() {
+  const g = game, p = g.player, S = L.safe, HW = L.HW, HH = L.HH
+  ui.buttons = {}
+  const x0 = S.l + 10, y0 = S.t + 8, narrow = HW < HH || HW < 560
+  // vitals
+  panel(x0, y0, 236, 62); rect(CYAN, x0, y0, 3, 62)
+  label('VITALS', x0 + 14, y0 + 8, [125, 159, 173], 13)
+  text(pad(Math.ceil(p.health), 3), x0 + 13, y0 + 23, 31, p.health > 25 ? WHITE : RED, true, true)
+  label(`SHIELD  ${pad(Math.trunc(p.shield), 2)}`, x0 + 86, y0 + 8, [115, 167, 190], 13)
+  rect([29, 48, 64], x0 + 86, y0 + 27, 138, 3); rect([98, 173, 221], x0 + 86, y0 + 27, Math.trunc(138 * p.shield / 75), 3)
+  for (let i = 0; i < 20; i++) rect(i < p.health / 5 ? CYAN : [27, 44, 55], x0 + 86 + i * 7, y0 + 38, 5, 12)
+  // dash readout (the DASH button also shows the recharge)
+  const yd = y0 + 68, fraction = 1 - Math.min(1, p.dash_cooldown / 2.6)
+  if (!g.show_map) {                                         // the open map takes this slot; the DASH button keeps the recharge ring
+    panel(x0, yd, 170, 40)
+    label('DASH', x0 + 14, yd + 7, fraction === 1 ? CYAN : [107, 139, 149], 13)
+    label(fraction === 1 ? 'READY' : `${p.dash_cooldown.toFixed(1)}s`, x0 + 66, yd + 7, WHITE, 13)
+    rect([26, 46, 58], x0 + 14, yd + 29, 142, 3); rect(CYAN, x0 + 14, yd + 29, Math.trunc(142 * fraction), 3)
+  }
+  // score + weapon under the top-right buttons (pause / map)
+  const tr = kitBox('tr'), rx = HW - S.r - 12
+  let ry = (tr ? tr.bottom : S.t + 58) + 8
+  const sc = text(pad(g.score, 6), rx, ry, 26, WHITE, true, true, 'topright')
+  text(`${pad(g.kills, 2)} ELIMINATIONS`, rx, ry + 30, 13, [140, 170, 180], false, true, 'topright')
+  if (g.combo >= 2 && g.combo_timer > 0) text(`${g.combo}x CHAIN`, sc[0] - 12, ry + 7, 16, GOLD, true, false, 'topright')
+  // objective, compass and boss bar in the middle of the top edge (second row on narrow screens)
+  const left = x0 + 236 + 12, right = (tr ? tr.left : HW - S.r - 132) - 12
+  let ow = Math.min(340, right - left), ox, oy
+  if (ow >= 250 && !narrow) { ox = (left + right) / 2; oy = S.t + 6 } else { ow = Math.min(340, HW - S.l - S.r - 24); ox = (S.l + HW - S.r) / 2; oy = Math.max(yd + 48, ry + 72) }
+  panel(ox - ow / 2, oy, ow, 50)
+  const [lab, obj] = objective(g)
+  text(lab, ox, oy + 7, 13, CYAN, false, true, 'midtop')
+  text(obj, ox, oy + 24, 18, WHITE, true, false, 'midtop')
+  compass(p, ox, oy + 58, (ow / 2 - 12) / 58, oy + 53)
+  bossBar(g, ox, oy + 78, ox - ow / 2, ow)
+  // weapon + ammo
+  const br = kitBox('br'), wx = rx - 204, accent = g.weapon === 'rifle' ? CYAN : GOLD, count = g.ammo[g.weapon]
+  let wy = narrow ? oy + 112 : ry + 66
+  if (!narrow && br) wy = Math.max(ry + 50, Math.min(wy, br.top - 64))   // stay clear of the button cluster
+  panel(wx, wy, 204, 56)
+  label(g.weapon === 'rifle' ? '01  /  ARC CARBINE' : '02  /  ION SHOTGUN', wx + 14, wy + 6, accent, 13)
+  text(pad(count, 2), wx + 12, wy + 21, 30, count > 0 ? WHITE : RED, true, true)
+  text(`/ ${pad(g.capacity, 2)}`, wx + 66, wy + 32, 17, [116, 150, 165], false, true)
+  if (g.reload_time > 0) label('CHARGING', wx + 122, wy + 34, accent, 13)
+  if (narrow) banner(g, HW / 2, Math.max(oy + 190, HH * 0.36), 26, 13)
+  else banner(g, HW / 2, Math.max(oy + 106, HH * 0.3), HW < 760 ? 26 : 32, 13, wx - 12, S.l + 8)
+  const hint = g.time < 12 ? 'STICK MOVE  /  DRAG AIM  /  DASH EVADES' : `${pad(g.enemies.length, 2)} HOSTILES  /  ${clock(g.time)}  /  MAP`
+  text(hint, HW / 2, narrow && br ? br.top - 12 : HH - S.b - 8, 13, [133, 165, 176], false, true, 'midbottom')
+  if (g.show_map) minimap(x0, yd, narrow ? 3 : 4)
+  if (g.show_fps) label(`${Math.round(g.fps)} FPS`, x0 + 180, yd + 7, CYAN, 13)
+}
+function toggles(y, cx, maxW, which = ['audio', 'quality', 'fps', 'fullscreen']) {   // touch replacements for M / F2 / F3 / F11
+  const all = { audio: ['audio', 'AUDIO ' + (audio.enabled ? 'ON' : 'OFF'), audio.enabled], quality: ['quality', game.high_quality ? 'QUALITY HIGH' : 'QUALITY BALANCED', true],
+    fps: ['fps', 'FPS ' + (game.show_fps ? 'ON' : 'OFF'), game.show_fps],
+    fullscreen: fullscreenOK() ? ['fullscreen', document.fullscreenElement ? 'EXIT FULLSCREEN' : 'FULLSCREEN', !!document.fullscreenElement] : null }
+  const items = which.map(k => all[k]).filter(Boolean)
+  const gap = 10, widths = items.map(([, t]) => Math.max(104, t.length * 8.2 + 26))
+  let total = widths.reduce((a, b) => a + b, 0) + gap * (items.length - 1), rows = [items.map((it, i) => [it, widths[i]])]
+  if (total > maxW) { const half = Math.ceil(items.length / 2); rows = [rows[0].slice(0, half), rows[0].slice(half)] }
+  rows.forEach((row, k) => {
+    const w = row.reduce((a, [, wd]) => a + wd, 0) + gap * (row.length - 1)
+    let x = cx - w / 2
+    for (const [[name, txt, on], wd] of row) { chip(name, txt, x, y + k * 58, wd, 48, on); x += wd + gap }
+  })
+  return y + rows.length * 58
+}
+function menuTouch() {
+  ui.buttons = {}
+  const S = L.safe, HW = L.HW, HH = L.HH, narrow = HW < HH, x = S.l + 24
+  menuShade(narrow ? HW * 1.6 : HW, HH)
+  let y = S.t + 16
+  aline(CYAN, x, y + 8, x + 36, y + 8, 3)
+  label('N O C T U R N E   /   I N T E R A C T I V E', x + 50, y, [164, 191, 201], 13)
+  if (!narrow) text('VOL. 01  /  WEB EDITION', HW - S.r - 24, y, 13, [132, 163, 174], false, true, 'topright')
+  y += 36
+  label(narrow ? 'A R E N A   F P S' : 'S I N G L E - P L A Y E R   A R E N A   F P S', x + 2, y, CYAN, 13)
+  const big = narrow ? Math.min(84, Math.trunc((HW - S.l - S.r - 40) / 3.6)) : Math.min(84, Math.max(60, Math.trunc(HH * 0.185)))
+  text('AETHER', x - 4, y + 16, big, WHITE, true)
+  text('// BREACH', x, y + 16 + Math.round(big * 0.94), Math.round(big * 0.66), CYAN, true)
+  y += 16 + Math.round(big * 0.94) + Math.round(big * 0.66) + 16
+  rect(RED, x, y + 3, 4, 38)
+  text('The city went silent.', x + 18, y, 18, WHITE)
+  text('Make an entrance.', x + 18, y + 22, 18, [137, 162, 175])
+  const bw = narrow ? Math.min(290, HW - S.l - S.r - 48 - 124) : 300
+  const by = narrow ? y + 70 : Math.max(y + 58, HH - S.b - 100)
+  button('start', 'INITIATE BREACH', [x, by, bw, 58], true, '[ TAP ]  DEPLOY TO THE ATRIUM', bw < 280 ? 19 : 22)
+  button('quit', 'EXIT', [x + bw + 14, by, 110, 58])
+  const legend = [['LEFT STICK', 'MOVE'], ['DRAG RIGHT SIDE', 'AIM'], ['FIRE', 'SHOOT'], ['DASH', 'EVADE'], ['1 / 2', 'WEAPONS'], ['RELOAD', 'CELL']]
+  if (!narrow) {
+    const rx = HW - S.r - 24
+    text('01  /  THE ATRIUM', rx, S.t + 52, 22, WHITE, true, false, 'topright')
+    text('THREE WAVES. ONE WAY OUT.', rx, S.t + 82, 13, CYAN, false, true, 'topright')
+    const colW = 150, lx = rx - colW * 2 + 10
+    legend.forEach(([k, a], i) => { const cx = lx + (i % 2) * colW, cy = S.t + 118 + Math.trunc(i / 2) * 40; label(k, cx, cy, WHITE, 13); label(a, cx, cy + 17, [107, 138, 153], 13) })
+    const colX = x + bw + 124 + 24
+    toggles(Math.max(S.t + 118 + 3 * 40 + 6, HH - S.b - 66), (colX + rx) / 2, rx - colX, ['audio', 'fullscreen'])
+  } else {
+    let ly = by + 58 + 44
+    text('01  /  THE ATRIUM', x, ly, 22, WHITE, true); text('THREE WAVES. ONE WAY OUT.', x, ly + 30, 13, CYAN, false, true)
+    ly += 64
+    legend.forEach(([k, a], i) => { const cx = x + (i % 2) * 170, cy = ly + Math.trunc(i / 2) * 40; label(k, cx, cy, WHITE, 13); label(a, cx, cy + 17, [107, 138, 153], 13) })
+    toggles(ly + 3 * 40 + 14, HW / 2, HW - S.l - S.r - 32, ['audio', 'fullscreen'])
+  }
+}
+function modalTouch() {
+  const g = game, S = L.safe, HW = L.HW, HH = L.HH, cx = (S.l + HW - S.r) / 2, avail = HW - S.l - S.r - 32
+  ui.buttons = {}
+  rect([3, 10, 21, 213], 0, 0, HW, HH)
+  let y = S.t + Math.max(12, HH * 0.06)
+  const bh = 56, gap = 14
+  const row = names => {                                   // a row of big buttons, or a column when narrow
+    const bw = Math.min(260, (avail - gap * (names.length - 1)) / names.length)
+    if (bw >= 170) { let x = cx - (bw * names.length + gap * (names.length - 1)) / 2; for (const [n, t, pri] of names) { button(n, t, [x, y, bw, bh], pri, null, bw < 220 ? 19 : 22); x += bw + gap } y += bh + 22 }
+    else { const w = Math.min(320, avail); for (const [n, t, pri] of names) { button(n, t, [cx - w / 2, y, w, bh], pri); y += bh + 12 } y += 10 }
+  }
+  if (g.state === 'paused') {
+    text('SIGNAL PAUSED', cx, y, 40, WHITE, true, false, 'midtop'); y += 50
+    text('Take a breath. The city can wait.', cx, y, 18, [135, 166, 178], false, false, 'midtop'); y += 40
+    row([['resume', 'RESUME', true], ['restart', 'RESTART RUN', false], ['menu', 'MAIN MENU', false]])
+    y = toggles(y, cx, avail) + 6
+    const lines = avail < 640 ? ['STICK MOVE  |  DRAG AIM  |  FIRE', 'DASH  |  1 / 2  |  RELOAD  |  MAP'] : ['STICK MOVE  |  DRAG AIM  |  FIRE  |  DASH  |  1 / 2  |  RELOAD  |  MAP']
+    lines.forEach((t, i) => text(t, cx, y + i * 22, 13, [136, 165, 177], false, true, 'midtop'))
+  } else {
+    const won = g.state === 'victory'
+    text(won ? 'TRANSMISSION COMPLETE' : 'SIGNAL LOST', cx, y, HW < 560 ? 30 : 40, won ? CYAN : RED, true, false, 'midtop'); y += HW < 560 ? 40 : 50
+    text(won ? 'You gave the city its heartbeat back.' : 'The Atrium claimed another runner. Go again.', cx, y, HW < 560 ? 15 : 18, WHITE, false, false, 'midtop'); y += 36
+    const s = Math.min(0.85, avail / 586)
+    stats(g, cx, y, s); y += 115 * s + 22
+    row([['restart', 'RUN IT BACK', true], ['menu', 'MAIN MENU', false]])
+  }
+}
+
+// ---------- view-space drawing: world, weapon, crosshair, screen effects ----------
+function drawWeapon() {                                     // renderer.weapon
+  const g = game, bob = Math.sin(g.walk_phase) * g.moving, kick = g.recoil
+  const reloadDip = g.reload_time > 0 ? Math.sin(g.reload_progress * Math.PI) * 210 : 0, switchDip = g.switch_time * 430
+  const ox = L.VW / 2 - 130 + bob * 7 + g.player.pitch * 0.08
+  const oy = L.VH - 398 + Math.abs(bob) * 5 + kick * 27 + reloadDip + switchDip
+  ctx.drawImage(weaponCanvas[g.weapon], Math.trunc(ox), Math.trunc(oy))
+  if (g.muzzle > 0) {
+    const cx = Math.trunc(ox + 210), cy = Math.trunc(oy + 111), scatter = g.weapon === 'scatter', color = scatter ? GOLD : CYAN, r = scatter ? 112 : 78
+    ctx.drawImage(glowCanvas(color, r, 1.5), cx - r - 1, cy - r - 1)
+    const rng = new PyRandom(Math.trunc(g.time * 1000)), pts = []
+    for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, rr = i % 2 === 0 ? rng.uniform(34, 85) : 10; pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]) }
+    fillPoly(color, pts)
+    disc([240, 255, 239], cx, cy, 12)
+  }
+}
+function viewOverlay() {                                    // crosshair and reload bar (ui.hud), centered on the view
+  const g = game, cx = Math.trunc(L.VW / 2), cy = Math.trunc(L.VH / 2)
+  let spread = 7 + g.recoil * 9 + g.moving * 2
+  if (g.weapon === 'scatter') spread += 10
+  const cross = g.hit_marker > 0 ? RED : [182, 240, 230]
+  for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+    aline([9, 23, 30], cx + dx * spread, cy + dy * spread, cx + dx * (spread + 7), cy + dy * (spread + 7), 4)
+    aline(cross, cx + dx * spread, cy + dy * spread, cx + dx * (spread + 6), cy + dy * (spread + 6), 2)
+  }
+  disc([220, 255, 246], cx, cy, 2)
+  if (g.hit_marker > 0) for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) sline(WHITE, cx + dx * 8, cy + dy * 8, cx + dx * 15, cy + dy * 15, 2)
+  if (g.reload_time > 0) {
+    const accent = g.weapon === 'rifle' ? CYAN : GOLD
+    rect([29, 50, 59], cx - 100, cy + 51, 200, 3); rect(accent, cx - 100, cy + 51, Math.trunc(200 * g.reload_progress), 3)
+    text('CHARGING CELL', cx, cy + 64, touchMode ? 13 : 12, accent, false, true, 'midtop')
+  }
+}
+function effects() {                                        // ui.effects: scanlines, damage flash, dash streaks
+  const g = game, VW = L.VW, VH = L.VH
+  ctx.fillStyle = 'rgba(0,5,12,0.051)'; ctx.beginPath()
+  for (let y = 0; y < VH; y += 4) ctx.rect(0, y, VW, 1)
+  ctx.fill()
+  if (g.damage_flash > 0) rect([255, 35, 61, Math.min(85, Math.trunc(g.damage_flash * 220))], 0, 0, VW, VH)
+  if (g.player.dash_time > 0) {
+    rect([30, 231, 240, 18], 0, 0, VW, VH)
+    ctx.strokeStyle = css([76, 150, 162]); ctx.lineWidth = 1; ctx.beginPath()
+    for (let i = 0; i < 18; i++) {
+      const a = i * TAU / 18
+      ctx.moveTo(VW / 2 + Math.cos(a) * 395, VH / 2 + Math.sin(a) * 290); ctx.lineTo(VW / 2 + Math.cos(a) * 680, VH / 2 + Math.sin(a) * 430)
+    }
+    ctx.stroke()
+  }
+}
+function capturePrompt() {                                  // desktop: the browser needs a click to lock the mouse again
+  rect([3, 10, 21, 170], 0, 0, 1280, 720)
+  text('CLICK TO RESUME', 640, 318, 37, WHITE, true, false, 'midtop')
+  text('THE BROWSER NEEDS A CLICK TO CAPTURE THE MOUSE  /  ESC PAUSE', 640, 370, 14, CYAN, false, true, 'midtop')
+}
+let weaponCanvas = null
+function draw() {
+  const g = game, t0 = performance.now()
+  const img = renderer.world(g)
+  L.worldMs = L.worldMs * 0.95 + (performance.now() - t0) * 0.05
+  wctx.putImageData(worldImage, 0, 0)
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(worldCanvas, 0, 0, L.bw, L.bh)             // nearest-neighbour upscale of the low-res world
+  ctx.imageSmoothingEnabled = true                           // the 1280x720 layer was smoothscaled in the original
+  ctx.setTransform(L.kv, 0, 0, L.kv, 0, 0)
+  if (g.state !== 'menu') {
+    drawWeapon()
+    if (g.shake > 0.5 && g.state === 'playing') {             // screen.scroll: the scene jolts, the HUD stays put
+      const dx = Math.trunc(g.rng.uniform(-g.shake, g.shake)), dy = Math.trunc(g.rng.uniform(-g.shake, g.shake))
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(canvas, Math.round(dx * L.kv), Math.round(dy * L.kv)); ctx.setTransform(L.kv, 0, 0, L.kv, 0, 0)
+    }
+    effects()
+    viewOverlay()
+    ctx.setTransform(L.kh, 0, 0, L.kh, 0, 0)
+    touchMode ? hudTouch() : hud()
+    if (g.state !== 'playing') touchMode ? modalTouch() : modal()
+    else if (showCapturePrompt()) capturePrompt()
+  } else {
+    effects()
+    ctx.setTransform(L.kh, 0, 0, L.kh, 0, 0)
+    touchMode ? menuTouch() : menu()
+  }
+}
+
+// ---------- audio.py: synthesized effects and the 112 BPM score (WebAudio) ----------
+const audio = {
+  enabled: true, ready: false, ctx: null, effects: {}, active: 0,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended' && !document.hidden) this.ctx.resume().catch(() => {}); return }
+    const AC = window.AudioContext || window.webkitAudioContext
+    if (!AC) return
+    try { this.ctx = new AC() } catch (e) { return }
+    const ac = this.ctx, rate = 22050, rng = new PyRandom(27)
+    const noise = n => { const a = new Float64Array(n); for (let i = 0; i < n; i++) a[i] = rng.uniform(-1, 1); return a }
+    const buffer = w => {                                    // np.clip -> int16 (x 28000) exactly like pygame.sndarray
+      const b = ac.createBuffer(1, w.length, rate), d = b.getChannelData(0)
+      for (let i = 0; i < w.length; i++) d[i] = Math.trunc(Math.max(-1, Math.min(1, w[i])) * 28000) / 32768
+      return b
+    }
+    const effect = (name, duration, fn) => {
+      const n = Math.trunc(duration * rate), w = new Float64Array(n), nz = fn.noise ? noise(n) : null
+      for (let i = 0; i < n; i++) w[i] = fn(i / rate, nz ? nz[i] : 0)
+      this.effects[name] = buffer(w)
+    }
+    const S = Math.sin, E = Math.exp, PI2 = 2 * Math.PI
+    const withNoise = f => (f.noise = true, f)
+    effect('rifle', 0.22, withNoise((t, z) => (0.35 * z + 0.55 * S(PI2 * (155 * t + 65 * (1 - E(-25 * t))))) * E(-25 * t)))
+    effect('scatter', 0.46, withNoise((t, z) => (0.6 * z + 0.6 * S(PI2 * (50 * t + 4 * (1 - E(-50 * t))))) * E(-12 * t)))
+    effect('hit', 0.12, withNoise((t, z) => (S(PI2 * 1050 * t) * 0.23 + z * 0.1) * E(-36 * t)))
+    effect('kill', 0.32, withNoise((t, z) => (S(PI2 * (780 * t - 650 * t * t)) * 0.25 + z * 0.2) * E(-13 * t)))
+    effect('hurt', 0.30, withNoise((t, z) => (S(PI2 * 65 * t) * 0.55 + z * 0.12) * E(-12 * t)))
+    effect('dash', 0.30, withNoise((t, z) => z * S(Math.PI * t / 0.3) * 0.26))
+    effect('pickup', 0.40, t => S(PI2 * (620 * t + 500 * t * t)) * E(-9 * t) * 0.32)
+    effect('reload', 0.18, withNoise((t, z) => (z * 0.3 + S(PI2 * 380 * t) * 0.2) * E(-35 * t)))
+    effect('wave', 0.90, t => (S(PI2 * 220 * t) + S(PI2 * 330 * t)) * S(Math.PI * t / 0.9) * 0.18)
+    effect('enemy', 0.22, t => S(PI2 * (480 * t - 500 * t * t)) * E(-15 * t) * 0.17)
+    // make_music: 32 beats at 112 BPM, bass + kick + snare + hats + arpeggio, soft-clipped with tanh
+    const beat = 60 / 112, wave = new Float64Array(Math.trunc(beat * 32 * rate))
+    const add = (start, note) => { const off = Math.trunc(start * rate), end = Math.min(wave.length, off + note.length); for (let i = off; i < end; i++) wave[i] += note[i - off] }
+    const tone = (freq, length, amp) => {
+      const n = Math.trunc(length * rate), a = new Float64Array(n)
+      for (let i = 0; i < n; i++) { const t = i / rate; a[i] = (S(PI2 * freq * t) + 0.28 * S(PI2 * freq * 2 * t)) * (Math.min(1, t * 60) * E(-3.5 * t / length)) * amp }
+      return a
+    }
+    const roots = [55, 65.406, 49, 73.416]
+    for (let step = 0; step < 64; step++) {
+      const when = step * beat / 2, root = roots[Math.trunc(step / 16) % 4]
+      add(when, tone(root * (step % 8 === 6 ? 2 : 1), beat * 0.45, 0.22))
+      if (step % 2 === 0) { const n = Math.trunc(0.24 * rate), k = new Float64Array(n); for (let i = 0; i < n; i++) { const t = i / rate; k[i] = S(PI2 * (45 * t + 2.7 * (1 - E(-30 * t)))) * E(-20 * t) * 0.5 } add(when, k) }
+      if (step % 8 === 4) { const n = Math.trunc(0.15 * rate), z = noise(n); for (let i = 0; i < n; i++) z[i] *= E(-28 * i / rate) * 0.17; add(when, z) }
+      const n = Math.trunc(0.05 * rate), z = noise(n)
+      for (let i = 0; i < n; i++) z[i] *= E(-75 * i / rate) * (step % 2 ? 0.065 : 0.035)
+      add(when, z)
+      add(when, tone(root * [4, 6, 8, 6, 4, 6, 9, 8][step % 8], beat * 0.8, 0.055))
+    }
+    for (let i = 0; i < wave.length; i++) wave[i] = Math.tanh(wave[i])
+    this.master = ac.createGain(); this.master.connect(ac.destination)
+    this.musicGain = ac.createGain(); this.musicGain.gain.value = this.enabled ? 0.32 : 0; this.musicGain.connect(this.master)
+    const music = ac.createBufferSource(); music.buffer = this.musicBuffer = buffer(wave); music.loop = true; music.connect(this.musicGain); music.start()
+    this.ready = true
+    if (ac.state === 'suspended') ac.resume().catch(() => {})
+  },
+  play(name, volume = 1) {                                   // pygame.mixer.find_channel(): 23 effect channels, never forced
+    if (!this.ready || !this.enabled || this.active >= 23 || !this.effects[name] || this.ctx.state !== 'running') return
+    const src = this.ctx.createBufferSource(), gain = this.ctx.createGain()
+    src.buffer = this.effects[name]; gain.gain.value = volume * 0.58
+    src.connect(gain); gain.connect(this.master)
+    this.active++; src.onended = () => { this.active--; gain.disconnect() }
+    src.start()
+  },
+  toggle() {
+    this.enabled = !this.enabled
+    if (this.ready) this.musicGain.gain.value = this.enabled ? 0.32 : 0
+    return this.enabled
+  },
+}
+
+// ---------- layout: desktop letterbox (as the pygame window) or full-screen touch view ----------
+let touchMode = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches)
+const L = { worldMs: 0, safe: { l: 0, r: 0, t: 0, b: 0 }, U: 1, worldH: 0 }
+const probe = document.createElement('div')
+probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)'
+document.body.appendChild(probe)
+let renderer = null, game = null
+function worldSize() {
+  if (!touchMode) return game.high_quality ? [640, 360] : [512, 288]
+  const base = L.worldH || (game.high_quality ? 360 : 288)
+  if (L.bw >= L.bh) return [Math.round(base * L.bw / L.bh), base]
+  const w = Math.round(base * 1.12)                          // portrait: keep the horizontal field of view
+  return [w, Math.round(w * L.bh / L.bw)]
+}
+function setRenderer() {
+  const [w, h] = worldSize()
+  if (renderer && renderer.w === w && renderer.h === h) return
+  const old = renderer
+  renderer = new Renderer(w, h)
+  worldCanvas.width = w; worldCanvas.height = h
+  worldImage = new ImageData(renderer.image.d, w, h)
+  if (game) {
+    game.renderer = renderer
+    if (old) { const p = game.player; p.pitch *= renderer.pitchUnit / old.pitchUnit }
+  }
+}
+function layout() {
+  const vw = innerWidth, vh = innerHeight
+  let cw, ch, left, top
+  if (!touchMode) { const ratio = Math.min(vw / 1280, vh / 720); cw = 1280 * ratio; ch = 720 * ratio; left = (vw - cw) / 2; top = (vh - ch) / 2 }
+  else { cw = vw; ch = vh; left = 0; top = 0 }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), bw = Math.max(1, Math.round(cw * dpr)), bh = Math.max(1, Math.round(ch * dpr))
+  Object.assign(canvas.style, { left: left + 'px', top: top + 'px', width: cw + 'px', height: ch + 'px' })
+  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh }
+  const cs = getComputedStyle(probe), px = v => parseFloat(v) || 0
+  Object.assign(L, { cw, ch, left, top, dpr, bw, bh })
+  L.kv = Math.min(bh / 720, bw / 1280); L.VW = bw / L.kv; L.VH = bh / L.kv
+  if (!touchMode) { L.kh = L.kv; L.HW = L.VW; L.HH = L.VH; L.U = cw / 1280; L.safe = { l: 0, r: 0, t: 0, b: 0 } }
+  else {
+    L.U = Math.min(1.35, Math.max(0.93, Math.min(cw, ch) / 400))   // CSS px per HUD unit: 13-unit text is >= 12 CSS px
+    L.kh = dpr * L.U; L.HW = bw / L.kh; L.HH = bh / L.kh
+    L.safe = { t: px(cs.paddingTop) / L.U, r: px(cs.paddingRight) / L.U, b: px(cs.paddingBottom) / L.U, l: px(cs.paddingLeft) / L.U }
+  }
+  if (game) setRenderer()
+}
+function setTouchMode(on) {
+  if (touchMode === on) return
+  touchMode = on; L.worldH = 0; layout()
+  if (kit) kit.show(on && game.state === 'playing')
+}
+
+// ---------- input: keyboard, mouse + pointer lock (desktop), touch-kit + drag-to-look (touch) ----------
+const input = { unlockAt: -1e9, lockAskedAt: -1e9, keys: new Set(), mouse: null, mouseHeld: false, relX: 0, relY: 0, lookId: null, lookX: 0, lookY: 0, touchFire: false, pressed: null, wheelAt: 0, lockWorked: false, lockUnavailable: false, swallow: false }
+const key = code => input.keys.has(code) ? 1 : 0
+const locked = () => document.pointerLockElement === canvas
+const capturePending = () => !touchMode && game.state === 'playing' && !locked() && !input.lockUnavailable
+const showCapturePrompt = () => capturePending() && performance.now() - input.lockAskedAt > 600   // lock requests settle asynchronously
+function requestLock() {
+  if (touchMode || !canvas.requestPointerLock || locked()) return
+  input.lockAskedAt = performance.now()
+  try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}) } catch (e) {}
+}
+function onCapture(on) {                                     // Game.capture_mouse
+  input.relX = input.relY = 0; input.mouseHeld = false
+  if (touchMode) {
+    if (kit) {
+      kit.show(on)
+      if (on && rotateDismissed && kit.rotate) kit.rotate.classList.remove('need')
+      if (on) requestAnimationFrame(() => dispatchEvent(new Event('resize')))   // touch-kit places the idle stick on resize
+    }
+  }
+  else if (on) requestLock()
+  else if (locked()) document.exitPointerLock()
+}
+document.addEventListener('pointerlockchange', () => {
+  if (locked()) { input.lockWorked = true; input.lockUnavailable = false; input.relX = input.relY = 0 }
+  else { input.unlockAt = performance.now(); if (game.state === 'playing' && !touchMode) pause() }   // Esc released the mouse: pause, as in the original
+})
+document.addEventListener('pointerlockerror', () => { if (!input.lockWorked) input.lockUnavailable = true })
+function pause() { game.state = 'paused'; game.capture_mouse(false) }
+function resume() { game.state = 'playing'; game.capture_mouse(true) }
+function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => { if (touchMode && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}) }).catch(() => {})
+  } catch (e) {}
+}
+const fullscreenOK = () => !!(document.fullscreenEnabled && document.documentElement.requestFullscreen)
+function toggleQuality() { game.high_quality = !game.high_quality; L.worldH = 0; setRenderer() }
+function exitGame() {                                        // EXIT: leave the page (a browser tab cannot quit)
+  if (history.length > 1 && document.referrer) history.back()
+  else location.href = '../../'
+}
+function clickAction(action) {
+  if (action === 'start' || action === 'restart') game.start()
+  else if (action === 'resume') resume()
+  else if (action === 'menu') { game.reset(); game.to_menu() }
+  else if (action === 'quit') exitGame()
+  else if (action === 'audio') audio.toggle()
+  else if (action === 'quality') toggleQuality()
+  else if (action === 'fps') game.show_fps = !game.show_fps
+  else if (action === 'fullscreen') toggleFullscreen()
+}
+function onKey(code) {                                       // Game.events (KEYDOWN)
+  const g = game
+  if (code === 'F11') toggleFullscreen()
+  else if (code === 'KeyM') audio.toggle()
+  else if (code === 'F3') g.show_fps = !g.show_fps
+  else if (code === 'F2') toggleQuality()
+  else if (code === 'Escape') { if (g.state === 'playing') pause(); else if (g.state === 'paused' && performance.now() - input.unlockAt > 400) resume() }
+  else if ((code === 'Enter' || code === 'NumpadEnter') && (g.state === 'menu' || g.state === 'dead' || g.state === 'victory')) g.start()
+  else if (g.state === 'playing') {
+    if (code === 'KeyR') g.reload()
+    else if (code === 'Digit1' || code === 'Digit2') g.switch_weapon(code === 'Digit1' ? 'rifle' : 'scatter')
+    else if (code === 'Tab') g.show_map = !g.show_map
+    else if (code === 'ShiftLeft' || code === 'ShiftRight' || code === 'Space') g.dash(key('KeyW') - key('KeyS'), key('KeyD') - key('KeyA'))
+  }
+}
+const NO_DEFAULT = new Set(['Tab', 'F2', 'F3', 'F11', 'Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'])
+addEventListener('keydown', e => {
+  if (NO_DEFAULT.has(e.code)) e.preventDefault()
+  audio.init()
+  if (e.repeat) return
+  input.keys.add(e.code)
+  onKey(e.code)
+})
+addEventListener('keyup', e => input.keys.delete(e.code))
+addEventListener('blur', () => { input.keys.clear(); input.mouseHeld = false; if (game.state === 'playing') pause() })   // WINDOWFOCUSLOST
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (game.state === 'playing') pause(); if (audio.ctx && audio.ctx.state === 'running') audio.ctx.suspend().catch(() => {}) }
+  else if (audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume().catch(() => {})
+})
+for (const type of ['pointerdown', 'touchend', 'click']) addEventListener(type, () => audio.init(), true)
+function toHud(e) { const k = L.bw / L.cw / L.kh; return [(e.clientX - L.left) * k, (e.clientY - L.top) * k] }
+function hitButton(pos) { for (const [name, r] of Object.entries(ui.buttons)) if (inside(pos, r)) return name; return null }
+canvas.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch' && !touchMode) setTouchMode(true)
+  const g = game
+  if (e.pointerType === 'mouse') {
+    input.mouse = toHud(e)
+    if (e.button !== 0) return
+    if (g.state !== 'playing') { const name = hitButton(input.mouse); if (name) clickAction(name); return }
+    if (capturePending()) { requestLock(); input.swallow = true; return }
+    input.mouseHeld = true
+    return
+  }
+  e.preventDefault()
+  if (g.state !== 'playing') { input.pressed = hitButton(toHud(e)); input.pressId = e.pointerId; return }
+  if (input.lookId === null) { input.lookId = e.pointerId; input.lookX = e.clientX; input.lookY = e.clientY; try { canvas.setPointerCapture(e.pointerId) } catch (x) {} }
+})
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType === 'mouse') {
+    input.mouse = toHud(e)
+    if (locked()) { input.relX += e.movementX; input.relY += e.movementY }
+    else if (input.lockUnavailable && game.state === 'playing') { input.relX += e.movementX; input.relY += e.movementY }
+    return
+  }
+  if (e.pointerId === input.lookId) { input.relTX = (input.relTX || 0) + e.clientX - input.lookX; input.relTY = (input.relTY || 0) + e.clientY - input.lookY; input.lookX = e.clientX; input.lookY = e.clientY }
+})
+const pointerEnd = e => {
+  if (e.pointerType === 'mouse') { if (e.button === 0 || !(e.buttons & 1)) { input.mouseHeld = false; input.swallow = false } return }
+  if (e.pointerId === input.lookId) input.lookId = null
+  if (e.pointerId === input.pressId) {                        // touch menus act on release over the same button
+    const name = hitButton(toHud(e)); if (name && name === input.pressed && game.state !== 'playing') clickAction(name)
+    input.pressed = null; input.pressId = null
+  }
+}
+canvas.addEventListener('pointerup', pointerEnd)
+canvas.addEventListener('pointercancel', e => { if (e.pointerId === input.lookId) input.lookId = null; if (e.pointerId === input.pressId) { input.pressed = null; input.pressId = null } input.mouseHeld = false })
+addEventListener('mouseup', e => { if (e.button === 0) input.mouseHeld = false })
+canvas.addEventListener('contextmenu', e => e.preventDefault())
+canvas.addEventListener('wheel', e => {                     // MOUSEWHEEL: switch weapon (one switch per notch)
+  e.preventDefault()
+  const now = performance.now()
+  if (game.state === 'playing' && Math.abs(e.deltaY) + Math.abs(e.deltaX) > 0 && now - input.wheelAt > 90) { input.wheelAt = now; game.switch_weapon(game.weapon === 'rifle' ? 'scatter' : 'rifle') }
+}, { passive: false })
+
+// touch controls (touch-kit): left stick = WASD, FIRE = hold, buttons map to the original keys
+let kit = null, rotateDismissed = false
+const kitStyle = document.createElement('style')
+kitStyle.textContent = `
+.tk-root .tk-btn{border-color:rgba(92,246,232,.55);background:rgba(8,20,31,.5);color:#e2f4f6;font-family:Consolas,"DejaVu Sans Mono",Menlo,monospace;letter-spacing:0;font-size:12px}
+.tk-root .tk-btn.s{width:54px;height:54px;font-size:12px}
+.tk-root .tk-lab{font-size:12px}
+.tk-root .tk-btn.on{background:rgba(92,246,232,.38);border-color:#b2fff0}
+.tk-root .tk-btn.ab-fire{border-color:rgba(255,195,102,.7)}
+.tk-root .tk-btn.ab-sel{border-color:#5cf6e8;box-shadow:0 0 0 2px rgba(92,246,232,.35),0 2px 12px rgba(0,0,0,.35)}
+.tk-root .tk-btn.ab-dash{background:conic-gradient(rgba(92,246,232,.42) calc(var(--cd,1)*360deg),rgba(8,20,31,.5) 0)}
+.tk-root .tk-base{border-color:rgba(92,246,232,.35);background:radial-gradient(circle,rgba(92,246,232,.08),rgba(92,246,232,.02) 70%)}
+.tk-root .tk-knob{background:rgba(92,246,232,.25);border-color:rgba(178,255,240,.6)}
+.tk-rot{background:rgba(2,8,15,.95)!important;font-family:Bahnschrift,"Segoe UI",Roboto,sans-serif!important}`
+document.head.appendChild(kitStyle)
+function makeKit() {
+  if (!window.TouchKit) return
+  kit = TouchKit.create({
+    show: 'manual', landscape: true,
+    sticks: [{ id: 'move', side: 'left', label: 'MOVE', keys: 'wasd' }],
+    buttons: [
+      { id: 'fire', label: 'FIRE', icon: '✦', size: 'l', row: 0, onDown: () => { input.touchFire = true }, onUp: () => { input.touchFire = false } },
+      { id: 'dash', label: 'DASH', icon: '»', row: 0, key: 'ShiftLeft', tap: true },
+      { id: 'reload', label: 'RELOAD', icon: '↻', size: 's', row: 1, key: 'KeyR', tap: true },
+      { id: 'w2', label: 'ION', icon: '2', size: 's', row: 1, key: 'Digit2', tap: true },
+      { id: 'w1', label: 'ARC', icon: '1', size: 's', row: 1, key: 'Digit1', tap: true },
+      { id: 'pause', label: 'PAUSE', icon: '❚❚', size: 's', place: 'top-right', key: 'Escape', tap: true },
+      { id: 'map', label: 'MAP', size: 's', place: 'top-right', key: 'Tab', tap: true },
+    ],
+  })
+  kit.buttons.fire.el.classList.add('ab-fire'); kit.buttons.dash.el.classList.add('ab-dash')
+  kit.rotate = document.querySelector('.tk-rot')
+  if (kit.rotate) kit.rotate.querySelector('button').addEventListener('click', () => { rotateDismissed = true })
+}
+let lastDash = -1, lastWeapon = ''
+function updateKit() {
+  if (!kit || !kit.visible) return
+  const f = 1 - Math.min(1, game.player.dash_cooldown / 2.6), q = Math.round(f * 40) / 40
+  if (q !== lastDash) { lastDash = q; kit.buttons.dash.el.style.setProperty('--cd', q) }
+  if (game.weapon !== lastWeapon) { lastWeapon = game.weapon; kit.buttons.w1.el.classList.toggle('ab-sel', lastWeapon === 'rifle'); kit.buttons.w2.el.classList.toggle('ab-sel', lastWeapon === 'scatter') }
+}
+
+// ---------- boot + main loop (Game.run) ----------
+layout()
+const A = ASSETS()
+weaponCanvas = { rifle: surfaceCanvas(A.weapons.rifle), scatter: surfaceCanvas(A.weapons.scatter) }
+game = new Game({ audio, rng: new PyRandom(Date.now() % 4294967296) })
+game.onCapture = onCapture
+setRenderer()
+makeKit()
+addEventListener('resize', layout)
+if (window.visualViewport) visualViewport.addEventListener('resize', layout)
+const portrait = matchMedia('(orientation: portrait)'), hook = window.__ab = { freeze: false }   // small debug/test hook
+const TOUCH_YAW = 0.0055, TOUCH_PITCH = 0.3                 // radians / pitch units per CSS pixel dragged
+let last = performance.now(), frames = [], lastState = game.state, slow = 0
+function frame(now) {
+  requestAnimationFrame(frame)
+  let dt = (now - last) / 1000; last = now
+  if (!(dt >= 0)) dt = 0
+  if (dt > 0.05) dt = 0.05
+  frames.push(now); while (frames.length > 11) frames.shift()
+  if (frames.length > 1) game.fps = 1000 * (frames.length - 1) / (frames[frames.length - 1] - frames[0])
+  const g = game, p = g.player
+  const rotating = kit && kit.rotate && kit.visible && kit.rotate.classList.contains('need') && portrait.matches
+  if (hook.freeze) dt = 0                                     // test hook: hold the simulation still for screenshots
+  if (g.state === 'playing' && !capturePending() && !rotating && !hook.freeze) {
+    const limit = 75 * renderer.pitchUnit
+    p.angle = pmod(p.angle + input.relX * 0.0024 + (input.relTX || 0) * TOUCH_YAW, TAU)
+    p.pitch = Math.max(-limit, Math.min(limit, p.pitch - input.relY * 0.16 * renderer.pitchUnit - (input.relTY || 0) * TOUCH_PITCH * renderer.pitchUnit))
+    input.relX = input.relY = input.relTX = input.relTY = 0
+    if (key('ArrowLeft')) p.angle -= dt * 1.9
+    if (key('ArrowRight')) p.angle += dt * 1.9
+    const firing = (input.mouseHeld && !input.swallow && (locked() || input.lockUnavailable)) || input.touchFire
+    g.update(dt, key('KeyW') - key('KeyS'), key('KeyD') - key('KeyA'), firing)
+  } else {
+    input.relX = input.relY = input.relTX = input.relTY = 0
+    if (g.state === 'menu') {
+      g.menu_time += dt
+      p.angle = -Math.PI / 2 + 0.13 + Math.sin(g.menu_time * 0.18) * 0.19
+      for (const e of g.enemies) e.age += dt
+    }
+  }
+  if (g.state !== lastState) {                                // death / victory release the controls
+    if (g.state !== 'playing' && touchMode && kit) kit.show(false)
+    lastState = g.state
+  }
+  if (touchMode && g.state === 'playing' && renderer.h > 150) {  // phones: lower the world resolution if it cannot keep up
+    slow = L.worldMs > 11 ? slow + 1 : Math.max(0, slow - 2)
+    if (slow > 90) { slow = 0; L.worldH = Math.max(150, Math.round(renderer.h * 0.85)); setRenderer() }
+  }
+  updateKit()
+  draw()
+}
+requestAnimationFrame(frame)
+Object.assign(hook, { game: () => game, renderer: () => renderer, layout: () => L, input, kit: () => kit, touchMode: () => touchMode, click: clickAction, audio,
+  button: name => { const r = ui.buttons[name]; return r && [L.left + (r[0] + r[2] / 2) * L.kh * L.cw / L.bw, L.top + (r[1] + r[3] / 2) * L.kh * L.cw / L.bw] } })
+})()
+</script>
+</body>
+</html>

@@ -440,6 +440,18 @@
    "thumb": "thumbs/ashbound.jpg"
   },
   {
+   "slug": "aether-breach",
+   "title": "에테르 브리치",
+   "en": "AETHER // BREACH",
+   "kind": "game",
+   "orientation": "landscape",
+   "desc": "네온 성채에서 세 차례 보안 웨이브와 수호자 보스를 돌파하는 레트로 아레나 FPS (파이썬 원작의 웹판)",
+   "mobile": "왼쪽 스틱 이동 · 오른쪽 드래그 조준 · FIRE·DASH·1/2·RELOAD 버튼",
+   "desktop": "WASD · 마우스 조준·사격 · Shift 대시 · 1/2 무기 · R 재장전",
+   "url": "play/aether-breach/",
+   "thumb": "thumbs/aether-breach.jpg"
+  },
+  {
    "slug": "horror-fps",
    "title": "호러 FPS",
    "en": "Horror FPS",
