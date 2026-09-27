@@ -1,0 +1,420 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>곱등이 서바이벌</title>
+<style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101a0c;font-family:"Malgun Gothic",sans-serif}canvas{display:block;width:100%;height:100%;cursor:crosshair;image-rendering:pixelated}#help{position:fixed;left:12px;top:69px;padding:6px 9px;color:#fff;background:#0009;border:1px solid #fff4;font-size:12px;pointer-events:none;text-shadow:1px 1px #000}
+/* 휴대폰·태블릿(html.touch): 화면 고정 · 스크롤/확대/길게 누르기 메뉴 없음 · 키보드 안내 숨김 */
+html.touch,html.touch body{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html.touch canvas{touch-action:none}html.touch #help{display:none}</style></head>
+<body><canvas id="game"></canvas><div id="help">WASD 이동 · 마우스 조준/발사 · 1~7/휠 무기 · B 상점 · ESC 배치 취소</div>
+<div id="safeProbe" style="position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)"></div><script>
+'use strict';
+// 모든 밸런스 수치는 이 객체에서 조정한다.
+const CONFIG=Object.freeze({
+ world:{width:3000,height:3000,hashGrid:96,buildGrid:48,spawnMargin:30,maxFrameDt:.033},
+ player:{speed:245,radius:15,maxHp:220,hitInvuln:.28,startX:1500,startY:1500},
+ progression:{levelSeconds:38,hpScale:.145,speedScale:.018,damageScale:.075,spawnBase:2.6,spawnPerLevel:.72,spawnPower:1.12,maxEnemies:1100,rewardScale:.26,initialEnemies:10},
+ enemyMix:{mediumPerLevel:.025,mediumMax:.38,largeStartLevel:3,largePerLevel:.013,largeMax:.32},
+ enemies:{
+  small:{name:'소형 곱등이',r:11,hp:31,speed:150,damage:7,reward:170,score:100,jump:[.32,.72],pause:[.08,.28],structureDamage:1,attackCooldown:.58,color:'#cf211a'},
+  medium:{name:'돌연변이 곱등이',r:17,hp:105,speed:125,damage:13,reward:850,score:450,jump:[.40,.78],pause:[.12,.34],structureDamage:1.25,attackCooldown:.52,color:'#aa1117'},
+  large:{name:'대형 곱등이',r:29,hp:390,speed:93,damage:30,reward:3600,score:1800,jump:[.48,.92],pause:[.16,.42],structureDamage:1.65,attackCooldown:.38,color:'#790b12'}},
+ weapons:[
+  {id:'pistol',name:'권총',price:0,ammo:-1,pack:0,packPrice:0,rate:3.5,damage:28,speed:1250,life:.72,spread:.025,pellets:1,pierce:0,knock:30,color:'#ffe26b',width:2,sfx:260},
+  {id:'smg',name:'기관단총',price:5800,ammo:900,pack:450,packPrice:1300,rate:12,damage:18,speed:1180,life:.68,spread:.09,pellets:1,pierce:0,knock:15,color:'#fff37b',width:2,sfx:330},
+  {id:'shotgun',name:'산탄총',price:26000,ammo:300,pack:120,packPrice:7500,rate:1.45,damage:23,speed:1050,life:.46,spread:.28,pellets:9,pierce:0,knock:85,color:'#ffd04d',width:3,sfx:120},
+  {id:'rifle',name:'돌격소총',price:98000,ammo:1600,pack:600,packPrice:24000,rate:9.4,damage:52,speed:1450,life:.84,spread:.035,pellets:1,pierce:1,knock:42,color:'#fff68b',width:3,sfx:210},
+  {id:'machinegun',name:'중기관총',price:620000,ammo:4200,pack:1400,packPrice:145000,rate:21,damage:70,speed:1600,life:.9,spread:.065,pellets:1,pierce:2,knock:65,color:'#ffea54',width:4,sfx:155},
+  {id:'flame',name:'화염방사기',price:2700000,ammo:3000,pack:1000,packPrice:620000,rate:30,damage:34,speed:520,life:.58,spread:.18,pellets:1,pierce:4,knock:18,color:'#ff8a26',width:10,flame:true,sfx:80},
+  {id:'rocket',name:'로켓 발사기',price:12500000,ammo:180,pack:36,packPrice:2600000,rate:.78,damage:520,speed:590,life:2.2,spread:.018,pellets:1,pierce:0,knock:240,color:'#ffb32f',width:7,rocket:true,blast:150,sfx:65}],
+ structures:{turret:{name:'자동 터렛',price:46000,size:38,hp:520,range:460,rate:7.5,damage:47,scanInterval:.10,scanJitter:.03,knockback:26,color:'#d7c45c'},barricade:{name:'X 바리케이드',price:5600,size:46,hp:850,color:'#aa2828'}},
+ pools:{enemies:1200,bullets:3000,particles:1800,tracers:1300,structures:640},economy:{startMoney:1200},effects:{bloodSmall:8,bloodLarge:18},recordsKey:'gob_survival_best_v1'});
+
+/* PURE_LOGIC_START */
+var PURE_LOGIC=(()=>{
+ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+ const snap=(v,size)=>Math.round(v/size)*size;
+ const circleOverlap=(ax,ay,ar,bx,by,br)=>{const x=ax-bx,y=ay-by,r=ar+br;return x*x+y*y<=r*r};
+ const circleRectOverlap=(cx,cy,r,rx,ry,rw,rh)=>{const x=clamp(cx,rx,rx+rw),y=clamp(cy,ry,ry+rh),dx=cx-x,dy=cy-y;return dx*dx+dy*dy<=r*r};
+ const segmentCircleT=(x1,y1,x2,y2,cx,cy,r)=>{const dx=x2-x1,dy=y2-y1,fx=x1-cx,fy=y1-cy,a=dx*dx+dy*dy,c=fx*fx+fy*fy-r*r;if(c<=0)return 0;if(!a)return Infinity;const b=2*(fx*dx+fy*dy),q=b*b-4*a*c;if(q<0)return Infinity;const t=(-b-Math.sqrt(q))/(2*a);return t>=0&&t<=1?t:Infinity};
+ const segmentCircleHit=(x1,y1,x2,y2,cx,cy,r)=>Number.isFinite(segmentCircleT(x1,y1,x2,y2,cx,cy,r));
+ const levelAtTime=(seconds,step)=>1+Math.floor(Math.max(0,seconds)/step);
+ const scaleForLevel=(base,level,per)=>base*(1+Math.max(0,level-1)*per);
+ const rewardForLevel=(base,level,scale)=>Math.round(base*Math.pow(1+Math.max(0,level-1)*scale,1.72));
+ const spawnRate=(base,per,power,level)=>base+per*Math.pow(Math.max(0,level-1),power);
+ return{clamp,snap,circleOverlap,circleRectOverlap,segmentCircleT,segmentCircleHit,levelAtTime,scaleForLevel,rewardForLevel,spawnRate};
+})();
+/* PURE_LOGIC_END */
+const{clamp,snap,circleOverlap,circleRectOverlap,segmentCircleT,segmentCircleHit,levelAtTime,scaleForLevel,rewardForLevel,spawnRate}=PURE_LOGIC;
+const C=document.getElementById('game'),X=C.getContext('2d',{alpha:false}),keys=Object.create(null),mouse={x:0,y:0,wx:0,wy:0,down:false};let W=innerWidth,H=innerHeight,DPR=1;
+// 터치(휴대폰·태블릿): 월드를 살짝 줌아웃(짧은 변 ≈ 540 월드 단위)하고 HUD/상점을 화면에 맞춰 배치한다. 데스크톱은 ZOOM 1 그대로.
+const TOUCH=!!(window.matchMedia&&matchMedia('(pointer: coarse)').matches);let ZOOM=1,VWW=W,VHW=H;const SAFE={t:0,r:0,b:0,l:0};let touchPlacing=false;if(TOUCH)document.documentElement.classList.add('touch');
+const rand=(a,b)=>a+Math.random()*(b-a),d2=(x,y,a,b)=>(x-a)**2+(y-b)**2;
+function resize(){W=innerWidth;H=innerHeight;DPR=Math.min(devicePixelRatio||1,2);C.width=W*DPR|0;C.height=H*DPR|0;X.imageSmoothingEnabled=false;if(TOUCH){ZOOM=Math.min(1,Math.min(W,H)/540);const p=document.getElementById('safeProbe');if(p){const cs=getComputedStyle(p);SAFE.t=parseFloat(cs.paddingTop)||0;SAFE.r=parseFloat(cs.paddingRight)||0;SAFE.b=parseFloat(cs.paddingBottom)||0;SAFE.l=parseFloat(cs.paddingLeft)||0}}VWW=W/ZOOM;VHW=H/ZOOM}addEventListener('resize',resize);resize();
+class Pool{constructor(n,f){this.items=Array.from({length:n},(_,i)=>Object.assign(f(i),{active:false,pi:i,ap:-1}));this.free=Array.from({length:n},(_,i)=>n-1-i);this.active=[]}get(){const i=this.free.pop();if(i===undefined)return null;const o=this.items[i];o.active=true;o.ap=this.active.length;this.active.push(o);return o}release(o){if(!o||!o.active)return;const p=o.ap,z=this.active.pop();if(z!==o){this.active[p]=z;z.ap=p}o.active=false;o.ap=-1;this.free.push(o.pi)}clear(){while(this.active.length)this.release(this.active[this.active.length-1])}}
+class Hash{constructor(s){this.s=s;this.cols=Math.ceil(CONFIG.world.width/s)+2;this.rows=Math.ceil(CONFIG.world.height/s)+2;this.buckets=Array.from({length:this.cols*this.rows},()=>[]);this.used=[];this.stamp=1}clear(){for(const i of this.used)this.buckets[i].length=0;this.used.length=0}insert(o,x,y,r){const s=this.s,x0=clamp(Math.floor((x-r)/s),-1,this.cols-2),x1=clamp(Math.floor((x+r)/s),-1,this.cols-2),y0=clamp(Math.floor((y-r)/s),-1,this.rows-2),y1=clamp(Math.floor((y+r)/s),-1,this.rows-2);for(let j=y0;j<=y1;j++)for(let i=x0;i<=x1;i++){const k=i+1+(j+1)*this.cols,a=this.buckets[k];if(a.length===0)this.used.push(k);a.push(o)}}query(x,y,r,fn){const z=++this.stamp,s=this.s,x0=clamp(Math.floor((x-r)/s),-1,this.cols-2),x1=clamp(Math.floor((x+r)/s),-1,this.cols-2),y0=clamp(Math.floor((y-r)/s),-1,this.rows-2),y1=clamp(Math.floor((y+r)/s),-1,this.rows-2);for(let j=y0;j<=y1;j++)for(let i=x0;i<=x1;i++){const a=this.buckets[i+1+(j+1)*this.cols];for(const o of a)if(o.active&&o.q!==z){o.q=z;fn(o)}}}}
+const EP=new Pool(CONFIG.pools.enemies,i=>({id:i,x:0,y:0,px:0,py:0,vx:0,vy:0,kx:0,ky:0,r:1,hp:1,maxHp:1,type:'small',phase:0,timer:0,attack:0,angle:0,squash:0,hit:0,bt:0}));
+const BP=new Pool(CONFIG.pools.bullets,i=>({serial:i,x:0,y:0,px:0,py:0,vx:0,vy:0,r:2,life:0,damage:0,pierce:0,knock:0,color:'#fff',flame:false,rocket:false,blast:0,angle:0,hitIds:new Int16Array(8),hitCount:0}));
+const PP=new Pool(CONFIG.pools.particles,()=>({x:0,y:0,vx:0,vy:0,life:0,max:0,size:2,color:'#fff',drag:0}));
+const TP=new Pool(CONFIG.pools.tracers,()=>({x1:0,y1:0,x2:0,y2:0,life:0,max:.08,width:2,color:'#ffe95c'}));
+const SP=new Pool(CONFIG.pools.structures,i=>({id:i,x:0,y:0,type:'',hp:0,maxHp:0,size:0,angle:0,fire:0,scan:0,target:null}));
+const EH=new Hash(CONFIG.world.hashGrid),SH=new Hash(CONFIG.world.hashGrid);let structureHashDirty=true;
+const grass=document.createElement('canvas');grass.width=grass.height=256;const GX=grass.getContext('2d');GX.fillStyle='#36aa2b';GX.fillRect(0,0,256,256);for(let i=0;i<4700;i++){GX.fillStyle=`rgba(${10+Math.random()*25|0},${130+Math.random()*60|0},${12+Math.random()*30|0},${rand(.06,.2)})`;GX.fillRect(Math.random()*256,Math.random()*256,rand(1,3),rand(1,3))}
+const grassPattern=X.createPattern(grass,'repeat');
+const decal=document.createElement('canvas');decal.width=CONFIG.world.width;decal.height=CONFIG.world.height;const DX=decal.getContext('2d');
+let audio=null,noiseBuf=null,lastShot=0,lastKill=0;const bulletHits=[],sortBulletHit=(a,b)=>a.bt-b.bt;
+function initAudio(){if(audio){audio.resume();return}audio=new(window.AudioContext||window.webkitAudioContext);noiseBuf=audio.createBuffer(1,audio.sampleRate*.25,audio.sampleRate);const a=noiseBuf.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=Math.random()*2-1}
+function tone(f,d=.07,v=.04,type='square',slide=.65){if(!audio)return;const t=audio.currentTime,o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(Math.max(35,f*slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(audio.destination);o.start();o.stop(t+d)}
+function noise(d=.09,v=.04,cut=700){if(!audio)return;const t=audio.currentTime,s=audio.createBufferSource(),f=audio.createBiquadFilter(),g=audio.createGain();s.buffer=noiseBuf;f.type='lowpass';f.frequency.value=cut;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);s.connect(f).connect(g).connect(audio.destination);s.start();s.stop(t+d)}
+function sfx(n,p=180){if(!audio)return;const z=performance.now();if(n==='shot'&&z-lastShot<22)return;if(n==='kill'&&z-lastKill<36)return;if(n==='shot'){lastShot=z;tone(p,.045,.025);noise(.045,.018,p*4)}else if(n==='kill'){lastKill=z;tone(92,.08,.025,'sawtooth',.45)}else if(n==='hurt')tone(70,.14,.08,'sawtooth',.35);else if(n==='place'||n==='buy')tone(n==='place'?420:620,.08,.05,'square',1.35);else if(n==='break'){noise(.2,.11,430);tone(55,.18,.06)}else if(n==='empty')tone(90,.04,.035)}
+const game={phase:'playing',time:0,level:1,score:0,money:CONFIG.economy.startMoney,kills:0,spawn:0,shop:false,build:null,shake:0,wave:2,best:0,empty:0};try{game.best=+(localStorage.getItem(CONFIG.recordsKey)||0)}catch(e){}
+const player={x:CONFIG.player.startX,y:CONFIG.player.startY,r:CONFIG.player.radius,hp:CONFIG.player.maxHp,maxHp:CONFIG.player.maxHp,angle:0,fire:0,inv:0,weapon:0,unlocked:CONFIG.weapons.map((w,i)=>i===0),ammo:CONFIG.weapons.map(w=>w.ammo)},cam={x:0,y:0};let serial=5000,shopButtons=[];
+function particle(x,y,color,size=3,life=.35,speed=100,count=1){for(let n=0;n<count;n++){const p=PP.get();if(!p)return;const a=Math.random()*6.283,v=rand(speed*.25,speed);p.x=x;p.y=y;p.vx=Math.cos(a)*v;p.vy=Math.sin(a)*v;p.life=p.max=life;p.size=rand(size*.5,size*1.35);p.color=color;p.drag=rand(3,7)}}
+function tracer(x1,y1,x2,y2,color='#ffe95c',width=2,life=.07){const t=TP.get();if(!t)return;t.x1=x1;t.y1=y1;t.x2=x2;t.y2=y2;t.color=color;t.width=width;t.life=t.max=life}
+function enemyHash(){EH.clear();for(const e of EP.active)EH.insert(e,e.x,e.y,e.r)}
+function structureHash(){SH.clear();for(const s of SP.active)SH.insert(s,s.x,s.y,s.size*.72);structureHashDirty=false}
+function enemyType(){const r=Math.random(),m=CONFIG.enemyMix,big=clamp((game.level-m.largeStartLevel)*m.largePerLevel,0,m.largeMax),mid=clamp((game.level-1)*m.mediumPerLevel,0,m.mediumMax);return r<big?'large':r<big+mid?'medium':'small'}
+function spawnEnemy(type=enemyType()){if(EP.active.length>=CONFIG.progression.maxEnemies)return;const e=EP.get();if(!e)return;const side=Math.random()*4|0,m=CONFIG.world.spawnMargin;if(side===0){e.x=rand(m,CONFIG.world.width-m);e.y=m}else if(side===1){e.x=CONFIG.world.width-m;e.y=rand(m,CONFIG.world.height-m)}else if(side===2){e.x=rand(m,CONFIG.world.width-m);e.y=CONFIG.world.height-m}else{e.x=m;e.y=rand(m,CONFIG.world.height-m)}const t=CONFIG.enemies[type];e.type=type;e.r=t.r;e.hp=e.maxHp=scaleForLevel(t.hp,game.level,CONFIG.progression.hpScale);e.vx=e.vy=e.kx=e.ky=0;e.phase=0;e.timer=rand(.05,.4);e.attack=0;e.squash=e.angle=e.hit=0;e.px=e.x;e.py=e.y}
+function bullet(x,y,a,w,mul=1){const b=BP.get();if(!b)return;a+=rand(-w.spread,w.spread);b.serial=++serial;b.x=b.px=x;b.y=b.py=y;b.vx=Math.cos(a)*w.speed;b.vy=Math.sin(a)*w.speed;b.r=w.flame?8:w.width+1;b.life=w.life;b.damage=w.damage*mul;b.pierce=w.pierce;b.knock=w.knock;b.color=w.color;b.flame=!!w.flame;b.rocket=!!w.rocket;b.blast=w.blast||0;b.angle=a;b.hitCount=0}
+function shoot(){const w=CONFIG.weapons[player.weapon];if(!player.unlocked[player.weapon]||player.fire>0)return;if(w.ammo>=0&&player.ammo[player.weapon]<=0){if(game.empty<=0){sfx('empty');game.empty=.25}return}player.fire=1/w.rate;if(w.ammo>=0)player.ammo[player.weapon]--;const x=player.x+Math.cos(player.angle)*22,y=player.y+Math.sin(player.angle)*22;for(let i=0;i<w.pellets;i++)bullet(x,y,player.angle,w);sfx('shot',w.sfx);game.shake=Math.max(game.shake,w.rocket?5:w.id==='shotgun'?3:1.2);particle(x,y,w.flame?'#ff701f':'#fff09a',w.flame?5:3,w.flame?.2:.12,w.flame?70:110,w.flame?1:3);if(!w.flame)particle(x,y,'#aaa293',4,.3,55,2)}
+function blood(e){const t=CONFIG.enemies[e.type];DX.save();DX.translate(e.x,e.y);DX.globalAlpha=.72;DX.fillStyle='#790710';for(let i=0,n=e.type==='large'?CONFIG.effects.bloodLarge:CONFIG.effects.bloodSmall;i<n;i++){const a=Math.random()*6.283,d=rand(0,e.r*1.45),r=rand(2,e.r*.45);DX.beginPath();DX.arc(Math.cos(a)*d,Math.sin(a)*d,r,0,6.283);DX.fill()}DX.globalAlpha=.5;DX.rotate(e.angle);DX.fillStyle=t.color;DX.beginPath();DX.ellipse(0,0,e.r*.9,e.r*.43,0,0,6.283);DX.fill();DX.strokeStyle='#340006';DX.lineWidth=2;for(let s=-1;s<=1;s+=2)for(let i=-1;i<=1;i++){DX.beginPath();DX.moveTo(i*e.r*.24,s*e.r*.24);DX.lineTo((i*.38+s*.55)*e.r,s*e.r*.95);DX.stroke()}DX.restore()}
+function hitEnemy(e,n,k,x,y){if(!e.active)return;e.hp-=n;const d=Math.hypot(e.x-x,e.y-y)||1;e.kx+=(e.x-x)/d*k;e.ky+=(e.y-y)/d*k;e.squash=.12;particle(e.x,e.y,'#9d0c10',3,.3,95,n>200?5:2);if(e.hp<=0){const t=CONFIG.enemies[e.type];blood(e);game.kills++;game.score+=Math.round(t.score*(1+(game.level-1)*.13));game.money+=rewardForLevel(t.reward,game.level,CONFIG.progression.rewardScale);sfx('kill');particle(e.x,e.y,'#bb1016',5,.48,155,e.type==='large'?13:6);EP.release(e)}}
+function explode(x,y,r,n,k){game.shake=Math.max(game.shake,12);particle(x,y,'#ff9b28',12,.65,260,28);particle(x,y,'#4b3b33',15,.9,130,18);EH.query(x,y,r,e=>{const d=Math.hypot(e.x-x,e.y-y);if(d<r+e.r)hitEnemy(e,n*(1-clamp(d/r,0,.78)),k,x,y)});noise(.24,.13,520);tone(58,.24,.08,'sawtooth',.3)}
+function blocked(x,y,r){let h=null;SH.query(x,y,r+38,s=>{if(!h&&(s.type==='barricade'?circleRectOverlap(x,y,r,s.x-s.size/2,s.y-s.size/2,s.size,s.size):circleOverlap(x,y,r,s.x,s.y,s.size*.47)))h=s});return h}
+function segmentBlock(x1,y1,x2,y2,r){let h=null;const mx=(x1+x2)/2,my=(y1+y2)/2;SH.query(mx,my,Math.hypot(x2-x1,y2-y1)/2+r+45,s=>{if(h)return;if(s.type==='turret'){if(segmentCircleHit(x1,y1,x2,y2,s.x,s.y,r+s.size*.47))h=s}else{const q=s.size/2+r;for(let i=1;i<=5&&!h;i++){const t=i/5,x=x1+(x2-x1)*t,y=y1+(y2-y1)*t;if(x>=s.x-q&&x<=s.x+q&&y>=s.y-q&&y<=s.y+q)h=s}}});return h}
+function structuresOverlap(type,x,y,s){const c=CONFIG.structures[type],h=c.size/2,sh=s.size/2;if(type==='barricade'&&s.type==='barricade')return Math.abs(x-s.x)<h+sh-1&&Math.abs(y-s.y)<h+sh-1;if(type==='barricade')return circleRectOverlap(s.x,s.y,s.size*.47,x-h,y-h,c.size,c.size);if(s.type==='barricade')return circleRectOverlap(x,y,c.size*.47,s.x-sh,s.y-sh,s.size,s.size);return circleOverlap(x,y,c.size*.5,s.x,s.y,s.size*.5)}
+function canPlace(type,x,y){const c=CONFIG.structures[type],h=c.size/2,r=type==='barricade'?h:c.size*.5;if(x<r||y<r||x>CONFIG.world.width-r||y>CONFIG.world.height-r)return false;if(type==='barricade'?circleRectOverlap(player.x,player.y,player.r+8,x-h,y-h,c.size,c.size):circleOverlap(x,y,r,player.x,player.y,player.r+8))return false;let ok=true;SH.query(x,y,c.size+55,s=>{if(structuresOverlap(type,x,y,s))ok=false});EH.query(x,y,c.size+30,e=>{if(circleOverlap(x,y,r,e.x,e.y,e.r+3))ok=false});return ok}
+function place(type,x,y){const c=CONFIG.structures[type];x=snap(x,CONFIG.world.buildGrid);y=snap(y,CONFIG.world.buildGrid);if(game.money<c.price||!canPlace(type,x,y)){sfx('empty');return}const s=SP.get();if(!s)return;Object.assign(s,{x,y,type,hp:c.hp,maxHp:c.hp,size:c.size,angle:0,fire:rand(0,.1),scan:rand(0,.12),target:null});game.money-=c.price;sfx('place');particle(x,y,'#f4d75b',4,.42,90,9);structureHash()}
+function destroy(s){particle(s.x,s.y,s.type==='barricade'?'#b52b2b':'#dcc65c',6,.65,150,14);sfx('break');SP.release(s);structureHashDirty=true}
+function attackStructure(e,s,t){if(!s.active||e.attack>0)return;s.hp-=scaleForLevel(t.damage,game.level,CONFIG.progression.damageScale)*t.structureDamage;e.attack=t.attackCooldown;particle(s.x+rand(-10,10),s.y+rand(-10,10),'#672020',3,.3,70,2);if(s.hp<=0)destroy(s)}
+function updateBullets(dt){for(let i=BP.active.length-1;i>=0;i--){const b=BP.active[i];b.life-=dt;b.px=b.x;b.py=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;if(b.flame)b.r+=22*dt;let dead=b.life<=0||b.x<0||b.y<0||b.x>CONFIG.world.width||b.y>CONFIG.world.height;bulletHits.length=0;if(!dead)EH.query((b.x+b.px)/2,(b.y+b.py)/2,Math.hypot(b.x-b.px,b.y-b.py)/2+b.r+30,e=>{for(let h=0;h<b.hitCount;h++)if(b.hitIds[h]===e.id)return;const t=segmentCircleT(b.px,b.py,b.x,b.y,e.x,e.y,e.r+b.r);if(Number.isFinite(t)){e.bt=t;bulletHits.push(e)}});bulletHits.sort(sortBulletHit);for(const e of bulletHits){if(dead||!e.active)continue;if(b.hitCount<b.hitIds.length)b.hitIds[b.hitCount++]=e.id;const ix=b.px+(b.x-b.px)*e.bt,iy=b.py+(b.y-b.py)*e.bt;if(b.rocket){explode(ix,iy,b.blast,b.damage,b.knock);b.x=ix;b.y=iy;dead=true}else{hitEnemy(e,b.damage,b.knock,b.px,b.py);if(!b.flame)tracer(b.px,b.py,ix,iy,b.color,b.r*.65);if(b.pierce--<=0)dead=true}}if(dead){if(b.rocket&&b.life<=0)explode(b.x,b.y,b.blast,b.damage,b.knock);BP.release(b)}}}
+function updateEnemies(dt){for(let i=EP.active.length-1;i>=0;i--){const e=EP.active[i],t=CONFIG.enemies[e.type];e.px=e.x;e.py=e.y;e.attack-=dt;e.timer-=dt;e.squash=Math.max(0,e.squash-dt);e.kx*=Math.exp(-7*dt);e.ky*=Math.exp(-7*dt);let target=blocked(e.x,e.y,e.r+3);if(target){e.phase=0;e.timer=Math.max(e.timer,.08);attackStructure(e,target,t)}else if(e.phase===0&&e.timer<=0){const a=Math.atan2(player.y-e.y,player.x-e.x)+rand(-.55,.55),dur=rand(t.jump[0],t.jump[1]),spd=scaleForLevel(t.speed,game.level,CONFIG.progression.speedScale)*rand(.85,1.25);e.vx=Math.cos(a)*spd;e.vy=Math.sin(a)*spd;e.angle=a;e.timer=dur;e.phase=1}else if(e.phase===1&&e.timer<=0){e.phase=0;e.timer=rand(t.pause[0],t.pause[1]);e.vx=e.vy=0}if(e.phase===1&&!target){const nx=e.x+(e.vx+e.kx)*dt,ny=e.y+(e.vy+e.ky)*dt,h=segmentBlock(e.x,e.y,nx,ny,e.r);if(h){e.phase=0;e.timer=.04;e.vx=e.vy=0;attackStructure(e,h,t)}else{e.x=clamp(nx,e.r,CONFIG.world.width-e.r);e.y=clamp(ny,e.r,CONFIG.world.height-e.r)}}else{e.x=clamp(e.x+e.kx*dt,e.r,CONFIG.world.width-e.r);e.y=clamp(e.y+e.ky*dt,e.r,CONFIG.world.height-e.r)}if(circleOverlap(e.x,e.y,e.r,player.x,player.y,player.r)&&player.inv<=0){player.hp-=scaleForLevel(t.damage,game.level,CONFIG.progression.damageScale);player.inv=CONFIG.player.hitInvuln;game.shake=8;sfx('hurt');particle(player.x,player.y,'#b81717',4,.4,125,7);const d=Math.hypot(player.x-e.x,player.y-e.y)||1;player.x+=(player.x-e.x)/d*18;player.y+=(player.y-e.y)/d*18;if(player.hp<=0)gameOver()}}}
+function updateStructures(dt){for(let i=SP.active.length-1;i>=0;i--){const s=SP.active[i];if(s.type!=='turret')continue;const c=CONFIG.structures.turret;s.fire-=dt;s.scan-=dt;if(s.scan<=0){s.scan=c.scanInterval+rand(0,c.scanJitter);let best=null,bd=c.range*c.range;EH.query(s.x,s.y,c.range,e=>{const d=d2(s.x,s.y,e.x,e.y);if(d<bd){bd=d;best=e}});s.target=best}if(s.target&&s.target.active){const e=s.target,d=d2(s.x,s.y,e.x,e.y);if(d>c.range*c.range){s.target=null;continue}s.angle=Math.atan2(e.y-s.y,e.x-s.x);if(s.fire<=0){s.fire=1/c.rate;const a=s.angle,len=Math.sqrt(d),ex=s.x+Math.cos(a)*len,ey=s.y+Math.sin(a)*len;hitEnemy(e,c.damage,c.knockback,s.x,s.y);tracer(s.x+Math.cos(a)*15,s.y+Math.sin(a)*15,ex,ey,'#ffea47',3,.075);particle(s.x+Math.cos(a)*18,s.y+Math.sin(a)*18,'#fff3a0',3,.12,80,2);sfx('shot',410)}}}}
+function updateParticles(dt){for(let i=PP.active.length-1;i>=0;i--){const p=PP.active[i];p.life-=dt;if(p.life<=0){PP.release(p);continue}p.vx*=Math.exp(-p.drag*dt);p.vy*=Math.exp(-p.drag*dt);p.x+=p.vx*dt;p.y+=p.vy*dt}for(let i=TP.active.length-1;i>=0;i--){const t=TP.active[i];t.life-=dt;if(t.life<=0)TP.release(t)}}
+function gameOver(){game.phase='dead';mouse.down=false;game.shop=false;game.build=null;game.best=Math.max(game.best,game.score);try{localStorage.setItem(CONFIG.recordsKey,game.best)}catch(e){}tone(52,.8,.11,'sawtooth',.22)}
+function reset(){EP.clear();BP.clear();PP.clear();TP.clear();SP.clear();DX.clearRect(0,0,CONFIG.world.width,CONFIG.world.height);Object.assign(game,{phase:'playing',time:0,level:1,score:0,money:CONFIG.economy.startMoney,kills:0,spawn:0,shop:false,build:null,shake:0,wave:2,empty:0});Object.assign(player,{x:CONFIG.player.startX,y:CONFIG.player.startY,hp:CONFIG.player.maxHp,fire:0,inv:0,weapon:0});player.unlocked=CONFIG.weapons.map((w,i)=>i===0);player.ammo=CONFIG.weapons.map(w=>w.ammo);for(let i=0;i<CONFIG.progression.initialEnemies;i++)spawnEnemy(i<CONFIG.progression.initialEnemies-2?'small':'medium');structureHash();enemyHash()}
+function update(dt){if(game.phase!=='playing')return;game.time+=dt;game.empty-=dt;player.fire-=dt;player.inv-=dt;game.wave-=dt;const level=levelAtTime(game.time,CONFIG.progression.levelSeconds);if(level!==game.level){game.level=level;game.wave=2.4;tone(520,.18,.06,'square',1.7)}const rate=spawnRate(CONFIG.progression.spawnBase,CONFIG.progression.spawnPerLevel,CONFIG.progression.spawnPower,game.level);game.spawn+=dt*rate;while(game.spawn>=1){spawnEnemy();game.spawn--}let mx=(keys.KeyD?1:0)-(keys.KeyA?1:0),my=(keys.KeyS?1:0)-(keys.KeyW?1:0),m=Math.hypot(mx,my)||1;mx/=m;my/=m;const nx=clamp(player.x+mx*CONFIG.player.speed*dt,player.r,CONFIG.world.width-player.r),ny=clamp(player.y+my*CONFIG.player.speed*dt,player.r,CONFIG.world.height-player.r);if(!blocked(nx,player.y,player.r))player.x=nx;if(!blocked(player.x,ny,player.r))player.y=ny;player.angle=Math.atan2(mouse.wy-player.y,mouse.wx-player.x);if(mouse.down&&!game.shop&&!game.build)shoot();enemyHash();updateBullets(dt);updateEnemies(dt);enemyHash();if(structureHashDirty)structureHash();updateStructures(dt);updateParticles(dt);cam.x=clamp(player.x-VWW/2,0,Math.max(0,CONFIG.world.width-VWW));cam.y=clamp(player.y-VHW/2,0,Math.max(0,CONFIG.world.height-VHW));mouse.wx=mouse.x/ZOOM+cam.x;mouse.wy=mouse.y/ZOOM+cam.y;game.shake*=Math.exp(-10*dt)}
+function visible(x,y,r=40){return x+r>cam.x&&y+r>cam.y&&x-r<cam.x+VWW&&y-r<cam.y+VHW}
+function makeEnemySprite(type){const t=CONFIG.enemies[type],r=t.r,p=Math.ceil(r*1.65),c=document.createElement('canvas');c.width=c.height=p*2;const g=c.getContext('2d');g.translate(p,p);g.strokeStyle='#360006';g.lineWidth=Math.max(2,r*.1);g.lineCap='square';for(let s=-1;s<=1;s+=2)for(let i=-1;i<=1;i++){g.beginPath();g.moveTo(i*r*.28,s*r*.28);g.lineTo((i*.45+s*.55)*r,s*r*.9);g.lineTo((i*.75+s*.65)*r,s*r*1.18);g.stroke()}g.beginPath();g.moveTo(r*.65,-r*.18);g.quadraticCurveTo(r*1.15,-r*.9,r*1.4,-r*.5);g.moveTo(r*.65,r*.18);g.quadraticCurveTo(r*1.15,r*.9,r*1.4,r*.5);g.stroke();g.fillStyle=t.color;g.strokeStyle='#4a0508';g.beginPath();g.ellipse(0,0,r,r*.5,0,0,6.283);g.fill();g.stroke();g.fillStyle='#ee4a31';g.beginPath();g.arc(r*.55,0,r*.28,0,6.283);g.fill();return c}
+const ENEMY_SPRITES={small:makeEnemySprite('small'),medium:makeEnemySprite('medium'),large:makeEnemySprite('large')};
+function drawEnemy(e){const t=CONFIG.enemies[e.type],hop=e.phase===1?Math.sin(clamp(e.timer/t.jump[1],0,1)*Math.PI)*e.r*.6:0,s=ENEMY_SPRITES[e.type];X.save();X.translate(e.x,e.y-hop);X.rotate(e.angle);X.scale(1+e.squash*1.5,1-e.squash);X.drawImage(s,-s.width/2,-s.height/2);X.restore();if(e.hp<e.maxHp&&e.type!=='small'){X.fillStyle='#290000';X.fillRect(e.x-e.r,e.y-e.r-9,e.r*2,4);X.fillStyle='#f02b2b';X.fillRect(e.x-e.r,e.y-e.r-9,e.r*2*clamp(e.hp/e.maxHp,0,1),4)}}
+function drawStructure(s,ghost=false,ok=true){const a=ghost?.55:1;X.save();X.globalAlpha=a;X.translate(s.x,s.y);if(s.type==='barricade'){X.fillStyle=ok?'#a92727':'#772020';X.strokeStyle='#501010';X.lineWidth=4;X.fillRect(-23,-23,46,46);X.strokeRect(-23,-23,46,46);X.strokeStyle='#ed5a4d';X.lineWidth=7;X.beginPath();X.moveTo(-16,-16);X.lineTo(16,16);X.moveTo(16,-16);X.lineTo(-16,16);X.stroke()}else{X.fillStyle=ok?'#767364':'#714444';X.strokeStyle='#2e302a';X.lineWidth=4;X.beginPath();X.arc(0,0,19,0,6.283);X.fill();X.stroke();X.rotate(s.angle||0);X.fillStyle='#d8c75d';X.fillRect(-5,-8,27,16);X.fillStyle='#272820';X.fillRect(12,-4,17,8)}X.restore();if(ghost){X.save();X.translate(s.x,s.y);X.globalAlpha=.95;X.strokeStyle=ok?'#75ff65':'#ff3b32';X.lineWidth=3;if(s.type==='barricade')X.strokeRect(-s.size/2-3,-s.size/2-3,s.size+6,s.size+6);else{X.beginPath();X.arc(0,0,s.size*.65,0,6.283);X.stroke()}X.restore()}if(!ghost&&s.hp<s.maxHp){X.fillStyle='#222';X.fillRect(s.x-20,s.y-s.size/2-9,40,4);X.fillStyle='#65d34f';X.fillRect(s.x-20,s.y-s.size/2-9,40*clamp(s.hp/s.maxHp,0,1),4)}}
+function worldDraw(){const sx=(Math.random()-.5)*game.shake,sy=(Math.random()-.5)*game.shake;X.save();if(ZOOM!==1)X.scale(ZOOM,ZOOM);X.translate(-cam.x+sx,-cam.y+sy);X.fillStyle=grassPattern;X.fillRect(cam.x-5,cam.y-5,VWW+10,VHW+10);const cx=cam.x|0,cy=cam.y|0,cw=Math.min(VWW+1,CONFIG.world.width-cx),ch=Math.min(VHW+1,CONFIG.world.height-cy);if(cw>0&&ch>0)X.drawImage(decal,cx,cy,cw,ch,cx,cy,cw,ch);X.strokeStyle='#1f5e1b';X.lineWidth=12;X.strokeRect(0,0,CONFIG.world.width,CONFIG.world.height);for(const s of SP.active)if(visible(s.x,s.y,s.size))drawStructure(s);for(const e of EP.active)if(visible(e.x,e.y,e.r+20))drawEnemy(e);for(const b of BP.active)if(visible(b.x,b.y,30)){X.fillStyle=b.color;X.globalAlpha=b.flame?clamp(b.life/.25,0,1):1;if(!b.flame){X.strokeStyle=b.color;X.lineWidth=Math.max(2,b.r*.8);X.beginPath();X.moveTo(b.px,b.py);X.lineTo(b.x,b.y);X.stroke()}X.beginPath();X.arc(b.x,b.y,b.r,0,6.283);X.fill();if(b.rocket){X.strokeStyle='#5b4a39';X.lineWidth=5;X.beginPath();X.moveTo(b.x,b.y);X.lineTo(b.x-Math.cos(b.angle)*20,b.y-Math.sin(b.angle)*20);X.stroke()}}X.globalAlpha=1;for(const t of TP.active)if(visible(t.x1,t.y1,500)){X.globalAlpha=t.life/t.max;X.strokeStyle=t.color;X.lineWidth=t.width;X.beginPath();X.moveTo(t.x1,t.y1);X.lineTo(t.x2,t.y2);X.stroke()}X.globalAlpha=1;for(const p of PP.active)if(visible(p.x,p.y,20)){X.globalAlpha=clamp(p.life/p.max,0,1);X.fillStyle=p.color;X.beginPath();X.arc(p.x,p.y,p.size*(.6+p.life/p.max*.4),0,6.283);X.fill()}X.globalAlpha=1;X.save();X.translate(player.x,player.y);X.rotate(player.angle);X.fillStyle=player.inv>0&&Math.floor(player.inv*30)%2?'#fff':'#e7d3b1';X.strokeStyle='#473a2c';X.lineWidth=3;X.beginPath();X.arc(0,0,player.r,0,6.283);X.fill();X.stroke();X.fillStyle='#29476d';X.fillRect(-10,-10,16,20);X.fillStyle='#333';X.fillRect(4,-4,27,8);X.restore();if(game.build&&(!TOUCH||touchPlacing)){const x=snap(mouse.wx,CONFIG.world.buildGrid),y=snap(mouse.wy,CONFIG.world.buildGrid);drawStructure({x,y,type:game.build,size:CONFIG.structures[game.build].size,angle:0},true,canPlace(game.build,x,y))}X.restore()}
+function money(v){return '₩'+Math.floor(v).toLocaleString('ko-KR')}
+function text(t,x,y,size=16,color='#fff',align='left'){X.font=`bold ${size}px "Malgun Gothic"`;X.textAlign=align;X.fillStyle='#000';X.fillText(t,x+2,y+2);X.fillStyle=color;X.fillText(t,x,y)}
+function hud(){if(TOUCH){hudTouch();return}text('Score '+game.score.toLocaleString(),14,28,21);text(`적 ${EP.active.length} / 처치 ${game.kills} / FPS ${fps}`,14,51,13,'#f7e4ce');const bh=42,y=H-bh;X.fillStyle='#151515dd';X.fillRect(0,y,W,bh);X.strokeStyle='#777';X.strokeRect(0,y,W,bh);X.fillStyle='#302b2b';X.fillRect(18,y+11,230,20);X.fillStyle=player.hp/player.maxHp>.3?'#36bb45':'#d42e2e';X.fillRect(20,y+13,226*clamp(player.hp/player.maxHp,0,1),16);text(`HP ${Math.ceil(player.hp)} / ${player.maxHp}`,132,y+27,13,'#fff','center');text(`Level ${game.level}`,280,y+27,18,'#ffe871');text(money(game.money),400,y+27,20,'#8dff78');const w=CONFIG.weapons[player.weapon],ammo=w.ammo<0?'∞':player.ammo[player.weapon].toLocaleString();text(`[${player.weapon+1}] ${w.name}  탄약 ${ammo}`,W-18,y+27,18,'#ffe36a','right');if(game.wave>0)text(`LEVEL ${game.level}  -  곱등이 밀도가 증가합니다!`,W/2,100,27,'#ffdf48','center');if(game.build)text(`${CONFIG.structures[game.build].name} 배치 중 · 좌클릭 설치 / ESC 취소`,W/2,36,17,'#ffef82','center')}
+function button(x,y,w,h,label,sub,enabled=true,selected=false){X.fillStyle=selected?'#776e35':enabled?'#394538':'#303030';X.fillRect(x,y,w,h);X.strokeStyle=enabled?'#9aaa83':'#555';X.strokeRect(x,y,w,h);text(label,x+10,y+20,14,enabled?'#fff':'#888');text(sub,x+w-8,y+38,12,enabled?'#ffe17a':'#777','right');shopButtons.push({x,y,w,h,action:null}) ;return shopButtons[shopButtons.length-1]}
+// 상점 배치 — 데스크톱은 원래 좌표 그대로, 터치 화면은 화면에 맞춰(가로: 무기 2열) 크게
+function shopLayout(){const n=CONFIG.weapons.length;if(!TOUCH){const pw=340,x=W-pw-12,y=12;return{x,y,w:pw,h:H-66,title:'B  생존 상점',sub:11,weapon:i=>[x+10,y+58+i*49,pw-20,46],labelY:y+58+n*49+17,struct:j=>[x+10,y+58+n*49+25+j*47,pw-20,43]}}const land=W>H,top=touchHudBottom()+6,x=SAFE.l+12,w=W-SAFE.l-SAFE.r-24,cols=land?2:1,rows=Math.ceil(n/cols),gap=4,sc=land?2:1,avail=H-SAFE.b-8-top,rh=Math.max(40,Math.min(50,Math.floor((avail-58-24-(land?1:2)*(46+gap))/rows)-gap)),cw=(w-20-(cols-1)*8)/cols,h=58+rows*(rh+gap)+24+Math.ceil(2/sc)*(46+gap)+6;return{x,y:top,w,h:Math.min(h,avail),title:'생존 상점',sub:12,weapon:i=>[x+10+(i%cols)*(cw+8),top+58+Math.floor(i/cols)*(rh+gap),cw,rh],labelY:top+58+rows*(rh+gap)+16,struct:j=>{const scw=(w-20-(sc-1)*8)/sc;return[x+10+(j%sc)*(scw+8),top+58+rows*(rh+gap)+24+Math.floor(j/sc)*(46+gap),scw,46]}}}
+function shop(){if(!game.shop)return;shopButtons=[];const L=shopLayout(),x=L.x,y=L.y,pw=L.w;X.fillStyle='#172019f2';X.fillRect(x,y,pw,L.h);X.strokeStyle='#b6c5a6';X.lineWidth=2;X.strokeRect(x,y,pw,L.h);text(L.title,x+16,y+28,20,'#eafaac');text(TOUCH?'무기 탭: 구매 / 보유 무기: 탄약 보급 · 🛒 닫기':'무기 클릭: 구매 / 보유 무기: 탄약 보급',x+16,y+49,L.sub,'#c5cdbd');CONFIG.weapons.forEach((w,i)=>{const own=player.unlocked[i],free=i===0,r=L.weapon(i),b=button(r[0],r[1],r[2],r[3],`${i+1}. ${w.name}${own?' ✓':''}`,free?'기본 무한탄':own?`+${w.pack} / ${money(w.packPrice)}`:money(w.price),free||game.money>=(own?w.packPrice:w.price),player.weapon===i);b.action=()=>{if(free){player.weapon=0;return}const cost=own?w.packPrice:w.price;if(game.money<cost){sfx('empty');return}game.money-=cost;if(own)player.ammo[i]+=w.pack;else{player.unlocked[i]=true;player.ammo[i]=w.ammo;player.weapon=i}sfx('buy')}});text(TOUCH?'거치물 (선택 후 필드를 눌러 배치)':'거치물 (선택 후 필드에 배치)',x+16,L.labelY,13,'#d8ffc4');['turret','barricade'].forEach((type,j)=>{const c=CONFIG.structures[type],r=L.struct(j),b=button(r[0],r[1],r[2],r[3],c.name,money(c.price),game.money>=c.price,game.build===type);b.action=()=>{if(game.money<c.price){sfx('empty');return}game.build=type;game.shop=false}})}
+function dialogLayout(){const w=TOUCH?Math.min(430,W-24):430,h=game.phase==='dead'?190:275,x=(W-w)/2,y=(H-h)/2,bw=TOUCH?180:136,bh=TOUCH?46:31;return{w,h,x,y,bw,bh,by:y+h-(TOUCH?60:49)}}
+function dialogButtonHit(){const D=dialogLayout();return mouse.x>=W/2-D.bw/2&&mouse.x<=W/2+D.bw/2&&mouse.y>=D.by&&mouse.y<=D.by+D.bh}
+function dialog(){if(game.phase==='playing')return;const D=dialogLayout(),w=D.w,h=D.h,x=D.x,y=D.y;X.fillStyle='#c7c7c7';X.fillRect(x,y,w,h);X.strokeStyle='#fff';X.lineWidth=3;X.strokeRect(x,y,w,h);X.fillStyle='#315b9b';X.fillRect(x+4,y+4,w-8,31);text(game.phase==='dead'?'오류':'생존 기록',x+14,y+27,15);X.fillStyle='#222';X.font='bold 20px "Malgun Gothic"';X.textAlign='center';X.fillText(game.phase==='dead'?'곱등이한테 죽었슴다 ㅠ':'최종 결과',W/2,y+78);if(game.phase==='result'){X.font='bold 16px "Malgun Gothic"';X.fillText(`점수 ${game.score.toLocaleString()}  ·  레벨 ${game.level}`,W/2,y+112);X.fillText(`처치 ${game.kills.toLocaleString()}  ·  생존 ${Math.floor(game.time)}초`,W/2,y+140);X.fillStyle='#7a1717';X.fillText(`최고 기록 ${game.best.toLocaleString()}`,W/2,y+168)}const by=D.by;X.fillStyle='#dedede';X.fillRect(W/2-D.bw/2,by,D.bw,D.bh);X.strokeStyle='#222';X.lineWidth=2;X.strokeRect(W/2-D.bw/2,by,D.bw,D.bh);X.fillStyle='#111';X.font='bold '+(TOUCH?17:15)+'px "Malgun Gothic"';X.fillText(game.phase==='dead'?'OK':'재시작',W/2,by+(TOUCH?D.bh/2+6:21))}
+function draw(){X.setTransform(DPR,0,0,DPR,0,0);X.clearRect(0,0,W,H);worldDraw();hud();shop();dialog()}
+function canvasPos(e){const r=C.getBoundingClientRect();mouse.x=(e.clientX-r.left)*W/r.width;mouse.y=(e.clientY-r.top)*H/r.height;mouse.wx=mouse.x/ZOOM+cam.x;mouse.wy=mouse.y/ZOOM+cam.y}
+C.addEventListener('mousemove',canvasPos);C.addEventListener('mousedown',e=>{canvasPos(e);initAudio();if(e.button!==0)return;if(game.phase==='dead'){if(dialogButtonHit())game.phase='result';return}if(game.phase==='result'){if(dialogButtonHit())reset();return}if(game.shop){for(const b of shopButtons)if(mouse.x>=b.x&&mouse.x<=b.x+b.w&&mouse.y>=b.y&&mouse.y<=b.y+b.h){b.action?.();return}}if(game.build){place(game.build,mouse.wx,mouse.wy);return}mouse.down=true});addEventListener('mouseup',e=>{if(e.button===0)mouse.down=false});C.addEventListener('contextmenu',e=>{e.preventDefault();game.build=null});
+addEventListener('keydown',e=>{keys[e.code]=true;initAudio();if(e.code==='KeyB'&&game.phase==='playing'){game.shop=!game.shop;game.build=null}if(e.code==='Escape'){game.build=null;game.shop=false}if(/^Digit[1-7]$/.test(e.code)){const i=+e.code.slice(5)-1;if(player.unlocked[i])player.weapon=i}});addEventListener('keyup',e=>keys[e.code]=false);C.addEventListener('wheel',e=>{e.preventDefault();let i=player.weapon;for(let n=0;n<7;n++){i=(i+(e.deltaY>0?1:6))%7;if(player.unlocked[i]){player.weapon=i;break}}},{passive:false});
+let last=performance.now(),fpsClock=last,fpsFrames=0,fps=60;function loop(now){const dt=Math.min(CONFIG.world.maxFrameDt,(now-last)/1000||0);last=now;if(++fpsFrames>=20){fps=Math.round(fpsFrames*1000/Math.max(1,now-fpsClock));fpsFrames=0;fpsClock=now}update(dt);draw();requestAnimationFrame(loop)}reset();requestAnimationFrame(loop);
+</script>
+<!-- touch-kit:start -->
+<script>
+/* touch-kit.js — on-screen touch controls for keyboard/mouse web games. No dependencies.
+ * Inline it into a single-file game (inside a script tag) or load it next to the game.
+ *
+ *   const kit = TouchKit.create({
+ *     sticks: [
+ *       { id: 'move', side: 'left',  label: 'MOVE', keys: 'wasd' },            // 'wasd' | 'arrows' | {up,down,left,right} codes
+ *       { id: 'aim',  side: 'right', label: 'AIM',  onMove: (x, y, on) => {} } // analog -1..1, on=false when released
+ *     ],
+ *     buttons: [ { id: 'fire', label: 'FIRE', icon: '✦', key: 'Space' },      // key: KeyboardEvent.code to hold while pressed
+ *                { id: 'map', label: 'MAP', key: 'KeyM', place: 'top-right' } ],
+ *     landscape: true,        // ask to rotate when the phone is held upright
+ *   })
+ *   kit.show(false)           // hide in menus, kit.show(true) in gameplay (default: shown on touch devices)
+ *   kit.stick('aim')          // → { x, y, on }   kit.pressed('fire') → boolean
+ *
+ * Buttons without `key` can use onDown/onUp. Sticks with `keys` send keydown/keyup (8 directions) and still report analog x/y.
+ * Keys are dispatched as KeyboardEvents (key, code, keyCode, which) on document, so window/document listeners receive them.
+ * Everything else on the page keeps working: the kit only captures touches that start on its own zones/buttons.
+ */
+(function () {
+  'use strict'
+  if (window.TouchKit) return
+  const KEYS = { Space: [' ', 32], Enter: ['Enter', 13], Escape: ['Escape', 27], Tab: ['Tab', 9], ShiftLeft: ['Shift', 16],
+    ControlLeft: ['Control', 17], AltLeft: ['Alt', 18], ArrowLeft: ['ArrowLeft', 37], ArrowUp: ['ArrowUp', 38],
+    ArrowRight: ['ArrowRight', 39], ArrowDown: ['ArrowDown', 40], Backspace: ['Backspace', 8] }
+  const keyInfo = code => {
+    if (KEYS[code]) return KEYS[code]
+    if (/^Key[A-Z]$/.test(code)) return [code[3].toLowerCase(), code.charCodeAt(3)]
+    if (/^Digit\d$/.test(code)) return [code[5], code.charCodeAt(5)]
+    return [code, 0]
+  }
+  const held = new Map()                                   // code → count of sources holding it
+  function sendKey(type, code) {
+    const [key, kc] = keyInfo(code)
+    const ev = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true, composed: true })
+    try { Object.defineProperty(ev, 'keyCode', { get: () => kc }); Object.defineProperty(ev, 'which', { get: () => kc }) } catch (e) {}
+    const t = document.activeElement && document.activeElement !== document.body ? document.activeElement : document
+    t.dispatchEvent(ev)
+  }
+  function press(code) { const n = held.get(code) || 0; held.set(code, n + 1); if (n === 0) sendKey('keydown', code) }
+  function release(code) { const n = held.get(code) || 0; if (n <= 1) { held.delete(code); if (n === 1) sendKey('keyup', code) } else held.set(code, n - 1) }
+  function tapKey(code) { press(code); setTimeout(() => release(code), 80) }
+
+  const isTouch = () => matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
+  const CSS = `
+.tk-root{position:fixed;inset:0;pointer-events:none;z-index:2147483000;font:600 12px/1 system-ui,-apple-system,'Segoe UI',sans-serif;
+  letter-spacing:.06em;color:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tk-root.tk-off{display:none}
+.tk-zone{position:absolute;bottom:0;top:22%;pointer-events:auto;touch-action:none}
+.tk-zone.l{left:0;width:42%}.tk-zone.r{right:0;width:42%}
+.tk-base{position:absolute;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;border:2px solid rgba(255,255,255,.28);
+  background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,.02) 70%);transition:opacity .15s;opacity:.55}
+.tk-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
+  background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.55);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.tk-base.on{opacity:.95}
+.tk-lab{position:absolute;left:0;right:0;top:50%;margin-top:-5px;text-align:center;opacity:.75;text-shadow:0 1px 2px #000;pointer-events:none}
+.tk-btns{position:absolute;display:flex;gap:12px;pointer-events:none}
+.tk-btns.br{right:calc(18px + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse;align-items:flex-end}
+.tk-btns.tr{right:calc(12px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));flex-direction:row-reverse}
+.tk-btns.tl{left:calc(12px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top))}
+.tk-btns.bl{left:calc(18px + env(safe-area-inset-left));bottom:calc(20px + env(safe-area-inset-bottom));flex-direction:column-reverse}
+.tk-row{display:flex;gap:12px;flex-direction:row-reverse;align-items:flex-end}
+.tk-btn{pointer-events:auto;touch-action:none;width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
+  background:rgba(20,22,30,.42);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.tk-btn.s{width:54px;height:54px;font-size:12px}.tk-btn.l{width:84px;height:84px}
+.tk-btn i{font-style:normal;font-size:22px;line-height:1}.tk-btn.s i{font-size:17px}
+.tk-btn.on{background:rgba(255,255,255,.34);border-color:#fff;transform:scale(.94)}
+.tk-rot{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+  background:rgba(8,9,14,.94);color:#eee;font:500 16px/1.5 system-ui,sans-serif;text-align:center;pointer-events:auto;padding:24px}
+.tk-rot b{font-size:44px;display:block;animation:tkr 1.8s ease-in-out infinite}
+.tk-rot button{margin-top:6px;background:none;border:1px solid #666;color:#bbb;border-radius:22px;padding:10px 20px;min-height:44px;font:inherit;font-size:14px}
+@keyframes tkr{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait){.tk-rot.need{display:flex}}
+`
+  // A tap on a kit button is followed by a compatibility `click` at the same spot ~100–300 ms later. If the button just
+  // opened a game overlay/menu under the finger, that click would hit it (and often close it). Swallow it.
+  let clickBlockUntil = 0
+  function suppressClick() { clickBlockUntil = Date.now() + 450 }
+  document.addEventListener('click', e => {
+    if (Date.now() < clickBlockUntil && !(e.target && e.target.closest && e.target.closest('.tk-root'))) { e.stopPropagation(); e.preventDefault() }
+  }, true)
+
+  function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e }
+
+  function create(opt) {
+    opt = opt || {}
+    if (!document.getElementById('tk-style')) { const st = el('style'); st.id = 'tk-style'; st.textContent = CSS; document.head.appendChild(st) }
+    const root = el('div', 'tk-root', document.body)
+    const api = { root, sticks: {}, buttons: {}, visible: false }
+    const rests = []                                         // idle-position functions, re-run when shown
+
+    // ---- sticks: floating — the base appears where the thumb lands inside its half of the screen
+    for (const s of opt.sticks || []) {
+      const side = s.side === 'right' ? 'r' : 'l'
+      const zone = el('div', 'tk-zone ' + side, root)
+      if (s.zone) Object.assign(zone.style, s.zone)
+      const base = el('div', 'tk-base', zone), knob = el('div', 'tk-knob', base)
+      if (s.label) el('div', 'tk-lab', knob, s.label)
+      const R = s.radius || 52, dz = s.deadzone == null ? 0.3 : s.deadzone
+      const keys = s.keys === 'wasd' ? { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }
+        : s.keys === 'arrows' ? { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } : s.keys || null
+      const st = { x: 0, y: 0, on: false, pid: null, cx: 0, cy: 0, dirs: {} }
+      api.sticks[s.id || side] = st
+      const rest = () => {                                   // idle hint position; keeps clear of the bottom-right buttons
+        const zr = zone.getBoundingClientRect(); let x = side === 'l' ? 96 : zr.width - 96
+        if (side === 'r' && groups.br) { const gr = groups.br.getBoundingClientRect(); if (gr.width) x = Math.min(x, gr.left - zr.left - 80) }
+        base.style.left = x + 'px'; base.style.top = (zr.height - 110) + 'px'
+      }
+      const setDirs = (want) => {
+        if (!keys) return
+        for (const d of ['up', 'down', 'left', 'right']) {
+          if (want[d] && !st.dirs[d]) { st.dirs[d] = true; press(keys[d]) }
+          else if (!want[d] && st.dirs[d]) { st.dirs[d] = false; release(keys[d]) }
+        }
+      }
+      const move = (px, py) => {
+        let dx = px - st.cx, dy = py - st.cy; const d = Math.hypot(dx, dy)
+        if (d > R) { dx *= R / d; dy *= R / d }
+        knob.style.transform = `translate(${dx}px,${dy}px)`
+        st.x = dx / R; st.y = dy / R
+        const m = Math.hypot(st.x, st.y), a = Math.atan2(st.y, st.x)
+        const want = { up: false, down: false, left: false, right: false }
+        if (m > dz) { const oct = Math.round(a / (Math.PI / 4)); // 8 directions
+          want.right = [0, 1, -1].includes(oct); want.left = [4, -4, 3, -3].includes(oct); want.down = [1, 2, 3].includes(oct); want.up = [-1, -2, -3].includes(oct) }
+        setDirs(want)
+        if (s.onMove) s.onMove(st.x, st.y, true)
+      }
+      zone.addEventListener('pointerdown', e => {
+        if (st.pid !== null) return
+        e.preventDefault(); st.pid = e.pointerId; try { zone.setPointerCapture(e.pointerId) } catch (x) {}
+        const zr = zone.getBoundingClientRect(); st.cx = e.clientX; st.cy = e.clientY
+        base.style.left = (e.clientX - zr.left) + 'px'; base.style.top = (e.clientY - zr.top) + 'px'
+        base.classList.add('on'); st.on = true; move(e.clientX, e.clientY)
+        if (s.onStart) s.onStart()
+      })
+      zone.addEventListener('pointermove', e => { if (e.pointerId === st.pid) { e.preventDefault(); move(e.clientX, e.clientY) } })
+      const end = e => {
+        if (e.pointerId !== st.pid) return
+        st.pid = null; st.on = false; st.x = st.y = 0; knob.style.transform = ''; base.classList.remove('on'); setDirs({}); rest()
+        if (s.onMove) s.onMove(0, 0, false); if (s.onEnd) s.onEnd()
+      }
+      zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end)
+      st.reset = () => { if (st.pid !== null) end({ pointerId: st.pid }) }
+      rests.push(rest); requestAnimationFrame(rest); addEventListener('resize', rest)
+    }
+
+    // ---- buttons: grouped by place (default bottom-right cluster)
+    const groups = {}
+    for (const b of opt.buttons || []) {
+      const place = b.place || 'bottom-right', code = { 'bottom-right': 'br', 'top-right': 'tr', 'top-left': 'tl', 'bottom-left': 'bl' }[place] || 'br'
+      if (!groups[code]) groups[code] = el('div', 'tk-btns ' + code, root)
+      let parent = groups[code]
+      if (code === 'br' && b.row != null) { parent = groups['br' + b.row] || (groups['br' + b.row] = el('div', 'tk-row', groups.br)) }
+      const btn = el('div', 'tk-btn' + (b.size ? ' ' + b.size : ''), parent, (b.icon ? `<i>${b.icon}</i>` : '') + (b.label ? `<span>${b.label}</span>` : ''))
+      const bs = { down: false, pid: null, el: btn }
+      api.buttons[b.id || b.label] = bs
+      const down = e => {
+        e.preventDefault(); e.stopPropagation()
+        if (b.toggle) { bs.down = !bs.down; btn.classList.toggle('on', bs.down); if (b.key) (bs.down ? press : release)(b.key); (bs.down ? b.onDown : b.onUp) && (bs.down ? b.onDown : b.onUp)(); return }
+        if (bs.pid !== null) return
+        bs.pid = e.pointerId; try { btn.setPointerCapture(e.pointerId) } catch (x) {}
+        bs.down = true; btn.classList.add('on')
+        if (b.key) { if (b.tap) tapKey(b.key); else press(b.key) }
+        if (b.onDown) b.onDown()
+        if (navigator.vibrate && b.buzz !== false) try { navigator.vibrate(8) } catch (x) {}
+      }
+      const up = e => {
+        suppressClick()
+        if (b.toggle || e.pointerId !== bs.pid) return
+        bs.pid = null; bs.down = false; btn.classList.remove('on')
+        if (b.key && !b.tap) release(b.key)
+        if (b.onUp) b.onUp()
+      }
+      btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up)
+      btn.addEventListener('contextmenu', e => e.preventDefault())
+    }
+
+    // ---- portrait → ask to rotate (can be dismissed)
+    let rot = null, rotDismissed = false                      // once dismissed, show(true) must not bring the hint back
+    if (opt.landscape) {
+      rot = el('div', 'tk-rot', document.body, `<b>⟳</b><div>${opt.rotateText || '휴대폰을 가로로 돌려 주세요'}<br><small style="opacity:.6">Rotate your phone</small></div><button type="button">그래도 세로로 하기</button>`)
+      rot.querySelector('button').addEventListener('click', () => { rotDismissed = true; rot.classList.remove('need') })
+    }
+
+    // ---- page hygiene for touch play: no pinch/double-tap zoom, no pull-to-refresh, no long-press menu on the game
+    if (opt.preventGestures !== false) {
+      document.documentElement.style.overscrollBehavior = 'none'
+      document.addEventListener('gesturestart', e => e.preventDefault())
+      let lastT = 0
+      document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastT < 300 && !(e.target.closest && e.target.closest('input,textarea,select,a,button'))) e.preventDefault(); lastT = now }, { passive: false })
+    }
+
+    api.show = on => {
+      api.visible = on; root.classList.toggle('tk-off', !on); if (on) requestAnimationFrame(() => rests.forEach(f => f())); if (rot) rot.classList.toggle('need', on && !!opt.landscape && !rotDismissed)
+      if (!on) { for (const s of Object.values(api.sticks)) s.reset && s.reset(); for (const [code] of held) sendKey('keyup', code); held.clear()
+        for (const b of Object.values(api.buttons)) { b.down = false; b.pid = null; b.el.classList.remove('on') } }
+    }
+    api.stick = id => api.sticks[id] || { x: 0, y: 0, on: false }
+    api.pressed = id => !!(api.buttons[id] && api.buttons[id].down)
+    api.destroy = () => { api.show(false); root.remove(); if (rot) rot.remove() }
+    const mode = opt.show || 'auto'
+    api.show(mode === 'always' || (mode === 'auto' && isTouch()))
+    if (mode === 'auto' && !api.visible) addEventListener('touchstart', function once() { removeEventListener('touchstart', once); api.show(true) }, { passive: true })
+    return api
+  }
+
+  // Helpers for games that read the mouse: fire mouse events at a point (client coords).
+  function mouse(target, type, x, y, extra) {
+    const ev = new MouseEvent(type, Object.assign({ clientX: x, clientY: y, bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1 }, extra || {}))
+    ;(target || document.elementFromPoint(x, y) || document).dispatchEvent(ev)
+  }
+  // Resume every AudioContext the game creates, on the first real touch (iOS/Android need a user gesture).
+  function unlockAudio() {
+    const ctxs = new Set(), AC = window.AudioContext || window.webkitAudioContext
+    if (AC && !AC.__tk) { const W = function (...a) { const c = new AC(...a); ctxs.add(c); return c }; W.prototype = AC.prototype; W.__tk = true; window.AudioContext = W; if (window.webkitAudioContext) window.webkitAudioContext = W }
+    const go = () => { for (const c of ctxs) if (c.state === 'suspended') c.resume().catch(() => {}) }
+    addEventListener('pointerdown', go, true); addEventListener('touchend', go, true)
+  }
+  window.TouchKit = { create, press, release, tapKey, sendKey, mouse, unlockAudio, isTouch }
+})()
+</script>
+<!-- touch-kit:end -->
+<script>
+'use strict';
+// ===== 휴대폰·태블릿 터치 조작 (touch-kit 사용) =====
+// 왼쪽 스틱: 이동(WASD) · 오른쪽 스틱: 조준, 절반 이상 밀면 사격 · ◀ ▶: 무기 교체(휠·숫자키 대신)
+// 🛒: 상점(B) · ✕: 배치 취소(ESC/우클릭 대신) · 필드를 누른 채 위치를 맞추고 떼면 설치(좌클릭 대신)
+// 상점·대화상자는 탭. 데스크톱(마우스)에서는 아무것도 바뀌지 않는다.
+function touchHudBottom(){return SAFE.t+(W>H?44:64)}
+function fitSize(t,size,maxW){X.font=`bold ${size}px "Malgun Gothic"`;const w=X.measureText(t).width;return w>maxW?Math.max(12,Math.floor(size*maxW/w)):size}
+// 터치 HUD: 엄지가 닿는 아래쪽 대신 위쪽 막대 (체력 · 레벨 · 잔고 · 무기/탄약), 그 아래 점수
+function hudTouch(){
+  const land=W>H,x0=SAFE.l+10,x1=W-SAFE.r-10,y0=SAFE.t,bh=touchHudBottom();
+  X.fillStyle='#151515dd';X.fillRect(0,0,W,bh);X.strokeStyle='#777';X.lineWidth=1;X.beginPath();X.moveTo(0,bh+.5);X.lineTo(W,bh+.5);X.stroke();
+  const hw=land?200:Math.min(190,Math.round(W*.48)),frac=clamp(player.hp/player.maxHp,0,1);
+  X.fillStyle='#302b2b';X.fillRect(x0,y0+11,hw,20);X.fillStyle=frac>.3?'#36bb45':'#d42e2e';X.fillRect(x0+2,y0+13,(hw-4)*frac,16);
+  text(`HP ${Math.ceil(player.hp)} / ${player.maxHp}`,x0+hw/2,y0+26,13,'#fff','center');
+  const w=CONFIG.weapons[player.weapon],ammo=w.ammo<0?'∞':player.ammo[player.weapon].toLocaleString(),wt=`[${player.weapon+1}] ${w.name}  탄약 ${ammo}`;
+  if(land){
+    text(`Level ${game.level}`,x0+hw+14,y0+28,18,'#ffe871');
+    text(money(game.money),x0+hw+120,y0+28,20,'#8dff78');
+    text(wt,x1,y0+28,fitSize(wt,18,x1-(x0+hw+300)),'#ffe36a','right');
+  }else{
+    text(money(game.money),x1,y0+28,fitSize(money(game.money),20,x1-x0-hw-12),'#8dff78','right');
+    text(`Lv ${game.level}`,x0,y0+54,16,'#ffe871');
+    text(wt,x1,y0+54,fitSize(wt,15,x1-x0-70),'#ffe36a','right');
+  }
+  text('Score '+game.score.toLocaleString(),x0,bh+26,19);
+  text(`적 ${EP.active.length} / 처치 ${game.kills} / FPS ${fps}`,x0,bh+46,13,'#f7e4ce');
+  const midY=Math.max(bh+80,H*.3);
+  if(game.wave>0){const t=`LEVEL ${game.level}  -  곱등이 밀도가 증가합니다!`;text(t,W/2,midY,fitSize(t,27,W-24),'#ffdf48','center')}
+  if(game.build){const t=`${CONFIG.structures[game.build].name} 배치 · 필드를 누른 채 위치를 맞추고 떼면 설치 · ✕ 취소`;text(t,W/2,midY+34,fitSize(t,16,W-24),'#ffef82','center')}
+  else if(game.time<12&&!game.shop&&game.phase==='playing'){const t1='왼쪽: 이동 · 오른쪽: 조준 (절반 이상 밀면 사격)',t2='◀ ▶ 무기 교체 · 🛒 상점';if(land){const t=t1+' · '+t2;text(t,W/2,midY+34,fitSize(t,14,W-24),'#e8f0da','center')}else{text(t1,W/2,midY+34,fitSize(t1,15,W-24),'#e8f0da','center');text(t2,W/2,midY+58,fitSize(t2,15,W-24),'#e8f0da','center')}}
+}
+(function(){
+  if(!TOUCH||!window.TouchKit)return;
+  TouchKit.unlockAudio(); // iOS·안드로이드: 첫 터치 때 소리 재개
+  const aim={on:false,x:1,y:0,m:0};
+  const cycle=d=>{const n=CONFIG.weapons.length;let i=player.weapon;for(let k=0;k<n;k++){i=(i+(d>0?1:n-1))%n;if(player.unlocked[i]){player.weapon=i;break}}};
+  const kit=TouchKit.create({show:'manual',
+    sticks:[{id:'move',side:'left',label:'이동',keys:'wasd'},
+      {id:'aim',side:'right',label:'조준',onMove:(x,y,on)=>{const m=Math.hypot(x,y);aim.m=on?m:0;if(on&&m>.2){aim.on=true;aim.x=x/m;aim.y=y/m}else if(!on)aim.on=false}}],
+    buttons:[{id:'shop',label:'상점',icon:'🛒',key:'KeyB',tap:true,place:'top-right',size:'s'},
+      {id:'cancel',label:'취소',icon:'✕',key:'Escape',tap:true,place:'top-right',size:'s'},
+      {id:'next',label:'무기',icon:'▶',size:'s',onDown:()=>cycle(1)},
+      {id:'prev',label:'무기',icon:'◀',size:'s',onDown:()=>cycle(-1)}]});
+  window.__touchKit=kit;
+  const zones=kit.root.querySelectorAll('.tk-zone'),tr=kit.root.querySelector('.tk-btns.tr'),br=kit.root.querySelector('.tk-btns.br'),B=kit.buttons;
+  let placeId=null,shown=null,top=-1,wasShop=false,wasBuild=false;
+  // 캔버스 탭: 대화상자 · 상점 버튼 · 배치 (누르고 끌어서 위치 확인 → 떼면 설치)
+  const setMouse=t=>{const r=C.getBoundingClientRect();mouse.x=(t.clientX-r.left)*W/r.width;mouse.y=(t.clientY-r.top)*H/r.height;mouse.wx=mouse.x/ZOOM+cam.x;mouse.wy=mouse.y/ZOOM+cam.y};
+  C.addEventListener('touchstart',e=>{e.preventDefault();initAudio();const t=e.changedTouches[0];
+    if(game.phase==='dead'){setMouse(t);if(dialogButtonHit())game.phase='result';return}
+    if(game.phase==='result'){setMouse(t);if(dialogButtonHit())reset();return}
+    if(game.shop){setMouse(t);for(const b of shopButtons)if(mouse.x>=b.x&&mouse.x<=b.x+b.w&&mouse.y>=b.y&&mouse.y<=b.y+b.h){b.action?.();return}return}
+    if(game.build&&placeId===null){placeId=t.identifier;touchPlacing=true;setMouse(t)}},{passive:false});
+  C.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===placeId)setMouse(t)},{passive:false});
+  const end=e=>{for(const t of e.changedTouches)if(t.identifier===placeId){setMouse(t);placeId=null;touchPlacing=false;if(game.build&&e.type==='touchend')place(game.build,mouse.wx,mouse.wy)}};
+  C.addEventListener('touchend',end);C.addEventListener('touchcancel',end);
+  (function sync(){
+    const playing=game.phase==='playing';
+    if(playing!==shown){shown=playing;kit.show(playing);if(!playing){aim.on=false;mouse.down=false}}
+    const t=touchHudBottom()+8;if(t!==top){top=t;tr.style.top=t+'px'}
+    const shop=!!game.shop,build=!!game.build;
+    if(shop!==wasShop||build!==wasBuild){ // 상점·배치 중: 조준 스틱을 끄고(탭이 캔버스로), 상점 중엔 이동 스틱·무기 버튼도 숨김
+      kit.sticks.aim.reset();if(shop)kit.sticks.move.reset();
+      zones[0].style.display=shop?'none':'';zones[1].style.display=shop||build?'none':'';br.style.display=shop?'none':'';
+      B.cancel.el.style.display=build?'':'none';wasShop=shop;wasBuild=build;aim.on=false;mouse.down=false}
+    if(playing&&!shop&&!build){ // 조준 스틱 → 게임의 마우스 조준점 (플레이어 기준), 절반 이상 밀면 사격
+      const px=(player.x-cam.x)*ZOOM,py=(player.y-cam.y)*ZOOM;mouse.x=px+aim.x*140;mouse.y=py+aim.y*140;mouse.down=aim.on&&aim.m>.5}
+    requestAnimationFrame(sync)})();
+  B.cancel.el.style.display='none';
+})();
+</script></body></html>
+
+
+
+
+
+
+
+

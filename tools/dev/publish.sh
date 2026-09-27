@@ -21,7 +21,7 @@ for (const s of process.argv.slice(1)) {
 for (const p of out) { if (!fs.existsSync(p)) { console.error("missing " + p); process.exit(1) } console.log(p) }
 ' "$@")
 git add -- "${paths[@]}"
-git add -A -- tools .github assets .gitignore 404.html README.md 2>/dev/null || true
+git add -A -- tools .github assets .gitignore 404.html README.md favicon.ico thumbs/_og.jpg 2>/dev/null || true
 git diff --cached --quiet && { echo "nothing to publish"; exit 0; }
 git commit -q -m "$msg"
 tmp="$(mktemp -d)"

@@ -842,6 +842,42 @@
      "desktop": "보기 전용",
      "url": "play/small-projects/claude-self-portrait/",
      "thumb": "thumbs/small-projects--claude-self-portrait.jpg"
+    },
+    {
+     "slug": "small-projects/night-eternal",
+     "title": "영원의 밤",
+     "en": "Night of the Eternal",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "자동 무기로 괴물 떼를 버티며 강화를 고르는 서바이버 생존 액션",
+     "mobile": "화면 어디서나 엄지로 이동 · 카드 탭으로 강화 · ❚❚ 일시정지",
+     "desktop": "WASD 이동 · 클릭/숫자로 강화 선택",
+     "url": "play/small-projects/night-eternal/",
+     "thumb": "thumbs/small-projects--night-eternal.jpg"
+    },
+    {
+     "slug": "small-projects/gopdungi-survival",
+     "title": "곱등이 서바이벌",
+     "en": "Gopdungi Survival",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "몰려드는 곱등이 떼를 총·터렛·바리케이드로 막아내는 탑다운 생존 슈터",
+     "mobile": "왼쪽 스틱 이동 · 오른쪽 스틱 조준·사격 · 🛒 상점 · 터렛 배치",
+     "desktop": "WASD 이동 · 마우스 조준·사격 · 상점·터렛",
+     "url": "play/small-projects/gopdungi-survival/",
+     "thumb": "thumbs/small-projects--gopdungi-survival.jpg"
+    },
+    {
+     "slug": "small-projects/gopdungi-survival-2",
+     "title": "곱등이 서바이벌 (빌드 2)",
+     "en": "Gopdungi Survival, build 2",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "곱등이 생존 슈터의 다른 빌드 — 무기 7종, 자동 터렛, 바리케이드",
+     "mobile": "왼쪽 스틱 이동 · 오른쪽 스틱 조준·사격 · ◀ ▶ 무기 · 🛒 상점",
+     "desktop": "WASD 이동 · 마우스 조준·사격 · 무기 교체",
+     "url": "play/small-projects/gopdungi-survival-2/",
+     "thumb": "thumbs/small-projects--gopdungi-survival-2.jpg"
     }
    ]
   },
