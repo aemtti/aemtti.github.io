@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>빛의 만화경</title>
+<meta name="description" content="손끝으로 빛의 흐름을 휘고 대칭 파문을 만드는 생성형 만화경">
+<meta name="theme-color" content="#05060f">
+<link rel="icon" href="data:,">
+<!--
+  빛의 만화경 — LightKaleidoscope.cs(WinForms)를 웹으로 옮긴 판입니다. 한 파일, 외부 파일 없음.
+  마우스 이동: 빛의 흐름 휘기 · 클릭: 대칭 파문 · 휠/↑↓: 대칭 수(3~16) · P: 색 · Space: 새 장면 · A: 자동 흐름 · F11: 전체화면 · Esc: 나가기
+  휴대폰: 드래그로 빛을 휘고, 탭으로 파문, 아래 버튼으로 나머지 조작.
+
+  원본은 CompositingQuality.HighQuality(감마 보정 합성)로 그려서 옅은 빛이 선형 광도로 더해집니다.
+  그 밝기를 그대로 내려고 WebGL2의 sRGB 프레임버퍼에 그리고(선형 공간 블렌딩), WebGL2가 없으면 Canvas 2D로 그립니다.
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none;
+    background: #05060f linear-gradient(235deg, rgb(10,8,27), rgb(3,6,13)); }
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  canvas { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud { z-index: 1; }
+  .bar { position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(12px + env(safe-area-inset-bottom)); display: none;
+    flex-wrap: wrap; justify-content: center; gap: 7px; pointer-events: none;
+    padding: 0 calc(10px + env(safe-area-inset-right)) 0 calc(10px + env(safe-area-inset-left)); }
+  .touch .bar { display: flex; }
+  .bar button { pointer-events: auto; min-height: 44px; min-width: 44px; padding: 0 13px; border-radius: 22px; margin: 0;
+    border: 1px solid rgba(236,224,255,.26); background: rgba(12,10,30,.58); color: rgba(236,232,250,.92);
+    font: 13px/1 'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',system-ui,sans-serif;
+    touch-action: manipulation; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+  .bar button:active, .bar button.on { background: rgba(236,224,255,.22); border-color: rgba(236,224,255,.66); }
+  .bar button[hidden] { display: none; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<canvas id="hud" aria-label="빛의 만화경"></canvas>
+<div class="bar" id="bar">
+  <button type="button" id="bLess" aria-label="대칭 줄이기">대칭 −</button>
+  <button type="button" id="bMore" aria-label="대칭 늘리기">대칭 +</button>
+  <button type="button" id="bPal">색</button>
+  <button type="button" id="bNew">새 장면</button>
+  <button type="button" id="bAuto" class="on">자동 흐름</button>
+  <button type="button" id="bFull">화면</button>
+  <button type="button" id="bExit">종료</button>
+</div>
+<script>
+(function () {
+  'use strict'
+
+  // ---- .NET Framework System.Random (원본과 같은 알고리즘; 시드는 원본처럼 시각에서) ----
+  function NetRandom(seed) {
+    const MBIG = 2147483647, a = new Array(56).fill(0)
+    seed |= 0
+    let mj = (161803398 - (seed === -2147483648 ? 2147483647 : Math.abs(seed))) | 0, mk = 1
+    a[55] = mj
+    for (let i = 1; i < 55; i++) {
+      const ii = (21 * i) % 55
+      a[ii] = mk; mk = (mj - mk) | 0; if (mk < 0) mk += MBIG; mj = a[ii]
+    }
+    for (let k = 1; k < 5; k++)
+      for (let i = 1; i < 56; i++) { a[i] = (a[i] - a[1 + (i + 30) % 55]) | 0; if (a[i] < 0) a[i] += MBIG }
+    let inext = 0, inextp = 21
+    this.nextDouble = function () {
+      if (++inext >= 56) inext = 1
+      if (++inextp >= 56) inextp = 1
+      let r = a[inext] - a[inextp]
+      if (r === MBIG) r--
+      if (r < 0) r += MBIG
+      a[inext] = r
+      return r * (1 / MBIG)
+    }
+    this.next = (lo, hi) => hi === undefined ? Math.floor(this.nextDouble() * lo) : Math.floor(this.nextDouble() * (hi - lo)) + lo
+  }
+
+  // ---- GDI+ 흉내 도우미 ----
+  const PT = 96 / 72
+  const KO = "'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',system-ui,sans-serif"
+  const SEGOE = "'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Roboto,Arial,sans-serif"
+  const ASC = 2229 / 2048, SEGOE_ASC = 2210 / 2048, LINE = 2724 / 2048
+  const TAU = Math.PI * 2
+  const rgba = (a, c) => `rgba(${c[0]},${c[1]},${c[2]},${+(a / 255).toFixed(4)})`
+  function circle(g, x, y, r) { g.beginPath(); g.arc(x, y, r > 0 ? r : 0, 0, TAU) }
+  function gdiLinearEnds(x, y, w, h, deg) {              // LinearGradientBrush(rect, c1, c2, angle) 의 시작·끝점
+    const a = deg * Math.PI / 180, dx = Math.cos(a), dy = Math.sin(a)
+    const half = (Math.abs(w * dx) + Math.abs(h * dy)) / 2, cx = x + w / 2, cy = y + h / 2
+    return [cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half]
+  }
+  function textAt(g, s, x, y, px, font, color, asc) {           // g.DrawString(s, font, brush, x, y)
+    g.font = font; g.fillStyle = color; g.textAlign = 'left'; g.textBaseline = 'alphabetic'
+    g.fillText(s, x + px / 6, y + (asc || ASC) * px)
+  }
+  function textIn(g, lines, rx, ry, rw, rh, px, font, color) {    // DrawString(…, RectangleF, 가운데 정렬)
+    const lh = LINE * px
+    let y = ry + (rh - lines.length * lh) / 2 + ASC * px
+    g.font = font; g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'alphabetic'
+    for (const l of lines) { g.fillText(l, rx + rw / 2, y); y += lh }
+  }
+
+  const Palettes = [
+    [[151, 112, 255], [108, 255, 217], [255, 183, 112], [236, 224, 255]],
+    [[255, 103, 146], [255, 207, 92], [92, 201, 255], [255, 238, 209]],
+    [[99, 255, 143], [50, 194, 255], [175, 104, 255], [220, 255, 238]],
+    [[255, 120, 86], [252, 71, 164], [143, 112, 255], [255, 222, 196]]
+  ]
+  const PaletteNames = ['새벽 정원', '여름 축제', '깊은 바다', '네온 석양']
+
+  // ---- 상태 (원본 KaleidoscopeForm 필드) ----
+  const Q = new URLSearchParams(location.search)
+  let frozen = Q.has('t') ? +Q.get('t') : null                   // 시험용: ?t=초 로 시계를 멈춤
+  const t0 = performance.now()
+  const clock = () => frozen != null ? frozen : (performance.now() - t0) / 1000
+  const motifs = [], ripples = []
+  const random = new NetRandom(Q.has('seed') ? +Q.get('seed') : (Date.now() % 2147483647))
+  let symmetry = 8, paletteIndex = 0, autoDrift = true
+  let pointer = { X: 0.5, Y: 0.5 }
+  let fieldBorn = 0, touchUI = false
+
+  function createField() {
+    motifs.length = 0
+    const count = 34 + random.next(10)
+    for (let index = 0; index < count; index++) {
+      motifs.push({
+        Radius: 34 + random.nextDouble() * 300,
+        Angle: random.nextDouble() * 6.28318,
+        Speed: -0.18 + random.nextDouble() * 0.36,
+        Size: 2.5 + random.nextDouble() * 12,
+        Wobble: 0.6 + random.nextDouble() * 2.3,
+        ColorIndex: random.next(4)
+      })
+    }
+    fieldBorn = clock()
+  }
+  createField()
+
+  // ---- 한 프레임의 무늬 (원본 DrawKaleidoscope / DrawSegment 계산; 모든 조각에서 같은 값) ----
+  let W = 1, H = 1, dpr = 1, inset = { t: 0, r: 0, b: 0, l: 0 }
+  let mx = new Float64Array(64), my = new Float64Array(64), ms = new Float64Array(64)
+  const rip = []                                                 // x, y, size, alpha, colorIndex
+  const F = { cx: 0, cy: 0, scale: 1, seconds: 0 }
+
+  function computeFrame(seconds) {
+    F.seconds = seconds
+    F.cx = W * 0.5; F.cy = H * 0.52
+    F.scale = Math.min(W, H) / 760
+    let pointerX = (pointer.X - 0.5) * 110, pointerY = (pointer.Y - 0.5) * 110
+    if (autoDrift) {
+      pointerX += Math.sin(seconds * 0.37) * 52
+      pointerY += Math.cos(seconds * 0.29) * 45
+    }
+    const localTime = seconds - fieldBorn, scale = F.scale
+    if (mx.length < motifs.length) { mx = new Float64Array(motifs.length); my = new Float64Array(motifs.length); ms = new Float64Array(motifs.length) }
+    for (let i = 0; i < motifs.length; i++) {
+      const motif = motifs[i]
+      const angle = motif.Angle + localTime * motif.Speed
+      const radius = motif.Radius * scale + Math.sin(localTime * motif.Wobble + motif.Angle) * 15
+      mx[i] = Math.cos(angle) * radius + pointerX * (motif.Radius / 420)
+      my[i] = Math.sin(angle) * radius * 0.55 + pointerY * (motif.Radius / 520)
+      ms[i] = motif.Size * scale * (0.78 + Math.sin(localTime * 1.4 + motif.Angle) * 0.22)
+    }
+    rip.length = 0
+    for (const ripple of ripples) {
+      const age = seconds - ripple.Born
+      const expansion = age / 2.4
+      const angle = ripple.Angle + age * 0.12
+      const radius = (ripple.Radius + expansion * 190) * scale
+      rip.push(Math.cos(angle) * radius, Math.sin(angle) * radius * 0.55, 8 + expansion * 22,
+        Math.max(0, Math.trunc((1.0 - age / 2.4) * 170)), ripple.ColorIndex % 4)
+    }
+  }
+
+  // ======================= WebGL2 렌더러 (선형 광도 합성 = GDI+ HighQuality) =======================
+  const VS_PRIM = `#version 300 es
+precision highp float;
+layout(location=0) in vec2 a_corner;
+layout(location=1) in vec4 a_geo;   // p0.xy, p1.xy
+layout(location=2) in vec4 a_par;   // type, r(반지름·선 반폭), w(고리 반폭), -
+layout(location=3) in vec4 a_col;   // sRGB 0..1, alpha
+layout(location=4) in vec4 a_col2;  // 방사형 그라데이션 바깥색
+uniform mat3 u_mat;
+uniform vec2 u_res;
+out vec2 v_p;
+flat out vec4 v_geo; flat out vec4 v_par; flat out vec4 v_col; flat out vec4 v_col2;
+void main() {
+  int type = int(a_par.x + 0.5);
+  vec2 p0 = a_geo.xy, p1 = a_geo.zw, local;
+  float m = 1.5;
+  if (type == 2 || type == 3) {
+    vec2 d = p1 - p0; float L = length(d);
+    vec2 dir = L > 1e-5 ? d / L : vec2(1.0, 0.0), nrm = vec2(-dir.y, dir.x);
+    float ext = (type == 2 ? a_par.y : 0.0) + m;
+    local = mix(p0 - dir * ext, p1 + dir * ext, a_corner.x * 0.5 + 0.5) + nrm * (a_par.y + m) * a_corner.y;
+  } else {
+    local = p0 + a_corner * (a_par.y + a_par.z + m);
+  }
+  vec2 w = (u_mat * vec3(local, 1.0)).xy;
+  gl_Position = vec4(w.x / u_res.x * 2.0 - 1.0, 1.0 - w.y / u_res.y * 2.0, 0.0, 1.0);
+  v_p = local; v_geo = a_geo; v_par = a_par; v_col = a_col; v_col2 = a_col2;
+}`
+  const FS_PRIM = `#version 300 es
+precision highp float;
+in vec2 v_p;
+flat in vec4 v_geo; flat in vec4 v_par; flat in vec4 v_col; flat in vec4 v_col2;
+uniform float u_dpr;
+out vec4 o;
+vec3 dec(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
+void main() {
+  int type = int(v_par.x + 0.5);
+  vec2 a = v_geo.xy, b = v_geo.zw;
+  float r = v_par.y, cov;
+  vec4 col = v_col;
+  if (type == 0) {
+    cov = clamp((r - length(v_p - a)) * u_dpr + 0.5, 0.0, 1.0);
+  } else if (type == 1) {
+    cov = clamp((v_par.z - abs(length(v_p - a) - r)) * u_dpr + 0.5, 0.0, 1.0);
+  } else if (type == 4) {
+    float d = length(v_p - a);
+    cov = clamp((r - d) * u_dpr + 0.5, 0.0, 1.0);
+    col = mix(v_col, v_col2, clamp(d / max(r, 1e-4), 0.0, 1.0));
+  } else {
+    vec2 ba = b - a, pa = v_p - a; float L = length(ba);
+    if (L < 1e-5) {
+      cov = type == 2 ? clamp((r - length(pa)) * u_dpr + 0.5, 0.0, 1.0) : 0.0;
+    } else if (type == 2) {
+      float h = clamp(dot(pa, ba) / (L * L), 0.0, 1.0);
+      cov = clamp((r - length(pa - ba * h)) * u_dpr + 0.5, 0.0, 1.0);
+    } else {
+      vec2 d = ba / L; float t = dot(pa, d), n = abs(pa.x * d.y - pa.y * d.x);
+      cov = clamp((r - n) * u_dpr + 0.5, 0.0, 1.0) * clamp(min(t, L - t) * u_dpr + 0.5, 0.0, 1.0);
+    }
+  }
+  float al = col.a * cov;
+  o = vec4(dec(col.rgb) * al, al);
+}`
+  const VS_FULL = `#version 300 es
+void main() { vec2 p = vec2(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0); gl_Position = vec4(p, 0.0, 1.0); }`
+  const FS_FULL = `#version 300 es
+precision highp float;
+uniform int u_mode;          // 0: GDI+ 선형 그라데이션(sRGB 보간) · 1: 선형 → sRGB 출력
+uniform sampler2D u_tex;
+uniform vec2 u_res;
+uniform float u_dpr;
+uniform vec4 u_g;            // 그라데이션 시작점, 끝점 (CSS px)
+uniform vec3 u_c0, u_c1;
+out vec4 o;
+vec3 dec(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
+vec3 enc(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+void main() {
+  if (u_mode == 0) {
+    vec2 p = vec2(gl_FragCoord.x, u_res.y - gl_FragCoord.y) / u_dpr;
+    vec2 d = u_g.zw - u_g.xy;
+    float t = clamp(dot(p - u_g.xy, d) / dot(d, d), 0.0, 1.0);
+    o = vec4(dec(mix(u_c0, u_c1, t)), 1.0);
+  } else {
+    o = vec4(enc(texelFetch(u_tex, ivec2(gl_FragCoord.xy), 0).rgb), 1.0);
+  }
+}`
+
+  function createGLRenderer(canvas) {
+    let gl = null
+    try { gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false }) } catch (e) {}
+    if (!gl) return null
+    function prog(vs, fs) {
+      const p = gl.createProgram()
+      for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+        const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s)
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s))
+        gl.attachShader(p, s)
+      }
+      gl.linkProgram(p)
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p))
+      return p
+    }
+    let prim, full
+    try { prim = prog(VS_PRIM, FS_PRIM); full = prog(VS_FULL, FS_FULL) } catch (e) { return null }
+    const U = (p, n) => gl.getUniformLocation(p, n)
+    const uP = { mat: U(prim, 'u_mat'), res: U(prim, 'u_res'), dpr: U(prim, 'u_dpr') }
+    const uF = { mode: U(full, 'u_mode'), tex: U(full, 'u_tex'), res: U(full, 'u_res'), dpr: U(full, 'u_dpr'), g: U(full, 'u_g'), c0: U(full, 'u_c0'), c1: U(full, 'u_c1') }
+
+    const vao = gl.createVertexArray()
+    gl.bindVertexArray(vao)
+    const quad = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    const ibuf = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, ibuf)
+    for (let k = 0; k < 4; k++) {
+      gl.enableVertexAttribArray(1 + k)
+      gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, 64, k * 16)
+      gl.vertexAttribDivisor(1 + k, 1)
+    }
+    gl.bindVertexArray(null)
+    const emptyVao = gl.createVertexArray()
+
+    let inst = new Float32Array(16 * 2048), n = 0
+    function push(type, x0, y0, x1, y1, r, w, c, a, c2, a2) {
+      if ((n + 1) * 16 > inst.length) { const t = new Float32Array(inst.length * 2); t.set(inst); inst = t }
+      const o = n * 16
+      inst[o] = x0; inst[o + 1] = y0; inst[o + 2] = x1; inst[o + 3] = y1
+      inst[o + 4] = type; inst[o + 5] = r; inst[o + 6] = w; inst[o + 7] = 0
+      inst[o + 8] = c[0] / 255; inst[o + 9] = c[1] / 255; inst[o + 10] = c[2] / 255; inst[o + 11] = a / 255
+      if (c2) { inst[o + 12] = c2[0] / 255; inst[o + 13] = c2[1] / 255; inst[o + 14] = c2[2] / 255; inst[o + 15] = a2 / 255 }
+      else { inst[o + 12] = inst[o + 13] = inst[o + 14] = inst[o + 15] = 0 }
+      n++
+    }
+    // 1px보다 작은 점·선은 넓이만큼만 빛나게 (GDI+ 안티에일리어싱과 같은 총량)
+    function pushCircle(x, y, r, c, a) { const m = 0.5 / dpr; if (r < m) { a *= (Math.max(r, 0) / m) ** 2; r = m } push(0, x, y, 0, 0, r, 0, c, a) }
+    function pushLine(type, x0, y0, x1, y1, width, c, a) { const m = 1 / dpr; if (width < m) { a *= width / m; width = m } push(type, x0, y0, x1, y1, width / 2, 0, c, a) }
+    function pushBezier(x1, y1, x2, y2, x3, y3, c, a) {           // DrawBezier((0,0), p1, p2, p3) — 잘게 나눈 꺾은선
+      const L = Math.hypot(x1, y1) + Math.hypot(x2 - x1, y2 - y1) + Math.hypot(x3 - x2, y3 - y2)
+      const steps = Math.max(3, Math.min(20, Math.ceil(L / 14)))
+      let px = 0, py = 0
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps, u = 1 - t, b1 = 3 * u * u * t, b2 = 3 * u * t * t, b3 = t * t * t
+        const qx = b1 * x1 + b2 * x2 + b3 * x3, qy = b1 * y1 + b2 * y2 + b3 * y3
+        pushLine(3, px, py, qx, qy, 1, c, a)
+        px = qx; py = qy
+      }
+    }
+    function pushGlow(x, y, radius, A, color) {                   // DrawGlow: 링 8개, alpha = max(1, A / (10 - ring))
+      for (let ring = 8; ring >= 1; ring--) pushCircle(x, y, radius * (ring / 8), color, Math.max(1, Math.floor(A / (10 - ring))))
+    }
+    const IDENT = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]), MAT = new Float32Array(9)
+    function upload() {
+      gl.bindVertexArray(vao)
+      gl.bindBuffer(gl.ARRAY_BUFFER, ibuf)
+      gl.bufferData(gl.ARRAY_BUFFER, inst.subarray(0, n * 16), gl.DYNAMIC_DRAW)
+    }
+    function drawInstances(mat) {
+      if (!n) return
+      gl.useProgram(prim)
+      gl.uniformMatrix3fv(uP.mat, false, mat); gl.uniform2f(uP.res, W, H); gl.uniform1f(uP.dpr, dpr)
+      gl.bindVertexArray(vao)
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n)
+    }
+    function flush(mat) { if (n) { upload(); drawInstances(mat) } }
+
+    function target(w, h) {
+      const tex = gl.createTexture()
+      gl.bindTexture(gl.TEXTURE_2D, tex)
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.SRGB8_ALPHA8, w, h)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      const fb = gl.createFramebuffer()
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb)
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+      const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      return { tex, fb, ok }
+    }
+    function free(t) { if (t) { gl.deleteFramebuffer(t.fb); gl.deleteTexture(t.tex) } }
+
+    let main = null, bg = null, fw = 0, fh = 0, bgKey = ''
+    const api = {
+      kind: 'webgl2',
+      ok: true,
+      resize() {
+        fw = canvas.width = Math.max(1, Math.round(W * dpr)); fh = canvas.height = Math.max(1, Math.round(H * dpr))
+        free(main); free(bg)
+        main = target(fw, fh); bg = target(fw, fh)
+        if (!main.ok || !bg.ok) api.ok = false
+        bgKey = ''
+      },
+      draw() {
+        if (gl.isContextLost()) return
+        gl.viewport(0, 0, fw, fh)
+        // 배경: 크기·팔레트가 바뀔 때만 그라데이션 + 빛무리 두 개를 따로 그려 둡니다
+        const key = fw + 'x' + fh + ':' + paletteIndex
+        if (key !== bgKey) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, bg.fb)
+          gl.disable(gl.BLEND)
+          gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, null)   // 그리는 대상 텍스처가 샘플러에 묶여 있으면 WebGL이 그리기를 거부합니다
+          gl.useProgram(full); gl.bindVertexArray(emptyVao)
+          const e = gdiLinearEnds(0, 0, W, H, 145)
+          gl.uniform1i(uF.mode, 0); gl.uniform2f(uF.res, fw, fh); gl.uniform1f(uF.dpr, dpr)
+          gl.uniform4f(uF.g, e[0], e[1], e[2], e[3])
+          gl.uniform3f(uF.c0, 10 / 255, 8 / 255, 27 / 255); gl.uniform3f(uF.c1, 3 / 255, 6 / 255, 13 / 255)
+          gl.drawArrays(gl.TRIANGLES, 0, 3)
+          gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+          n = 0
+          pushGlow(W * 0.2, H * 0.78, Math.max(W, H) * 0.42, 22, Palettes[paletteIndex][0])
+          pushGlow(W * 0.86, H * 0.16, Math.max(W, H) * 0.33, 18, Palettes[paletteIndex][1])
+          flush(IDENT)
+          bgKey = key
+        }
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, bg.fb); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, main.fb)
+        gl.blitFramebuffer(0, 0, fw, fh, 0, 0, fw, fh, gl.COLOR_BUFFER_BIT, gl.NEAREST)
+        gl.bindFramebuffer(gl.FRAMEBUFFER, main.fb)
+        gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+
+        // 조각 하나 분량의 무늬를 올려 두고, 대칭 수만큼 회전·뒤집기 행렬만 바꿔 그립니다 (원본의 그리는 순서 그대로)
+        const palette = Palettes[paletteIndex]
+        n = 0
+        for (let i = 0; i < motifs.length; i++) {
+          const ci = motifs[i].ColorIndex % 4, color = palette[ci], x = mx[i], y = my[i], size = ms[i]
+          pushLine(2, 0, 0, x, y, Math.max(0.7, size * 0.12), color, 30)
+          pushCircle(x, y, size * 1.8, color, 22)
+          pushCircle(x, y, size * 0.5, color, 175)
+          const tailX = x * 0.78, tailY = y * 0.78
+          pushBezier(tailX * 0.35, tailY, tailX, tailY * 0.35, x, y, palette[(ci + 1) % 4], 42)
+        }
+        for (let k = 0; k < rip.length; k += 5) push(1, rip[k], rip[k + 1], 0, 0, rip[k + 2], 0.75, palette[rip[k + 4]], rip[k + 3])
+        upload()
+        for (let segment = 0; segment < symmetry; segment++) {
+          const th = segment * TAU / symmetry, c = Math.cos(th), s = Math.sin(th), sy = (segment & 1) === 1 ? -1 : 1
+          MAT[0] = c; MAT[1] = s; MAT[2] = 0
+          MAT[3] = -s * sy; MAT[4] = c * sy; MAT[5] = 0
+          MAT[6] = F.cx; MAT[7] = F.cy; MAT[8] = 1
+          drawInstances(MAT)
+        }
+
+        // 가운데 빛 (DrawCenter)
+        const pulse = 18 * F.scale + Math.sin(F.seconds * 1.8) * 3
+        n = 0
+        pushGlow(F.cx, F.cy, pulse * 4.4, 48, palette[0])
+        push(4, F.cx, F.cy, 0, 0, Math.max(pulse, 0), 0, palette[3], 245, palette[0], 90)
+        flush(IDENT)
+
+        // 선형 → sRGB 로 화면에
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+        gl.disable(gl.BLEND)
+        gl.useProgram(full); gl.bindVertexArray(emptyVao)
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, main.tex)
+        gl.uniform1i(uF.mode, 1); gl.uniform1i(uF.tex, 0)
+        gl.drawArrays(gl.TRIANGLES, 0, 3)
+      }
+    }
+    api.resize()
+    if (!api.ok) return null
+    return api
+  }
+
+  // ======================= Canvas 2D 렌더러 (WebGL2가 없을 때; 합성은 sRGB 공간이라 조금 어둡습니다) =======================
+  function create2DRenderer(canvas) {
+    const g = canvas.getContext('2d')
+    const bgCanvas = document.createElement('canvas'), bgCtx = bgCanvas.getContext('2d')
+    let bgKey = ''
+    function drawGlow(c, x, y, radius, A, color) {
+      for (let ring = 8; ring >= 1; ring--) { circle(c, x, y, radius * (ring / 8)); c.fillStyle = rgba(Math.max(1, Math.floor(A / (10 - ring))), color); c.fill() }
+    }
+    return {
+      kind: '2d',
+      ok: true,
+      resize() { canvas.width = bgCanvas.width = Math.max(1, Math.round(W * dpr)); canvas.height = bgCanvas.height = Math.max(1, Math.round(H * dpr)); bgKey = '' },
+      draw() {
+        const key = W + 'x' + H + ':' + paletteIndex
+        if (key !== bgKey) {
+          bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+          const e = gdiLinearEnds(0, 0, W, H, 145), lg = bgCtx.createLinearGradient(e[0], e[1], e[2], e[3])
+          lg.addColorStop(0, 'rgb(10,8,27)'); lg.addColorStop(1, 'rgb(3,6,13)')
+          bgCtx.fillStyle = lg; bgCtx.fillRect(0, 0, W, H)
+          drawGlow(bgCtx, W * 0.2, H * 0.78, Math.max(W, H) * 0.42, 22, Palettes[paletteIndex][0])
+          drawGlow(bgCtx, W * 0.86, H * 0.16, Math.max(W, H) * 0.33, 18, Palettes[paletteIndex][1])
+          bgKey = key
+        }
+        g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(bgCanvas, 0, 0)
+        g.setTransform(dpr, 0, 0, dpr, 0, 0)
+        const palette = Palettes[paletteIndex]
+        const line = palette.map(c => rgba(30, c)), glow = palette.map(c => rgba(22, c)), core = palette.map(c => rgba(175, c)), conn = palette.map(c => rgba(42, c))
+        const ripCol = []
+        for (let k = 0; k < rip.length; k += 5) ripCol.push(rgba(rip[k + 3], palette[rip[k + 4]]))
+        g.lineCap = 'round'
+        for (let segment = 0; segment < symmetry; segment++) {
+          g.save()
+          g.translate(F.cx, F.cy)
+          g.rotate(segment * TAU / symmetry)
+          if ((segment & 1) === 1) g.scale(1, -1)
+          for (let i = 0; i < motifs.length; i++) {
+            const ci = motifs[i].ColorIndex % 4, x = mx[i], y = my[i], size = ms[i]
+            g.beginPath(); g.moveTo(0, 0); g.lineTo(x, y); g.lineWidth = Math.max(0.7, size * 0.12); g.strokeStyle = line[ci]; g.stroke()
+            circle(g, x, y, size * 1.8); g.fillStyle = glow[ci]; g.fill()
+            circle(g, x, y, size * 0.5); g.fillStyle = core[ci]; g.fill()
+            const tailX = x * 0.78, tailY = y * 0.78
+            g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(tailX * 0.35, tailY, tailX, tailY * 0.35, x, y); g.lineWidth = 1; g.strokeStyle = conn[(ci + 1) % 4]; g.stroke()
+          }
+          g.lineWidth = 1.5
+          for (let k = 0, j = 0; k < rip.length; k += 5, j++) { circle(g, rip[k], rip[k + 1], rip[k + 2]); g.strokeStyle = ripCol[j]; g.stroke() }
+          g.restore()
+        }
+        g.lineCap = 'butt'
+        const pulse = 18 * F.scale + Math.sin(F.seconds * 1.8) * 3
+        drawGlow(g, F.cx, F.cy, pulse * 4.4, 48, palette[0])
+        const rg = g.createRadialGradient(F.cx, F.cy, 0, F.cx, F.cy, Math.max(pulse, 0.01))
+        rg.addColorStop(0, rgba(245, palette[3])); rg.addColorStop(1, rgba(90, palette[0]))
+        circle(g, F.cx, F.cy, pulse); g.fillStyle = rg; g.fill()
+      }
+    }
+  }
+
+  // ---- 화면 ----
+  let sceneCanvas = document.getElementById('scene')
+  const hud = document.getElementById('hud'), hctx = hud.getContext('2d')
+  let renderer = Q.get('renderer') === '2d' ? null : createGLRenderer(sceneCanvas)
+  function useCanvas2D() {
+    const c = document.createElement('canvas'); c.id = 'scene'
+    sceneCanvas.replaceWith(c); sceneCanvas = c
+    renderer = create2DRenderer(c); renderer.resize()
+  }
+  if (!renderer) useCanvas2D()
+  sceneCanvas.addEventListener('webglcontextlost', e => { e.preventDefault(); useCanvas2D() })
+
+  const probe = document.createElement('div')
+  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+    'padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
+  document.body.appendChild(probe)
+
+  function resize() {
+    const s = getComputedStyle(probe)
+    inset = { t: parseFloat(s.paddingTop) || 0, r: parseFloat(s.paddingRight) || 0, b: parseFloat(s.paddingBottom) || 0, l: parseFloat(s.paddingLeft) || 0 }
+    W = Math.max(1, hud.clientWidth); H = Math.max(1, hud.clientHeight)
+    dpr = Math.min(window.devicePixelRatio || 1, 2)
+    hud.width = Math.round(W * dpr); hud.height = Math.round(H * dpr)
+    renderer.resize()
+    if (!renderer.ok) useCanvas2D()
+    render()
+  }
+
+  const GUIDE = '클릭  파문     휠/↑↓  대칭     P  색     SPACE  새 장면     A  자동 흐름     F11  화면     ESC  종료'
+  function drawHud(g) {
+    const small = 12, badgePx = 12, titlePx = 18 * PT            // 원본 8.5pt·8pt 글자는 휴대폰 가독성을 위해 12px로
+    const white = rgba(225, [244, 240, 255]), muted = rgba(120, [175, 167, 194])
+    const L = inset.l, T = inset.t
+    textAt(g, 'LIGHT KALEIDOSCOPE', 32 + L, 27 + T, badgePx, `bold ${badgePx}px ${SEGOE}`, rgba(190, Palettes[paletteIndex][1]), SEGOE_ASC)
+    textAt(g, '빛의 만화경', 29 + L, 48 + T, titlePx, `${titlePx}px ${KO}`, white)
+    const hint = touchUI ? '손가락을 움직여 빛을 휘고, 빈 곳을 눌러 파문을 만드세요.' : '마우스를 움직여 빛을 휘고, 빈 곳을 눌러 파문을 만드세요.'
+    textAt(g, hint, 32 + L, 86 + T, small, `${small}px ${KO}`, muted)
+
+    const status = '대칭 ' + symmetry + '겹   ·   ' + PaletteNames[paletteIndex] + '   ·   자동 흐름 ' + (autoDrift ? '켜짐' : '꺼짐')
+    g.font = `${small}px ${KO}`
+    const statusW = g.measureText(status).width + small / 3
+    g.font = `${titlePx}px ${KO}`
+    const titleRight = 29 + L + g.measureText('빛의 만화경').width + titlePx / 3
+    if (W - inset.r - statusW - 32 > titleRight + 16) {
+      g.font = `${small}px ${KO}`; g.fillStyle = muted; g.textAlign = 'right'; g.textBaseline = 'alphabetic'
+      g.fillText(status, W - inset.r - 32 - small / 6, 32 + T + ASC * small)
+    } else {
+      textAt(g, status, 32 + L, 108 + T, small, `${small}px ${KO}`, muted)   // 좁은 화면: 설명 아래로
+    }
+
+    if (!touchUI) {
+      const gw = W - 40 - L - inset.r
+      g.font = `${small}px ${KO}`
+      let lines = [GUIDE]
+      if (g.measureText(GUIDE).width > gw) { const k = GUIDE.indexOf('SPACE'); lines = [GUIDE.slice(0, k).trim(), GUIDE.slice(k)] }
+      textIn(g, lines, 20 + L, H - 43 - inset.b - (lines.length - 1) * LINE * small / 2, gw, 24, small, `${small}px ${KO}`, muted)
+    }
+  }
+
+  function render() {
+    const seconds = clock()
+    for (let index = ripples.length - 1; index >= 0; index--)          // 원본 타이머: 2.4초 지난 파문 지우기
+      if (seconds - ripples[index].Born > 2.4) ripples.splice(index, 1)
+    computeFrame(seconds)
+    renderer.draw()
+    hctx.setTransform(1, 0, 0, 1, 0, 0); hctx.clearRect(0, 0, hud.width, hud.height)
+    hctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    drawHud(hctx)
+  }
+
+  // ---- 입력 ----
+  function setPointer(x, y) {
+    if (W <= 0 || H <= 0) return
+    pointer = { X: Math.max(0, Math.min(1, x / W)), Y: Math.max(0, Math.min(1, y / H)) }
+  }
+  function addRipple(x, y) {
+    const dx = x - W * 0.5, dy = y - H * 0.52
+    ripples.push({ Radius: Math.sqrt(dx * dx + dy * dy), Angle: Math.atan2(dy, dx), Born: clock(), ColorIndex: random.next(4) })
+    if (ripples.length > 12) ripples.shift()
+  }
+  function changeSymmetry(delta) { symmetry = Math.max(3, Math.min(16, symmetry + delta)) }
+  function newScene() { createField(); ripples.length = 0 }
+  function nextPalette() { paletteIndex = (paletteIndex + 1) % Palettes.length }
+  function toggleAuto() { autoDrift = !autoDrift; document.getElementById('bAuto').classList.toggle('on', autoDrift) }
+
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement
+  function toggleFullscreen() {
+    const d = document, el = d.documentElement
+    try {
+      const p = fsEl() ? (d.exitFullscreen || d.webkitExitFullscreen).call(d) : (el.requestFullscreen || el.webkitRequestFullscreen).call(el)
+      if (p && p.catch) p.catch(() => {})
+    } catch (e) {}
+  }
+  function leave() {                                   // 원본의 Esc(창 닫기) → 들어온 곳으로 돌아가기
+    const go = () => {
+      try { if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) { history.back(); return } } catch (e) {}
+      location.href = '../'
+    }
+    if (fsEl() && document.exitFullscreen) document.exitFullscreen().then(go, go); else go()
+  }
+  function setTouch(on) { touchUI = on; document.body.classList.toggle('touch', on) }
+
+  hud.addEventListener('pointermove', e => setPointer(e.clientX, e.clientY))
+  hud.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return
+    if (e.pointerType === 'touch') { if (!touchUI) setTouch(true); setPointer(e.clientX, e.clientY) }
+    addRipple(e.clientX, e.clientY)
+  })
+  hud.addEventListener('contextmenu', e => e.preventDefault())
+
+  let wheelAcc = 0
+  addEventListener('wheel', e => {                     // 원본: 휠 한 칸마다 대칭 ±1 (터치패드는 모아서 한 칸)
+    e.preventDefault()
+    const d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 600 : 1)
+    if (Math.abs(d) >= 40) { changeSymmetry(d < 0 ? 1 : -1); wheelAcc = 0; return }
+    wheelAcc += d
+    if (Math.abs(wheelAcc) >= 60) { changeSymmetry(wheelAcc < 0 ? 1 : -1); wheelAcc = 0 }
+  }, { passive: false })
+
+  function onKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    switch (e.code) {
+      case 'Escape': leave(); break
+      case 'Space': newScene(); e.preventDefault(); break
+      case 'KeyP': nextPalette(); break
+      case 'KeyA': toggleAuto(); break
+      case 'ArrowUp': case 'NumpadAdd': case 'Equal': changeSymmetry(1); e.preventDefault(); break
+      case 'ArrowDown': case 'NumpadSubtract': case 'Minus': changeSymmetry(-1); e.preventDefault(); break
+      // F11: 브라우저의 전체화면 전환이 원본의 F11과 같은 일을 합니다.
+    }
+  }
+  addEventListener('keydown', onKey)
+
+  function bindButton(id, fn) {
+    const b = document.getElementById(id)
+    b.addEventListener('pointerdown', e => e.stopPropagation())
+    b.addEventListener('mousedown', e => e.preventDefault())
+    b.addEventListener('click', e => { e.preventDefault(); fn(); b.blur() })
+  }
+  bindButton('bLess', () => changeSymmetry(-1))
+  bindButton('bMore', () => changeSymmetry(1))
+  bindButton('bPal', nextPalette)
+  bindButton('bNew', newScene)
+  bindButton('bAuto', toggleAuto)
+  bindButton('bFull', toggleFullscreen)
+  bindButton('bExit', leave)
+  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) document.getElementById('bFull').hidden = true
+
+  setTouch(matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
+  addEventListener('resize', resize)
+  if (window.visualViewport) visualViewport.addEventListener('resize', resize)
+  resize()
+  function frame() { render(); requestAnimationFrame(frame) }
+  requestAnimationFrame(frame)
+
+  // 시험용 창구
+  window.__port = {
+    state: () => ({ symmetry, paletteIndex, autoDrift, pointer, ripples: ripples.length, motifs: motifs.length, touchUI, renderer: renderer.kind }),
+    freeze(t) { frozen = t; render() },
+    setPointer(x, y) { pointer = { X: x, Y: y } },
+    click(x, y) { addRipple(x, y) },
+    key(code) { onKey({ code, preventDefault() {} }) },
+    set(o) { if ('symmetry' in o) symmetry = o.symmetry; if ('paletteIndex' in o) paletteIndex = o.paletteIndex; if ('autoDrift' in o) autoDrift = o.autoDrift; render() },
+    clearRipples() { ripples.length = 0 },
+    render
+  }
+})()
+</script>
+</body>
+</html>

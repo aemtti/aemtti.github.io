@@ -71,7 +71,7 @@
    "title": "작은 정원",
    "en": "ChatGPT Playground",
    "kind": "collection",
-   "desc": "ChatGPT와 함께 만든 정원 연작 — 별빛을 심는 정원, 오디오 엽서, 가상의 도감과 현장 기록",
+   "desc": "ChatGPT와 함께 만든 정원 연작 — 별빛을 심는 정원, 만화경, 유성 게임, 행성 라디오, 새벽의 단편소설, 오디오 엽서와 기록들",
    "url": "play/chatgpt-playground/",
    "thumb": "thumbs/chatgpt-playground.jpg",
    "items": [
@@ -122,6 +122,66 @@
      "desktop": "스크롤해서 읽기 · 목차 클릭으로 이동",
      "url": "play/chatgpt-playground/garden-anthropology/",
      "thumb": "thumbs/chatgpt-playground--garden-anthropology.jpg"
+    },
+    {
+     "slug": "chatgpt-playground/starlight-rest",
+     "title": "별빛 휴식",
+     "en": "Starlight Rest",
+     "kind": "toy",
+     "orientation": "any",
+     "desc": "빈 곳을 눌러 별빛을 남기고, 호흡 안내에 맞춰 숨을 고르는 작은 휴식",
+     "mobile": "빈 곳을 눌러 별빛 남기기 · 아래 버튼으로 호흡 안내·비우기",
+     "desktop": "클릭으로 별빛 · Space 호흡 안내 · C 비우기",
+     "url": "play/chatgpt-playground/starlight-rest/",
+     "thumb": "thumbs/chatgpt-playground--starlight-rest.jpg"
+    },
+    {
+     "slug": "chatgpt-playground/light-kaleidoscope",
+     "title": "빛의 만화경",
+     "en": "Light Kaleidoscope",
+     "kind": "toy",
+     "orientation": "any",
+     "desc": "손끝으로 빛의 흐름을 휘고 대칭 파문을 만드는 생성형 만화경",
+     "mobile": "드래그로 빛 휘기 · 탭으로 파문 · 버튼으로 대칭·색 바꾸기",
+     "desktop": "마우스로 빛 휘기 · 클릭 파문 · 휠 대칭 · P 색",
+     "url": "play/chatgpt-playground/light-kaleidoscope/",
+     "thumb": "thumbs/chatgpt-playground--light-kaleidoscope.jpg"
+    },
+    {
+     "slug": "chatgpt-playground/between-meteors",
+     "title": "유성 사이",
+     "en": "Between Meteors",
+     "kind": "game",
+     "orientation": "any",
+     "desc": "별가루를 모으고 붉은 유성을 피하는 짧은 아케이드 게임",
+     "mobile": "탭해서 시작 · 어디서나 끌어서 이동 · 오른쪽 위 일시정지",
+     "desktop": "마우스 또는 방향키/WASD · Space 시작·일시정지",
+     "url": "play/chatgpt-playground/between-meteors/",
+     "thumb": "thumbs/chatgpt-playground--between-meteors.jpg"
+    },
+    {
+     "slug": "chatgpt-playground/planet-radio",
+     "title": "행성 라디오",
+     "en": "Planet Radio",
+     "kind": "music",
+     "orientation": "any",
+     "desc": "코드가 직접 합성하는 세 채널 — 빗소리, 느린 우주선, 새벽 전파",
+     "mobile": "재생 버튼으로 켜기 · 채널 1·2·3 · 음량 버튼",
+     "desktop": "Space 재생/멈춤 · 1·2·3 채널 · V 음량",
+     "url": "play/chatgpt-playground/planet-radio/",
+     "thumb": "thumbs/chatgpt-playground--planet-radio.jpg"
+    },
+    {
+     "slug": "chatgpt-playground/two-am-door",
+     "title": "새벽 두 시의 문",
+     "en": "The Door at 2 AM",
+     "kind": "art",
+     "orientation": "any",
+     "desc": "다섯 번의 선택으로 결말이 달라지는 새벽 두 시의 인터랙티브 단편소설",
+     "mobile": "선택지 버튼을 눌러 진행 · 새 이야기 버튼",
+     "desktop": "숫자 1·2·3 또는 클릭으로 선택 · R 새 이야기",
+     "url": "play/chatgpt-playground/two-am-door/",
+     "thumb": "thumbs/chatgpt-playground--two-am-door.jpg"
     }
    ]
   },

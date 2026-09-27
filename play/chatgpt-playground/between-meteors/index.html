@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>유성 사이</title>
+<meta name="description" content="별가루를 모으고 붉은 유성을 피하는 짧은 아케이드 게임">
+<meta name="theme-color" content="#05060f">
+<link rel="icon" href="data:,">
+<!--
+  유성 사이 — BetweenMeteors.cs(WinForms)를 웹으로 옮긴 판입니다. 한 파일, 외부 파일 없음.
+  마우스 이동 또는 방향키/WASD: 이동 · Space: 시작/일시정지/계속 · R: 다시 시작 · Esc: 나가기
+  휴대폰: 화면 어디서나 끌어서 이동(손가락이 빛을 가리지 않도록 움직인 만큼만 따라감), 탭으로 시작, 오른쪽 위 버튼으로 일시정지.
+  휴대폰처럼 작은 화면에서는 판 전체를 비율대로 줄여(짧은 변 520 기준) 원본 창과 비슷한 크기의 판에서 놉니다.
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none;
+    background: #050612 linear-gradient(230deg, rgb(10,9,31), rgb(3,7,18)); }
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    font-family: 'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',system-ui,sans-serif; }
+  #stage { position: fixed; left: env(safe-area-inset-left); right: env(safe-area-inset-right); top: env(safe-area-inset-top); bottom: env(safe-area-inset-bottom); }
+  canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .tbtn { position: absolute; display: none; min-width: 44px; min-height: 44px; margin: 0; padding: 0 14px; box-sizing: border-box;
+    border-radius: 22px; border: 1px solid rgba(143,255,213,.55); background: rgba(12,14,34,.62); color: rgba(244,240,255,.95);
+    font-family: inherit; font-weight: 600; font-size: 13px; line-height: 1; white-space: pre; touch-action: manipulation; }
+  .tbtn:active { background: rgba(143,255,213,.25); }
+  #bPause { right: 14px; width: 48px; height: 48px; padding: 0; font-size: 15px; letter-spacing: -1px; }
+  #menu { position: absolute; left: 0; right: 0; display: none; justify-content: center; gap: 12px; pointer-events: none; }
+  #menu .tbtn { position: static; display: block; pointer-events: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" aria-label="유성 사이"></canvas>
+  <button type="button" class="tbtn" id="bPause" aria-label="일시정지">❚❚</button>
+  <div id="menu">
+    <button type="button" class="tbtn" id="bRestart">R  다시 시작</button>
+    <button type="button" class="tbtn" id="bExit">나가기</button>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict'
+
+  // ---- .NET Framework System.Random (원본과 같은 알고리즘; 시드는 원본처럼 시각에서) ----
+  function NetRandom(seed) {
+    const MBIG = 2147483647, a = new Array(56).fill(0)
+    seed |= 0
+    let mj = (161803398 - (seed === -2147483648 ? 2147483647 : Math.abs(seed))) | 0, mk = 1
+    a[55] = mj
+    for (let i = 1; i < 55; i++) {
+      const ii = (21 * i) % 55
+      a[ii] = mk; mk = (mj - mk) | 0; if (mk < 0) mk += MBIG; mj = a[ii]
+    }
+    for (let k = 1; k < 5; k++)
+      for (let i = 1; i < 56; i++) { a[i] = (a[i] - a[1 + (i + 30) % 55]) | 0; if (a[i] < 0) a[i] += MBIG }
+    let inext = 0, inextp = 21
+    this.nextDouble = function () {
+      if (++inext >= 56) inext = 1
+      if (++inextp >= 56) inextp = 1
+      let r = a[inext] - a[inextp]
+      if (r === MBIG) r--
+      if (r < 0) r += MBIG
+      a[inext] = r
+      return r * (1 / MBIG)
+    }
+  }
+
+  // ---- GDI+ 흉내 도우미 ----
+  const PT = 96 / 72
+  const KO = "'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',system-ui,sans-serif"
+  const SEGOE = "'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Roboto,Arial,sans-serif"
+  const SEGOE_LIGHT = "'Segoe UI Light','Segoe UI',system-ui,-apple-system,'Helvetica Neue',Roboto,Arial,sans-serif"
+  const ASC = 2229 / 2048, SEGOE_ASC = 2210 / 2048, LINE = 2724 / 2048
+  const TAU = Math.PI * 2
+  const rgba = (a, r, g, b) => `rgba(${r},${g},${b},${+(a / 255).toFixed(4)})`
+  function tint(r, g, b) { const t = []; return a => t[a] || (t[a] = rgba(a, r, g, b)) }
+  function circle(g, x, y, r) { g.beginPath(); g.arc(x, y, r > 0 ? r : 0, 0, TAU) }
+  function gdiLinear(g, x, y, w, h, c1, c2, deg) {
+    const a = deg * Math.PI / 180, dx = Math.cos(a), dy = Math.sin(a)
+    const half = (Math.abs(w * dx) + Math.abs(h * dy)) / 2, cx = x + w / 2, cy = y + h / 2
+    const lg = g.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half)
+    lg.addColorStop(0, c1); lg.addColorStop(1, c2); return lg
+  }
+  function textAt(g, s, x, y, px, font, color, asc) {           // g.DrawString(s, font, brush, x, y)
+    g.font = font; g.fillStyle = color; g.textAlign = 'left'; g.textBaseline = 'alphabetic'
+    g.fillText(s, x + px / 6, y + (asc || ASC) * px)
+  }
+  function textIn(g, s, rx, ry, rw, rh, px, font, color, asc) {  // DrawString(…, RectangleF, 가운데 정렬)
+    const lines = s.split('\n'), lh = LINE * px
+    let y = ry + (rh - lines.length * lh) / 2 + (asc || ASC) * px
+    g.font = font; g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'alphabetic'
+    for (const l of lines) { g.fillText(l, rx + rw / 2, y); y += lh }
+  }
+
+  // ---- 화면 ----
+  const stage = document.getElementById('stage'), canvas = document.getElementById('c'), ctx = canvas.getContext('2d')
+  const Q = new URLSearchParams(location.search)
+  let frozen = Q.has('t') ? +Q.get('t') : null
+  const t0 = performance.now()
+  const clockNow = () => frozen != null ? frozen : (performance.now() - t0) / 1000
+  let cssW = 1, cssH = 1, s = 1, dpr = 1
+  let W = 900, H = 650                                  // 원본의 ClientSize (논리 픽셀)
+
+  // ---- 상태 (원본 MeteorGameForm 필드) ----
+  const items = [], particles = [], backStars = []
+  const random = new NetRandom(Q.has('seed') ? +Q.get('seed') : (Date.now() % 2147483647))
+  let state = 'Ready'
+  let playerX = 0, playerY = 0
+  let left = false, right = false, up = false, down = false
+  let lastTick = 0, elapsed = 0, starSpawn = 0, meteorSpawn = 0
+  let invulnerable = 0, shake = 0, mouseControlUntil = 0, survivalScore = 0
+  let score = 0, bestScore = 0, lives = 3, combo = 0
+  let touchUI = false, gameOverAt = -9
+
+  for (let index = 0; index < 90; index++) {
+    backStars.push({
+      X: random.nextDouble(),
+      Y: random.nextDouble(),
+      Size: 0.6 + random.nextDouble() * 1.8,
+      Phase: random.nextDouble() * 6.28318
+    })
+  }
+
+  function resize() {
+    cssW = Math.max(1, stage.clientWidth); cssH = Math.max(1, stage.clientHeight)
+    s = Math.min(1, Math.min(cssW, cssH) / 520)        // 휴대폰: 짧은 변을 520 논리 픽셀로 (원본 창의 최소 높이)
+    W = cssW / s; H = cssH / s
+    dpr = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.width = Math.round(cssW * dpr); canvas.height = Math.round(cssH * dpr)
+    keepPlayerInBounds()
+    layoutButtons()
+    render()
+  }
+
+  function tick() {
+    const now = clockNow()
+    const delta = Math.min(0.05, Math.max(0, now - lastTick))
+    lastTick = now
+    if (state === 'Playing') updateGame(delta, now)
+    else updateParticles(delta)
+    render()
+  }
+
+  function startGame() {
+    items.length = 0
+    particles.length = 0
+    score = 0
+    lives = 3
+    combo = 0
+    elapsed = 0
+    starSpawn = 0.2
+    meteorSpawn = 0.65
+    invulnerable = 0
+    shake = 0
+    survivalScore = 0
+    left = right = up = down = false
+    resetPlayer()
+    state = 'Playing'
+    syncUi()
+  }
+
+  function resetPlayer() {
+    playerX = W * 0.5
+    playerY = H * 0.78
+    keepPlayerInBounds()
+  }
+
+  function keepPlayerInBounds() {
+    playerX = Math.max(28, Math.min(W - 28, playerX))
+    playerY = Math.max(105, Math.min(H - 42, playerY))
+  }
+
+  function updateGame(delta, now) {
+    elapsed += delta
+    starSpawn -= delta
+    meteorSpawn -= delta
+    invulnerable = Math.max(0, invulnerable - delta)
+    shake = Math.max(0, shake - delta)
+
+    const difficulty = 1.0 + elapsed / 34.0
+    if (starSpawn <= 0) {
+      spawn('Stardust', difficulty)
+      starSpawn = 0.48 + random.nextDouble() * 0.32
+    }
+    if (meteorSpawn <= 0) {
+      spawn('Meteor', difficulty)
+      meteorSpawn = Math.max(0.22, 0.78 - difficulty * 0.08) + random.nextDouble() * 0.22
+    }
+
+    if (now > mouseControlUntil) {
+      let horizontal = (right ? 1 : 0) - (left ? 1 : 0)
+      let vertical = (down ? 1 : 0) - (up ? 1 : 0)
+      const length = Math.sqrt(horizontal * horizontal + vertical * vertical)
+      if (length > 0) {
+        horizontal /= length
+        vertical /= length
+        playerX += horizontal * 330 * delta
+        playerY += vertical * 330 * delta
+      }
+    }
+    keepPlayerInBounds()
+
+    for (let index = items.length - 1; index >= 0; index--) {
+      const item = items[index]
+      item.Y += item.Speed * delta
+      item.X += Math.sin(elapsed * 1.4 + item.Phase) * item.Drift * delta
+
+      if (item.Y - item.Size > H) {
+        if (item.Kind === 'Stardust') combo = 0
+        items.splice(index, 1)
+        continue
+      }
+
+      const dx = item.X - playerX
+      const dy = item.Y - playerY
+      const hitRadius = item.Size * 0.55 + 12
+      if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+        if (item.Kind === 'Stardust') collectStardust(item)
+        else if (invulnerable <= 0) hitMeteor(item)
+        else continue
+        items.splice(index, 1)
+      }
+    }
+
+    updateParticles(delta)
+    survivalScore += delta * 3.0
+    const earned = Math.trunc(survivalScore)
+    if (earned > 0) {
+      score += earned
+      survivalScore -= earned
+    }
+  }
+
+  function spawn(kind, difficulty) {
+    const size = kind === 'Stardust'
+      ? 7 + random.nextDouble() * 7
+      : 15 + random.nextDouble() * 19
+    const margin = size + 10
+    const X = margin + random.nextDouble() * Math.max(1, W - margin * 2)
+    const Speed = kind === 'Stardust'
+      ? 105 + random.nextDouble() * 90
+      : 145 + random.nextDouble() * 100 + difficulty * 13
+    const Phase = random.nextDouble() * 6.28318
+    items.push({ X, Y: -size * 2, Speed, Drift: kind === 'Stardust' ? 12 : 24, Size: size, Phase, Kind: kind })
+  }
+
+  function collectStardust(item) {
+    combo = Math.min(12, combo + 1)
+    score += 10 + combo * 2
+    burst(item.X, item.Y, MINT, 13)
+  }
+
+  function hitMeteor(item) {
+    lives--
+    combo = 0
+    invulnerable = 1.2
+    shake = 0.32
+    burst(item.X, item.Y, ROSE, 20)
+    if (lives <= 0) {
+      state = 'GameOver'
+      bestScore = Math.max(bestScore, score)
+      gameOverAt = clockNow()
+      syncUi()
+    }
+  }
+
+  const MINT = tint(143, 255, 213), ROSE = tint(255, 112, 128)
+  function burst(x, y, color, count) {
+    for (let index = 0; index < count; index++) {
+      const angle = random.nextDouble() * Math.PI * 2.0
+      const speed = 35 + random.nextDouble() * 130
+      particles.push({
+        X: x, Y: y,
+        Vx: Math.cos(angle) * speed,
+        Vy: Math.sin(angle) * speed,
+        Size: 2 + random.nextDouble() * 5,
+        Life: 0.45 + random.nextDouble() * 0.65,
+        Color: color
+      })
+    }
+  }
+
+  function updateParticles(delta) {
+    const damp = Math.pow(0.98, delta / 0.016)           // 원본은 16ms 틱마다 0.98배 — 화면 주사율과 상관없이 같게
+    for (let index = particles.length - 1; index >= 0; index--) {
+      const particle = particles[index]
+      particle.Life -= delta
+      if (particle.Life <= 0) {
+        particles.splice(index, 1)
+        continue
+      }
+      particle.X += particle.Vx * delta
+      particle.Y += particle.Vy * delta
+      particle.Vx *= damp
+      particle.Vy *= damp
+    }
+  }
+
+  // ---- 그리기 ----
+  let rockGrad = null
+  const starTint = tint(225, 220, 255)
+  const HAZE = rgba(12, 112, 86, 220), SD_GLOW = rgba(14, 143, 255, 213), SD_CORE = rgba(235, 172, 255, 225)
+  const TAIL = rgba(80, 255, 118, 132), M_GLOW = rgba(38, 255, 80, 108), P_GLOW = rgba(12, 165, 145, 255)
+
+  function render() {
+    const g = ctx
+    g.setTransform(dpr * s, 0, 0, dpr * s, 0, 0)
+    drawBackground(g)
+    g.save()
+    if (shake > 0) {
+      const power = shake / 0.32 * 8.0
+      g.translate((random.nextDouble() - 0.5) * power, (random.nextDouble() - 0.5) * power)
+    }
+    drawItems(g)
+    drawParticles(g)
+    drawPlayer(g)
+    g.restore()
+    drawHud(g)
+    if (state !== 'Playing') drawOverlay(g)
+  }
+
+  function drawBackground(g) {
+    g.fillStyle = gdiLinear(g, 0, 0, W, H, 'rgb(10,9,31)', 'rgb(3,7,18)', 140)
+    g.fillRect(0, 0, W, H)
+    const seconds = clockNow()
+    for (const star of backStars) {
+      const pulse = 0.3 + Math.sin(seconds * 0.7 + star.Phase) * 0.25
+      const alpha = 35 + Math.trunc(Math.max(0, pulse) * 145)
+      const y = (star.Y * H + elapsed * (9 + star.Size * 4)) % Math.max(1, H)
+      circle(g, star.X * W + star.Size / 2, y + star.Size / 2, star.Size / 2); g.fillStyle = starTint(alpha); g.fill()
+    }
+    g.beginPath(); g.ellipse(W * 0.5, H * 0.65, W * 0.4, H * 0.55, 0, 0, TAU); g.fillStyle = HAZE; g.fill()
+  }
+
+  function drawItems(g) {
+    if (!rockGrad) {                                    // LinearGradientBrush(사각형, 주황 → 자주, 45°): 단위 원에 한 번만 만들어 둠
+      rockGrad = g.createLinearGradient(-0.5, -0.5, 0.5, 0.5)
+      rockGrad.addColorStop(0, 'rgb(255,178,124)'); rockGrad.addColorStop(1, 'rgb(112,52,85)')
+    }
+    for (const item of items) {
+      if (item.Kind === 'Stardust') {
+        for (let ring = 4; ring >= 1; ring--) { circle(g, item.X, item.Y, item.Size * (1 + ring * 0.8) / 2); g.fillStyle = SD_GLOW; g.fill() }
+        circle(g, item.X, item.Y, item.Size / 2); g.fillStyle = SD_CORE; g.fill()
+      } else {
+        g.beginPath(); g.moveTo(item.X, item.Y - item.Size * 2.5); g.lineTo(item.X, item.Y - item.Size * 0.3)
+        g.lineWidth = Math.max(2, item.Size * 0.25); g.lineCap = 'round'; g.strokeStyle = TAIL; g.stroke(); g.lineCap = 'butt'
+        circle(g, item.X, item.Y, item.Size); g.fillStyle = M_GLOW; g.fill()
+        g.save(); g.translate(item.X, item.Y); g.scale(item.Size, item.Size)
+        circle(g, 0, 0, 0.5); g.fillStyle = rockGrad; g.fill()
+        g.restore()
+      }
+    }
+  }
+
+  function drawParticles(g) {
+    for (const particle of particles) {
+      const alpha = Math.max(0, Math.min(255, Math.trunc(particle.Life * 300)))
+      circle(g, particle.X, particle.Y, particle.Size / 2); g.fillStyle = particle.Color(alpha); g.fill()
+    }
+  }
+
+  function drawPlayer(g) {
+    if (state === 'Ready') return
+    const seconds = clockNow()
+    if (invulnerable > 0 && (Math.trunc(seconds * 10) & 1) === 0) return
+    const radius = 12 + Math.sin(seconds * 4.0) * 1.5
+    for (let ring = 5; ring >= 1; ring--) { circle(g, playerX, playerY, radius * (1.2 + ring * 0.65)); g.fillStyle = P_GLOW; g.fill() }
+    const body = g.createRadialGradient(playerX - radius * 0.3, playerY - radius * 0.35, 0, playerX, playerY, radius)   // PathGradientBrush
+    body.addColorStop(0, '#fff'); body.addColorStop(1, rgba(190, 151, 112, 255))
+    circle(g, playerX, playerY, radius); g.fillStyle = body; g.fill()
+  }
+
+  const fpx = pt => Math.max(pt * PT, 12 / s)           // 글자는 화면에서 12px 아래로 줄이지 않습니다
+  const WHITE = rgba(230, 244, 240, 255), MUTED = rgba(130, 171, 164, 192), MINT_TEXT = rgba(210, 143, 255, 213)
+  const HEART_ON = rgba(225, 255, 116, 139), HEART_OFF = rgba(35, 154, 142, 166)
+
+  function drawHud(g) {
+    const title = fpx(10), scorePx = 27 * PT, small = fpx(8.5)
+    textAt(g, '유성 사이', 28, 23, title, `bold ${title}px ${KO}`, WHITE)
+    textAt(g, String(score).padStart(6, '0'), 25, 43, scorePx, `300 ${scorePx}px ${SEGOE_LIGHT}`, WHITE, SEGOE_ASC)
+    const comboText = combo > 1 ? '별가루 연속 ' + combo : '별가루를 모아보세요'
+    textAt(g, comboText, 30, 86, small, `${small}px ${KO}`, combo > 1 ? MINT_TEXT : MUTED)
+
+    const rightEdge = W - 30
+    for (let index = 0; index < 3; index++) {
+      const x = rightEdge - index * 25
+      circle(g, x - 15 + 7, 29 + 7, 7); g.fillStyle = index < lives ? HEART_ON : HEART_OFF; g.fill()
+    }
+    // 원본 자리(rightEdge - 105)에 두되, 휴대폰에서 글자가 커져 왼쪽 빛 동그라미를 가리면 그만큼 왼쪽으로
+    g.font = `${small}px ${KO}`
+    const labelW = g.measureText('남은 빛').width + small / 6
+    const labelX = rightEdge - 105 + labelW > rightEdge - 60 ? rightEdge - 69 - labelW : rightEdge - 105
+    textAt(g, '남은 빛', labelX, 27, small, `${small}px ${KO}`, MUTED)
+
+    const guide = touchUI ? '화면 어디서나 끌어서 움직이기     ❚❚ 일시정지' : '마우스 또는 방향키/WASD 이동     SPACE 일시정지     R 다시 시작     ESC 종료'
+    g.font = `${small}px ${KO}`
+    const gw = g.measureText(guide).width
+    textAt(g, guide, (W - gw) / 2 - small / 6, H - 27, small, `${small}px ${KO}`, MUTED)
+  }
+
+  function drawOverlay(g) {
+    g.fillStyle = rgba(155, 4, 5, 16); g.fillRect(0, 0, W, H)
+
+    let eyebrow, title, body
+    if (state === 'Ready') {
+      eyebrow = 'A TINY ARCADE IN THE DARK'
+      title = '유성 사이'
+      body = touchUI ? '별가루를 모으고 붉은 유성을 피하세요.\n화면을 끌면 작은 빛이 따라 움직입니다.'
+        : '별가루를 모으고 붉은 유성을 피하세요.\n마우스를 움직이거나 방향키를 사용하면 됩니다.'
+    } else if (state === 'Paused') {
+      eyebrow = 'TAKE A BREATH'
+      title = '잠시 멈춤'
+      body = touchUI ? '화면을 누르면 그대로 이어집니다.' : 'Space를 누르면 그대로 이어집니다.'
+    } else {
+      eyebrow = 'THE LIGHT RETURNS'
+      title = '이번 여행  ' + score.toLocaleString('ko-KR')
+      body = '최고 기록  ' + bestScore.toLocaleString('ko-KR') + (touchUI ? '\n화면을 눌러 다시 시작할 수 있습니다.' : '\nR 또는 클릭으로 다시 시작할 수 있습니다.')
+    }
+
+    const eyebrowPx = fpx(8), titlePx = 34 * PT, bodyPx = fpx(11), buttonPx = fpx(10)
+    const middle = H * 0.46
+    textIn(g, eyebrow, 40, middle - 105, W - 80, 24, eyebrowPx, `bold ${eyebrowPx}px ${SEGOE}`, rgba(190, 170, 140, 255), SEGOE_ASC)
+    textIn(g, title, 40, middle - 70, W - 80, 68, titlePx, `${titlePx}px ${KO}`, rgba(245, 244, 240, 255))
+    textIn(g, body, 80, middle + 6, W - 160, 65, bodyPx, `${bodyPx}px ${KO}`, rgba(175, 180, 172, 198))
+
+    const action = state === 'Paused' ? (touchUI ? '눌러서  계속하기' : 'SPACE  계속하기') : (touchUI ? '화면을 눌러  시작' : 'SPACE 또는 클릭  시작')
+    const bx = W / 2 - 110, by = middle + 89
+    g.fillStyle = rgba(60, 143, 255, 213); g.fillRect(bx, by, 220, 46)
+    g.lineWidth = 1; g.strokeStyle = rgba(170, 143, 255, 213)
+    const o = s * dpr === 1 ? 0.5 : 0                    // GDI+처럼 1px 테두리를 또렷하게
+    g.strokeRect(bx + o, by + o, 220, 46)
+    textIn(g, action, bx, by, 220, 46, buttonPx, `bold ${buttonPx}px ${KO}`, rgba(245, 244, 240, 255))
+  }
+
+  // ---- 터치 버튼 ----
+  const bPause = document.getElementById('bPause'), menu = document.getElementById('menu')
+  function layoutButtons() {
+    bPause.style.top = Math.round(52 * s) + 'px'
+    menu.style.top = Math.round((H * 0.46 + 89 + 46 + 16) * s) + 'px'
+  }
+  function syncUi() {
+    bPause.style.display = touchUI && (state === 'Playing' || state === 'Paused') ? 'block' : 'none'
+    bPause.textContent = state === 'Paused' ? '▶' : '❚❚'
+    bPause.setAttribute('aria-label', state === 'Paused' ? '계속하기' : '일시정지')
+    menu.style.display = touchUI && state === 'Paused' ? 'flex' : 'none'
+  }
+  function setTouch(on) { touchUI = on; syncUi() }
+
+  // ---- 입력 (원본 HandleMouseMove / HandleMouseDown / HandleKeyDown) ----
+  function spaceAction() {
+    if (state === 'Ready' || state === 'GameOver') startGame()
+    else if (state === 'Playing') state = 'Paused'
+    else if (state === 'Paused') state = 'Playing'
+    syncUi()
+  }
+  let drag = null
+  canvas.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return
+    if (e.pointerType === 'mouse') {
+      if (state === 'Ready' || state === 'GameOver') startGame()
+      else if (state === 'Paused') { state = 'Playing'; syncUi() }
+      return
+    }
+    if (!touchUI) setTouch(true)
+    if (state === 'GameOver' && clockNow() - gameOverAt < 0.8) return   // 피하던 손가락으로 결과를 건너뛰지 않도록
+    if (state === 'Ready' || state === 'GameOver') startGame()
+    else if (state === 'Paused') { state = 'Playing'; syncUi() }
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY }
+    try { canvas.setPointerCapture(e.pointerId) } catch (err) {}
+  })
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'mouse') {
+      if (state !== 'Playing') return
+      const r = canvas.getBoundingClientRect()
+      playerX = (e.clientX - r.left) / s
+      playerY = (e.clientY - r.top) / s
+      mouseControlUntil = clockNow() + 1.5
+      keepPlayerInBounds()
+      return
+    }
+    if (!drag || e.pointerId !== drag.id) return
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y
+    drag.x = e.clientX; drag.y = e.clientY
+    if (state !== 'Playing') return
+    playerX += dx / s
+    playerY += dy / s
+    mouseControlUntil = clockNow() + 1.5
+    keepPlayerInBounds()
+  })
+  const endDrag = e => { if (drag && e.pointerId === drag.id) drag = null }
+  canvas.addEventListener('pointerup', endDrag)
+  canvas.addEventListener('pointercancel', endDrag)
+  canvas.addEventListener('contextmenu', e => e.preventDefault())
+
+  function setMovementKey(code, value) {
+    if (code === 'ArrowLeft' || code === 'KeyA') left = value
+    else if (code === 'ArrowRight' || code === 'KeyD') right = value
+    else if (code === 'ArrowUp' || code === 'KeyW') up = value
+    else if (code === 'ArrowDown' || code === 'KeyS') down = value
+  }
+  function onKeyDown(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    if (e.code === 'Escape') { leave(); return }
+    if (e.code === 'Space') { spaceAction(); e.preventDefault(); return }
+    if (e.code === 'KeyR') { startGame(); return }
+    if (/^Arrow/.test(e.code)) e.preventDefault()
+    setMovementKey(e.code, true)
+  }
+  addEventListener('keydown', onKeyDown)
+  addEventListener('keyup', e => setMovementKey(e.code, false))
+  addEventListener('blur', () => { left = right = up = down = false })   // 창을 떠나면 눌린 키가 남지 않도록
+
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement
+  function leave() {                                   // 원본의 Esc(창 닫기) → 들어온 곳으로 돌아가기
+    const go = () => {
+      try { if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) { history.back(); return } } catch (e) {}
+      location.href = '../'
+    }
+    if (fsEl() && document.exitFullscreen) document.exitFullscreen().then(go, go); else go()
+  }
+
+  function bindButton(b, fn) {
+    b.addEventListener('pointerdown', e => e.stopPropagation())
+    b.addEventListener('mousedown', e => e.preventDefault())
+    b.addEventListener('click', e => { e.preventDefault(); fn(); b.blur() })
+  }
+  bindButton(bPause, spaceAction)
+  bindButton(document.getElementById('bRestart'), startGame)
+  bindButton(document.getElementById('bExit'), leave)
+
+  setTouch(matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
+  addEventListener('resize', resize)
+  if (window.visualViewport) visualViewport.addEventListener('resize', resize)
+  resize()
+  resetPlayer()
+  lastTick = clockNow()
+  function frame() { tick(); requestAnimationFrame(frame) }
+  requestAnimationFrame(frame)
+
+  // 시험용 창구
+  window.__port = {
+    summary: () => ({ state, score, lives, combo, items: items.length, particles: particles.length, playerX, playerY, elapsed, invulnerable, shake, bestScore, W, H, s, touchUI }),
+    freeze(t) { frozen = t; lastTick = t; render() },
+    startGame,
+    update(dt, now) { updateGame(dt, now) },
+    setKey(name, v) { if (name === 'left') left = v; else if (name === 'right') right = v; else if (name === 'up') up = v; else if (name === 'down') down = v },
+    set(o) { if ('shake' in o) shake = o.shake; if ('state' in o) { state = o.state; syncUi() } if ('score' in o) score = o.score; if ('bestScore' in o) bestScore = o.bestScore; if ('lives' in o) lives = o.lives; render() },
+    render
+  }
+})()
+</script>
+</body>
+</html>

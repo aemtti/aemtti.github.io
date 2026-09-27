@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>행성 라디오</title>
+<meta name="description" content="코드가 직접 합성하는 세 개의 채널 — 빗소리, 느린 우주선, 새벽 전파">
+<meta name="theme-color" content="#060713">
+<link rel="icon" href="data:,">
+<!--
+  행성 라디오 — PlanetRadio.cs(WinForms)를 웹으로 옮긴 판입니다. 한 파일, 외부 파일 없음.
+  소리는 원본과 같은 식과 같은 난수(System.Random 2408 + 채널×917)로 14초 파형(22050Hz, 16비트)을 만들어 Web Audio로 되풀이 재생합니다.
+  처음에는 소리가 나지 않습니다. Space: 재생/멈춤 · 1, 2, 3: 채널 · V: 음량 작게/중간/크게 · Esc: 나가기 — 모두 화면 버튼으로도 됩니다.
+  실제 기기 음량은 바꾸지 않고, 합성 파형의 크기만 조절합니다.
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none;
+    background: #060713 linear-gradient(235deg, rgb(13,10,33), rgb(4,7,17)); }
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    font-family: 'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',system-ui,sans-serif; }
+  canvas { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+  .ui { position: absolute; box-sizing: border-box; margin: 0; }
+  .label { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; line-height: 1.33; white-space: pre-wrap; pointer-events: none; }
+  #desc { color: rgb(170,164,192); }
+  #status { color: rgb(150,143,167); }
+  .btn { display: flex; align-items: center; justify-content: center; padding: 0 6px; border: 1px solid; border-radius: 0;
+    background: rgb(28,23,51); color: rgb(240,235,250); font-family: inherit; font-weight: bold; font-size: 12px; line-height: 1.2; white-space: pre;
+    cursor: pointer; touch-action: manipulation; outline: none; }
+  .btn.active { background: rgb(51,42,82); border-width: 2px; }
+  @media (hover: hover) {
+    .btn:hover { background: rgb(33,27,61); }
+    .btn.active:hover { background: rgb(61,50,98); }
+  }
+  .btn:active { background: rgb(108,94,169); }
+  .btn.active:active { background: rgb(126,115,170); }
+</style>
+</head>
+<body>
+<canvas id="c" aria-hidden="true"></canvas>
+<div class="ui label" id="desc"></div>
+<button type="button" class="ui btn" id="st0"></button>
+<button type="button" class="ui btn" id="st1"></button>
+<button type="button" class="ui btn" id="st2"></button>
+<button type="button" class="ui btn" id="play">재생</button>
+<button type="button" class="ui btn" id="vol">음량  중간</button>
+<div class="ui label" id="status" role="status"></div>
+<script>
+(function () {
+  'use strict'
+
+  // ---- .NET Framework System.Random: 같은 시드 → 원본과 같은 빗방울·전파 위치 ----
+  function NetRandom(seed) {
+    const MBIG = 2147483647, a = new Array(56).fill(0)
+    seed |= 0
+    let mj = (161803398 - (seed === -2147483648 ? 2147483647 : Math.abs(seed))) | 0, mk = 1
+    a[55] = mj
+    for (let i = 1; i < 55; i++) {
+      const ii = (21 * i) % 55
+      a[ii] = mk; mk = (mj - mk) | 0; if (mk < 0) mk += MBIG; mj = a[ii]
+    }
+    for (let k = 1; k < 5; k++)
+      for (let i = 1; i < 56; i++) { a[i] = (a[i] - a[1 + (i + 30) % 55]) | 0; if (a[i] < 0) a[i] += MBIG }
+    let inext = 0, inextp = 21
+    this.nextDouble = function () {
+      if (++inext >= 56) inext = 1
+      if (++inextp >= 56) inextp = 1
+      let r = a[inext] - a[inextp]
+      if (r === MBIG) r--
+      if (r < 0) r += MBIG
+      a[inext] = r
+      return r * (1 / MBIG)
+    }
+    this.next = (lo, hi) => hi === undefined ? Math.floor(this.nextDouble() * lo) : Math.floor(this.nextDouble() * (hi - lo)) + lo
+  }
+
+  // <synth> ---- 원본 BuildSoundscape / Synthesize* 그대로 ----
+  function buildSoundscape(station, volumeLevel) {
+    const sampleRate = 22050
+    const seconds = 14
+    const sampleCount = sampleRate * seconds
+    const samples = new Float64Array(sampleCount)
+    const random = new NetRandom(2408 + station * 917)
+    const volume = [0.34, 0.52, 0.70][Math.max(0, Math.min(2, volumeLevel))]
+
+    if (station === 0) synthesizeRain(samples, sampleRate, random)
+    else if (station === 1) synthesizeShip(samples, sampleRate, random)
+    else synthesizeDawn(samples, sampleRate, random)
+
+    const out = new Float32Array(sampleCount)
+    const fadeSamples = sampleRate
+    for (let index = 0; index < sampleCount; index++) {
+      let edge = 1.0
+      if (index < fadeSamples) edge = index / fadeSamples
+      else if (index >= sampleCount - fadeSamples) edge = (sampleCount - 1 - index) / fadeSamples
+      const value = Math.max(-1.0, Math.min(1.0, samples[index] * volume * edge))
+      out[index] = Math.trunc(value * 32767) / 32768          // (short)(value * short.MaxValue) → 16비트 WAV와 같은 값
+    }
+    return { sampleRate, data: out }
+  }
+
+  function synthesizeRain(samples, sampleRate, random) {
+    let filtered = 0
+    for (let index = 0; index < samples.length; index++) {
+      const white = random.nextDouble() * 2.0 - 1.0
+      filtered = filtered * 0.88 + white * 0.12
+      samples[index] = filtered * 0.55 + white * 0.08
+    }
+
+    const drops = 34
+    for (let drop = 0; drop < drops; drop++) {
+      const start = random.next(Math.trunc(sampleRate / 2), samples.length - Math.trunc(sampleRate / 2))
+      const length = Math.trunc(sampleRate * (0.18 + random.nextDouble() * 0.24))
+      const frequency = 620.0 + random.nextDouble() * 1250.0
+      for (let offset = 0; offset < length && start + offset < samples.length; offset++) {
+        const time = offset / sampleRate
+        const envelope = Math.exp(-time * 15.0)
+        samples[start + offset] += Math.sin(Math.PI * 2.0 * frequency * time) * envelope * 0.26
+      }
+    }
+  }
+
+  function synthesizeShip(samples, sampleRate, random) {
+    let filtered = 0
+    for (let index = 0; index < samples.length; index++) {
+      const time = index / sampleRate
+      const pulse = 0.72 + Math.sin(Math.PI * 2.0 * 0.085 * time) * 0.14
+      const drone = Math.sin(Math.PI * 2.0 * 55.0 * time) * 0.34 +
+        Math.sin(Math.PI * 2.0 * 82.5 * time + Math.sin(time * 0.21) * 0.7) * 0.20 +
+        Math.sin(Math.PI * 2.0 * 110.0 * time) * 0.08
+      const white = random.nextDouble() * 2.0 - 1.0
+      filtered = filtered * 0.992 + white * 0.008
+      samples[index] = drone * pulse + filtered * 0.18
+    }
+  }
+
+  function synthesizeDawn(samples, sampleRate, random) {
+    for (let index = 0; index < samples.length; index++) {
+      const time = index / sampleRate
+      const warmth = Math.sin(Math.PI * 2.0 * 110.0 * time) * 0.18 +
+        Math.sin(Math.PI * 2.0 * 165.0 * time) * 0.11 +
+        Math.sin(Math.PI * 2.0 * 220.0 * time) * 0.05
+      const slow = 0.72 + Math.sin(Math.PI * 2.0 * 0.07 * time) * 0.18
+      samples[index] = warmth * slow
+    }
+
+    for (let signal = 0; signal < 16; signal++) {
+      const start = random.next(sampleRate, samples.length - sampleRate)
+      const length = Math.trunc(sampleRate * (0.45 + random.nextDouble() * 0.65))
+      const baseFrequency = 360.0 + random.nextDouble() * 330.0
+      for (let offset = 0; offset < length && start + offset < samples.length; offset++) {
+        const time = offset / sampleRate
+        const progress = offset / length
+        const frequency = baseFrequency + progress * (90.0 + random.nextDouble() * 0.4)
+        const envelope = Math.sin(Math.PI * progress) * Math.exp(-time * 1.5)
+        samples[start + offset] += Math.sin(Math.PI * 2.0 * frequency * time) * envelope * 0.12
+      }
+    }
+  }
+  // </synth>
+
+  // ---- GDI+ 흉내 도우미 ----
+  const PT = 96 / 72
+  const KO = "'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',system-ui,sans-serif"
+  const SEGOE = "'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Roboto,Arial,sans-serif"
+  const ASC = 2229 / 2048, SEGOE_ASC = 2210 / 2048, LINE = 2724 / 2048
+  const TAU = Math.PI * 2
+  const rgba = (a, c) => `rgba(${c[0]},${c[1]},${c[2]},${+(a / 255).toFixed(4)})`
+  function circle(g, x, y, r) { g.beginPath(); g.arc(x, y, r > 0 ? r : 0, 0, TAU) }
+  function gdiLinear(g, x, y, w, h, c1, c2, deg) {
+    const a = deg * Math.PI / 180, dx = Math.cos(a), dy = Math.sin(a)
+    const half = (Math.abs(w * dx) + Math.abs(h * dy)) / 2, cx = x + w / 2, cy = y + h / 2
+    const lg = g.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half)
+    lg.addColorStop(0, c1); lg.addColorStop(1, c2); return lg
+  }
+  function textIn(g, s, rx, ry, rw, rh, px, font, color, asc) {
+    g.font = font; g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'alphabetic'
+    g.fillText(s, rx + rw / 2, ry + (rh - LINE * px) / 2 + (asc || ASC) * px)
+  }
+
+  const StationNames = ['비 내리는 관측소', '느린 우주선', '새벽 전파']
+  const StationDescriptions = ['먼 지붕의 빗소리와 가끔 반짝이는 물방울', '낮은 엔진음과 아주 느린 맥박', '따뜻한 전파 사이로 지나가는 짧은 신호']
+  const StationColors = [[102, 199, 255], [170, 140, 255], [255, 180, 112]]
+  const VolumeLabels = ['작게', '중간', '크게']
+
+  // ---- 상태 ----
+  const Q = new URLSearchParams(location.search)
+  let frozen = Q.has('t') ? +Q.get('t') : null
+  const t0 = performance.now()
+  const clock = () => frozen != null ? frozen : (performance.now() - t0) / 1000
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d')
+  const $ = id => document.getElementById(id)
+  const stationButtons = [$('st0'), $('st1'), $('st2')], playButton = $('play'), volumeButton = $('vol')
+  const descriptionLabel = $('desc'), statusLabel = $('status')
+  const stars = []
+  const visualRandom = new NetRandom(82624)
+  let stationIndex = 0, volumeIndex = 1, playing = false, prepared = false, lastStationChange = 0
+  let playbackBackend = '', touchUI = false
+  let actx = null, source = null, preparedBuffer = null
+  const bufferCache = {}
+
+  for (let index = 0; index < 64; index++) {
+    stars.push({
+      X: visualRandom.nextDouble(),
+      Y: visualRandom.nextDouble(),
+      Size: 0.6 + visualRandom.nextDouble() * 1.8,
+      Phase: visualRandom.nextDouble() * 6.28318
+    })
+  }
+
+  stationButtons.forEach((b, index) => {
+    b.textContent = (index + 1) + '  ' + StationNames[index]
+    b.style.borderColor = `rgb(${StationColors[index].join(',')})`
+  })
+  playButton.style.borderColor = 'rgb(143,255,213)'
+  volumeButton.style.borderColor = 'rgb(115,108,135)'
+
+  // ---- 오디오 (원본: WAV 파일 → PlaySound 반복 재생 / 여기: 같은 파형 → AudioBufferSourceNode loop) ----
+  function audioContext() {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext
+      if (!AC) throw new Error('이 브라우저는 Web Audio를 지원하지 않습니다.')
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback' } catch (e) {}   // iPhone 무음 스위치에도 들리도록
+      actx = new AC()
+    }
+    if (actx.state === 'suspended') actx.resume().catch(() => {})
+    return actx
+  }
+
+  function selectStation(index) {
+    const wasPlaying = playing
+    stopAndReleaseAudio()
+    stationIndex = index
+    prepared = false
+    lastStationChange = clock()
+    descriptionLabel.textContent = StationDescriptions[index]
+    stationButtons.forEach((b, i) => b.classList.toggle('active', i === stationIndex))
+    if (wasPlaying) {
+      prepareAudio()
+      startPlayback()
+    } else {
+      playButton.textContent = '재생'
+      statusLabel.textContent = '선택됨 · ' + StationNames[index]
+    }
+  }
+
+  function togglePlayback() {
+    if (playing) {
+      stopPlayback()
+      playButton.textContent = '재생'
+      statusLabel.textContent = touchUI ? '잠시 멈춤 · 재생을 누르면 다시 재생' : '잠시 멈춤 · Space로 다시 재생'
+    } else {
+      if (!prepared) prepareAudio()
+      startPlayback()
+    }
+  }
+
+  function startPlayback() {
+    if (!prepared || !preparedBuffer) {
+      playing = false
+      playButton.textContent = '재생'
+      statusLabel.textContent = '소리를 준비하지 못했습니다.'
+      return
+    }
+    try {
+      stopPlayback()
+      const ac = audioContext()
+      source = ac.createBufferSource()
+      source.buffer = preparedBuffer
+      source.loop = true
+      source.connect(ac.destination)
+      source.start()
+      playbackBackend = 'Web Audio'
+      playing = true
+      playButton.textContent = '멈춤'
+      statusLabel.textContent = '재생 중 · ' + playbackBackend + ' 경로가 응답했습니다.'
+    } catch (error) {
+      stopPlayback()
+      playing = false
+      alert('소리를 재생하지 못했습니다.\n\n' + (error && error.message || error))
+    }
+  }
+
+  function cycleVolume() {
+    volumeIndex = (volumeIndex + 1) % 3
+    volumeButton.textContent = '음량  ' + VolumeLabels[volumeIndex]
+    if (playing) {
+      stopAndReleaseAudio()
+      prepareAudio()
+      startPlayback()
+    } else {
+      stopAndReleaseAudio()
+      prepared = false
+      statusLabel.textContent = '음량을 ' + VolumeLabels[volumeIndex] + '로 준비했습니다.'
+    }
+  }
+
+  function prepareAudio() {
+    statusLabel.textContent = '파형을 만들고 있습니다…'
+    try {
+      const ac = audioContext()
+      const key = stationIndex + '-' + volumeIndex
+      let buffer = bufferCache[key]
+      if (!buffer) {
+        const wave = buildSoundscape(stationIndex, volumeIndex)
+        if (!wave.data.length) throw new Error('생성된 파형이 비어 있습니다.')
+        buffer = ac.createBuffer(1, wave.data.length, wave.sampleRate)
+        buffer.getChannelData(0).set(wave.data)
+        bufferCache[key] = buffer
+      }
+      preparedBuffer = buffer
+      prepared = true
+    } catch (error) {
+      stopAndReleaseAudio()
+      statusLabel.textContent = '이 컴퓨터에서 소리를 준비하지 못했습니다.'
+      alert('합성 파형을 준비하지 못했습니다.\n\n' + (error && error.message || error))
+    }
+  }
+
+  function stopAndReleaseAudio() {
+    stopPlayback()
+    preparedBuffer = null
+    prepared = false
+  }
+
+  function stopPlayback() {
+    if (source) {
+      try { source.stop() } catch (e) {}
+      try { source.disconnect() } catch (e) {}
+      source = null
+    }
+    playbackBackend = ''
+    playing = false
+  }
+
+  // ---- 배치: 넓은 화면은 원본 창(780×590) 그대로, 휴대폰은 세로·가로에 맞춰 다시 배치 ----
+  let W = 1, H = 1, dpr = 1, inset = { t: 0, r: 0, b: 0, l: 0 }, L = null
+  const probe = document.createElement('div')
+  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+    'padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
+  document.body.appendChild(probe)
+
+  function place(el, x, y, w, h) { el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.style.width = Math.round(w) + 'px'; el.style.height = Math.round(h) + 'px' }
+
+  function layout() {
+    const s = getComputedStyle(probe)
+    inset = { t: parseFloat(s.paddingTop) || 0, r: parseFloat(s.paddingRight) || 0, b: parseFloat(s.paddingBottom) || 0, l: parseFloat(s.paddingLeft) || 0 }
+    W = Math.max(1, document.documentElement.clientWidth); H = Math.max(1, document.documentElement.clientHeight)   // 핀치 확대와 상관없는 크기
+    const aw = W - inset.l - inset.r, ah = H - inset.t - inset.b
+    const l = { stations: [] }
+    if (aw >= 780 && ah >= 590) {
+      // 원본 창 배치 (가운데)
+      const ox = Math.round(inset.l + (aw - 780) / 2), oy = Math.round(inset.t + (ah - 590) / 2)
+      l.mode = 'window'
+      l.eyebrow = [ox + 40, oy + 27, 700, 22]; l.title = [ox + 40, oy + 50, 700, 48]
+      l.cx = ox + 390; l.cy = oy + 255; l.k = 1
+      l.desc = [ox + 110, oy + 337, 560, 30]
+      for (let i = 0; i < 3; i++) l.stations.push([ox + 55 + i * 225, oy + 390, 205, 48])
+      l.play = [ox + 220, oy + 480, 160, 52]; l.vol = [ox + 400, oy + 480, 160, 52]
+      l.status = [ox + 170, oy + 542, 440, 22]
+    } else if (aw > ah) {
+      // 가로 휴대폰: 왼쪽에 제목과 수신기, 오른쪽에 조작
+      l.mode = 'land'
+      const rw = Math.min(360, aw * 0.47), rx = inset.l + aw - rw - 12
+      const leftW = rx - 10 - inset.l, lx = inset.l + leftW / 2
+      l.eyebrow = [lx - leftW / 2, inset.t + 8, leftW, 22]; l.title = [lx - leftW / 2, inset.t + 26, leftW, 48]
+      const top = inset.t + 76, availH = H - inset.b - 6 - top
+      l.k = Math.max(0.5, Math.min(1, availH / 332, (leftW - 8) / 332))
+      l.cx = lx; l.cy = top + availH / 2
+      const sh = 44, gap = 8, total = 30 + 6 + 3 * sh + 2 * gap + 12 + 48 + 6 + 22
+      let y = inset.t + Math.max(6, (ah - total) / 2)
+      l.desc = [rx, y, rw, 30]; y += 36
+      for (let i = 0; i < 3; i++) { l.stations.push([rx, y, rw, sh]); y += sh + gap }
+      y += 12 - gap
+      l.play = [rx, y, (rw - 10) / 2, 48]; l.vol = [rx + (rw + 10) / 2, y, (rw - 10) / 2, 48]; y += 54
+      l.status = [rx - 10, y, rw + 20, 22]
+    } else {
+      // 세로 휴대폰: 위에서 아래로
+      l.mode = 'port'
+      const cw = Math.min(aw - 32, 420), x0 = inset.l + (aw - cw) / 2
+      const rest = 72 + 30 + 3 * 48 + 2 * 10 + 16 + 52 + 8 + 22 + 24
+      l.k = Math.max(0.5, Math.min(1, (aw - 20) / 332, (ah - rest) / 332))
+      const recv = 332 * l.k, total = rest + recv
+      let y = inset.t + Math.max(8, (ah - total) / 2)
+      l.eyebrow = [x0, y, cw, 22]; l.title = [x0, y + 18, cw, 48]; y += 72
+      l.cx = inset.l + aw / 2; l.cy = y + recv / 2
+      l.desc = [x0, l.cy + 82 * l.k, cw, 30]
+      y += recv + 6
+      for (let i = 0; i < 3; i++) { l.stations.push([x0, y, cw, 48]); y += 58 }
+      y += 16 - 10
+      l.play = [x0, y, (cw - 12) / 2, 52]; l.vol = [x0 + (cw + 12) / 2, y, (cw - 12) / 2, 52]; y += 60
+      l.status = [x0, y, cw, 22]
+    }
+    L = l
+    place(descriptionLabel, ...l.desc)
+    l.stations.forEach((r, i) => place(stationButtons[i], ...r))
+    place(playButton, ...l.play); place(volumeButton, ...l.vol); place(statusLabel, ...l.status)
+    dpr = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr)
+    render()
+  }
+
+  // ---- 그리기 (원본 OnPaint) ----
+  const starTint = []
+  function render() {
+    const g = ctx
+    g.setTransform(dpr, 0, 0, dpr, 0, 0)
+    g.fillStyle = gdiLinear(g, 0, 0, W, H, 'rgb(13,10,33)', 'rgb(4,7,17)', 145)
+    g.fillRect(0, 0, W, H)
+    const color = StationColors[stationIndex]
+    const gx = L.cx + 171.6 * L.k, gy = L.cy - 113.4 * L.k               // 원본: (Width*0.72, Height*0.24) = 수신기 중심 + (171.6, -113.4)
+    for (let ring = 7; ring >= 1; ring--) {
+      circle(g, gx, gy, 230 * L.k * ring / 7); g.fillStyle = rgba(Math.max(1, Math.floor(20 / (9 - ring))), color); g.fill()
+    }
+    drawStars(g)
+    drawReceiver(g)
+    drawHeader(g)
+  }
+
+  function drawStars(g) {
+    const seconds = clock()
+    for (const star of stars) {
+      const wave = Math.sin(seconds * 0.55 + star.Phase) * 0.5 + 0.5
+      const alpha = 30 + Math.trunc(wave * 130)
+      circle(g, star.X * W + star.Size / 2, star.Y * H + star.Size / 2, star.Size / 2)
+      g.fillStyle = starTint[alpha] || (starTint[alpha] = rgba(alpha, [230, 225, 255])); g.fill()
+    }
+  }
+
+  function drawReceiver(g) {
+    const cx = L.cx, cy = L.cy, k = L.k
+    const seconds = clock() - lastStationChange
+    const color = StationColors[stationIndex]
+    const baseRadius = 72 * k
+
+    g.lineWidth = 1
+    for (let ring = 3; ring >= 1; ring--) {
+      const pulse = playing ? Math.sin(seconds * (0.8 + ring * 0.22)) * 7 : 0
+      const radius = baseRadius + (ring * 28 + pulse) * k
+      const alpha = playing ? 58 - ring * 9 : 25
+      circle(g, cx, cy, radius); g.strokeStyle = rgba(alpha, color); g.stroke()
+    }
+
+    const bars = 42
+    g.lineWidth = 2; g.lineCap = 'round'
+    for (let index = 0; index < bars; index++) {
+      const angle = index / bars * Math.PI * 2.0
+      const wave = playing ? Math.sin(seconds * (2.0 + stationIndex * 0.7) + index * 0.72) * 0.5 + 0.5 : 0.1
+      const inner = baseRadius + 12 * k
+      const outer = inner + (8 + wave * 26) * k
+      g.beginPath()
+      g.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner)
+      g.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer)
+      g.strokeStyle = rgba(110 + Math.trunc(wave * 110), color); g.stroke()
+    }
+    g.lineCap = 'butt'
+
+    const orb = g.createRadialGradient(cx - 18 * k, cy - 22 * k, 0, cx, cy, baseRadius)    // PathGradientBrush
+    orb.addColorStop(0, rgba(220, [245, 240, 255])); orb.addColorStop(1, rgba(155, color))
+    circle(g, cx, cy, baseRadius); g.fillStyle = orb; g.fill()
+
+    const namePx = 10 * PT, statePx = 12
+    textIn(g, StationNames[stationIndex], cx - baseRadius, cy - 25 * k, baseRadius * 2, 27 * k, namePx, `bold ${namePx}px ${KO}`, rgba(235, [255, 255, 255]))
+    textIn(g, playing ? 'ON AIR' : 'READY', cx - baseRadius, cy + 3 * k, baseRadius * 2, 22 * k, statePx, `${statePx}px ${KO}`, rgba(170, [225, 219, 242]))
+  }
+
+  function drawHeader(g) {
+    const eyebrowPx = 12, titlePx = 22 * PT
+    textIn(g, 'THREE SIGNALS FROM NOWHERE', ...L.eyebrow, eyebrowPx, `bold ${eyebrowPx}px ${SEGOE}`, rgba(170, [154, 137, 205]), SEGOE_ASC)
+    textIn(g, '행성 라디오', ...L.title, titlePx, `${titlePx}px ${KO}`, rgba(242, [244, 240, 255]))
+  }
+
+  // ---- 입력 ----
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement
+  function leave() {                                   // 원본의 Esc(창 닫기) → 소리를 끄고 들어온 곳으로
+    stopAndReleaseAudio()
+    const go = () => {
+      try { if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) { history.back(); return } } catch (e) {}
+      location.href = '../'
+    }
+    if (fsEl() && document.exitFullscreen) document.exitFullscreen().then(go, go); else go()
+  }
+
+  function bindButton(b, fn) {
+    b.addEventListener('mousedown', e => e.preventDefault())          // 포커스가 남아 Space가 버튼을 다시 누르지 않도록
+    b.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' && !touchUI) setTouch(true) })
+    b.addEventListener('click', e => { e.preventDefault(); fn(); b.blur() })
+  }
+  stationButtons.forEach((b, i) => bindButton(b, () => selectStation(i)))
+  bindButton(playButton, togglePlayback)
+  bindButton(volumeButton, cycleVolume)
+
+  addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    switch (e.code) {
+      case 'Escape': leave(); break
+      case 'Space': togglePlayback(); e.preventDefault(); break
+      case 'Digit1': case 'Numpad1': selectStation(0); break
+      case 'Digit2': case 'Numpad2': selectStation(1); break
+      case 'Digit3': case 'Numpad3': selectStation(2); break
+      case 'KeyV': cycleVolume(); break
+    }
+  })
+
+  function setTouch(on) {
+    const before = touchUI
+    touchUI = on
+    if (!playing && statusLabel.textContent === (before ? TOUCH_HINT : KEY_HINT)) statusLabel.textContent = on ? TOUCH_HINT : KEY_HINT
+  }
+  const KEY_HINT = 'Space를 누르기 전에는 소리가 나지 않습니다.', TOUCH_HINT = '재생을 누르기 전에는 소리가 나지 않습니다.'
+
+  selectStation(0)
+  touchUI = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
+  statusLabel.textContent = touchUI ? TOUCH_HINT : KEY_HINT
+  addEventListener('resize', layout)
+  if (window.visualViewport) visualViewport.addEventListener('resize', layout)
+  layout()
+
+  let lastDraw = -1
+  function frame(ts) {                                  // 원본 타이머 33ms → 초당 약 30번 그리기
+    if (lastDraw < 0 || ts - lastDraw >= 31) { lastDraw = ts; render() }
+    requestAnimationFrame(frame)
+  }
+  requestAnimationFrame(frame)
+
+  // 시험용 창구
+  window.__port = {
+    state: () => ({ stationIndex, volumeIndex, playing, prepared, status: statusLabel.textContent, play: playButton.textContent, vol: volumeButton.textContent,
+      mode: L.mode, audio: actx ? actx.state : 'none', source: !!source, touchUI }),
+    freeze(t) { frozen = t; render() },
+    selectStation(i) { selectStation(i); lastStationChange = 0; render() },
+    fakePlaying(text) { playing = true; playButton.textContent = '멈춤'; statusLabel.textContent = text; render() },
+    buildSoundscape,
+    render
+  }
+})()
+</script>
+</body>
+</html>

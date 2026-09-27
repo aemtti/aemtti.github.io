@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>별빛 휴식</title>
+<meta name="description" content="빈 곳을 눌러 별빛을 남기고, 호흡 안내에 맞춰 숨을 고르는 작은 휴식 장면">
+<meta name="theme-color" content="#070514">
+<link rel="icon" href="data:,">
+<!--
+  별빛 휴식 — StarlightRest.cs(WinForms)를 웹으로 옮긴 판입니다. 한 파일, 외부 파일 없음.
+  그림·시간·문구·난수(System.Random 824 시드)는 원본과 같고, 휴대폰에서는 아래 버튼이 키보드를 대신합니다.
+  화면 클릭/탭: 별빛 남기기 · Space: 호흡 안내 · C: 별빛 비우기 · S: 장면 저장(PNG 내려받기) · F11: 전체화면 · Esc: 나가기
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none;
+    background: #070514 linear-gradient(225deg, rgb(13,9,31), rgb(5,6,17)); }
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  canvas { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .bar { position: fixed; left: 0; right: 0; bottom: calc(14px + env(safe-area-inset-bottom)); display: none;
+    flex-wrap: wrap; justify-content: center; gap: 8px; pointer-events: none;
+    padding: 0 calc(12px + env(safe-area-inset-right)) 0 calc(12px + env(safe-area-inset-left)); }
+  .touch .bar { display: flex; }
+  .bar button { pointer-events: auto; min-height: 44px; min-width: 44px; padding: 0 15px; border-radius: 22px; margin: 0;
+    border: 1px solid rgba(192,170,255,.30); background: rgba(24,17,52,.55); color: rgba(229,223,246,.92);
+    font: 13px/1 'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',system-ui,sans-serif;
+    touch-action: manipulation; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+  .bar button:active, .bar button.on { background: rgba(156,117,255,.30); border-color: rgba(192,170,255,.72); }
+  .bar button[hidden] { display: none; }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="별빛 휴식 — 빈 곳을 눌러 별빛을 남겨보세요"></canvas>
+<div class="bar" id="bar">
+  <button type="button" id="bBreath">호흡 시작</button>
+  <button type="button" id="bClear">별빛 비우기</button>
+  <button type="button" id="bSave">장면 저장</button>
+  <button type="button" id="bFull">화면 전환</button>
+  <button type="button" id="bExit">나가기</button>
+</div>
+<script>
+(function () {
+  'use strict'
+
+  // ---- .NET Framework System.Random: 시드가 같으면 원본(C#)과 같은 수열을 냅니다 ----
+  function NetRandom(seed) {
+    const MBIG = 2147483647, a = new Array(56).fill(0)
+    seed |= 0
+    let mj = (161803398 - (seed === -2147483648 ? 2147483647 : Math.abs(seed))) | 0, mk = 1
+    a[55] = mj
+    for (let i = 1; i < 55; i++) {
+      const ii = (21 * i) % 55
+      a[ii] = mk; mk = (mj - mk) | 0; if (mk < 0) mk += MBIG; mj = a[ii]
+    }
+    for (let k = 1; k < 5; k++)
+      for (let i = 1; i < 56; i++) { a[i] = (a[i] - a[1 + (i + 30) % 55]) | 0; if (a[i] < 0) a[i] += MBIG }
+    let inext = 0, inextp = 21
+    this.nextDouble = function () {
+      if (++inext >= 56) inext = 1
+      if (++inextp >= 56) inextp = 1
+      let r = a[inext] - a[inextp]
+      if (r === MBIG) r--
+      if (r < 0) r += MBIG
+      a[inext] = r
+      return r * (1 / MBIG)
+    }
+    this.next = (lo, hi) => hi === undefined ? Math.floor(this.nextDouble() * lo) : Math.floor(this.nextDouble() * (hi - lo)) + lo
+  }
+
+  // ---- GDI+ 그리기 흉내: 글꼴 크기는 포인트(96dpi), DrawString은 왼쪽에 1/6em 여백, 줄 높이 1.33em ----
+  const PT = 96 / 72
+  const KO = "'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',system-ui,sans-serif"
+  const ASC = 2229 / 2048, LINE = 2724 / 2048
+  const TAU = Math.PI * 2
+  const rgba = (a, r, g, b) => `rgba(${r},${g},${b},${+(a / 255).toFixed(4)})`
+  function tint(r, g, b) { const t = []; return a => t[a] || (t[a] = rgba(a, r, g, b)) }
+  function circle(g, x, y, r) { g.beginPath(); g.arc(x, y, r > 0 ? r : 0, 0, TAU) }
+  function gdiLinear(g, x, y, w, h, c1, c2, deg) {            // LinearGradientBrush(rect, c1, c2, angle)
+    const a = deg * Math.PI / 180, dx = Math.cos(a), dy = Math.sin(a)
+    const half = (Math.abs(w * dx) + Math.abs(h * dy)) / 2, cx = x + w / 2, cy = y + h / 2
+    const lg = g.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half)
+    lg.addColorStop(0, c1); lg.addColorStop(1, c2); return lg
+  }
+  function textIn(g, lines, rx, ry, rw, rh, px, font, color) {  // DrawString(…, RectangleF, 가운데 정렬)
+    const lh = LINE * px
+    let y = ry + (rh - lines.length * lh) / 2 + ASC * px
+    g.font = font; g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'alphabetic'
+    for (const l of lines) { g.fillText(l, rx + rw / 2, y); y += lh }
+  }
+
+  // ---- 화면 ----
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d')
+  const bgCanvas = document.createElement('canvas'), bgCtx = bgCanvas.getContext('2d')
+  const Q = new URLSearchParams(location.search)
+  let frozen = Q.has('t') ? +Q.get('t') : null                  // 시험용: ?t=초 로 시계를 멈춤
+  const t0 = performance.now()
+  const clock = () => frozen != null ? frozen : (performance.now() - t0) / 1000
+  let W = 1, H = 1, dpr = 1, inset = { t: 0, r: 0, b: 0, l: 0 }
+  const probe = document.createElement('div')
+  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+    'padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'
+  document.body.appendChild(probe)
+
+  // ---- 상태 (원본 GardenForm 필드) ----
+  const stars = [], lights = []
+  const random = new NetRandom(824)
+  let guidedBreathing = false, guideStarted = 0
+  let snapshotMessage = '', snapshotMessageUntil = 0
+  let touchUI = false
+
+  for (let index = 0; index < 110; index++) {
+    stars.push({
+      X: random.nextDouble(),
+      Y: random.nextDouble(),
+      Size: 0.8 + random.nextDouble() * 2.2,
+      Phase: random.nextDouble() * 6.28318,
+      Speed: 0.35 + random.nextDouble() * 0.9
+    })
+  }
+
+  const starGlow = tint(178, 160, 255), starCore = tint(242, 239, 255)
+  const lightGlow = rgba(12, 133, 255, 213), lightCore = rgba(230, 157, 255, 219)
+
+  function resize() {
+    const s = getComputedStyle(probe)
+    inset = { t: parseFloat(s.paddingTop) || 0, r: parseFloat(s.paddingRight) || 0, b: parseFloat(s.paddingBottom) || 0, l: parseFloat(s.paddingLeft) || 0 }
+    W = Math.max(1, canvas.clientWidth); H = Math.max(1, canvas.clientHeight)
+    dpr = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.width = bgCanvas.width = Math.round(W * dpr)
+    canvas.height = bgCanvas.height = Math.round(H * dpr)
+    bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    drawBackground(bgCtx)
+    render()
+  }
+
+  function drawBackground(g) {
+    g.fillStyle = gdiLinear(g, 0, 0, W, H, 'rgb(13,9,31)', 'rgb(5,6,17)', 135)
+    g.fillRect(0, 0, W, H)
+    drawGlow(g, W * 0.12, H * 0.82, Math.max(W, H) * 0.32, 45, 70, 220, 180)
+    drawGlow(g, W * 0.88, H * 0.15, Math.max(W, H) * 0.28, 38, 145, 96, 230)
+  }
+
+  function drawGlow(g, x, y, radius, A, r, gg, b) {
+    for (let ring = 7; ring >= 1; ring--) {
+      const size = radius * (ring / 7)
+      circle(g, x, y, size); g.fillStyle = rgba(Math.max(2, Math.floor(A / (9 - ring))), r, gg, b); g.fill()
+    }
+  }
+
+  function drawStars(g, seconds) {
+    for (const star of stars) {
+      const wave = Math.sin(seconds * star.Speed + star.Phase) * 0.5 + 0.5
+      const alpha = 35 + Math.trunc(wave * 185)
+      const x = star.X * W, y = star.Y * H, size = star.Size + wave * 0.8
+      circle(g, x, y, size * 2.5); g.fillStyle = starGlow(Math.floor(alpha / 5)); g.fill()
+      circle(g, x, y, size / 2); g.fillStyle = starCore(alpha); g.fill()
+    }
+  }
+
+  function drawLights(g, seconds) {
+    for (const light of lights) {
+      const age = seconds - light.Born
+      const floatY = Math.sin(age * 1.2 + light.Phase) * 5
+      const pulse = 0.8 + Math.sin(age * 2.3 + light.Phase) * 0.2
+      const x = light.X * W, y = light.Y * H + floatY, size = light.Size * pulse
+      for (let ring = 4; ring >= 1; ring--) { circle(g, x, y, size * (1 + ring * 0.9) / 2); g.fillStyle = lightGlow; g.fill() }
+      circle(g, x, y, size / 2); g.fillStyle = lightCore; g.fill()
+    }
+  }
+
+  function drawBreathingOrb(g, seconds) {
+    let progress, phase, count
+    if (guidedBreathing) {
+      const cycle = (seconds - guideStarted) % 12.0
+      if (cycle < 4.0) { progress = ease(cycle / 4.0); phase = '들이쉬기'; count = Math.ceil(4.0 - cycle) }
+      else if (cycle < 6.0) { progress = 1; phase = '머물기'; count = Math.ceil(6.0 - cycle) }
+      else { progress = 1 - ease((cycle - 6.0) / 6.0); phase = '내쉬기'; count = Math.ceil(12.0 - cycle) }
+    } else {
+      progress = 0.46 + Math.sin(seconds * 0.55) * 0.12
+      phase = '숨 고르기'
+      count = 0
+    }
+
+    // 원본 창은 760×520보다 작아지지 않으므로, 휴대폰에서도 그 크기의 구슬(반지름 44)보다 작게 만들지 않습니다.
+    const baseRadius = Math.max(Math.min(W, H) * 0.085, 44)
+    const radius = baseRadius * (0.88 + progress * 0.24)
+    const cx = W * 0.5, cy = H * 0.55
+
+    drawGlow(g, cx, cy, radius * 2.2, 62, 156, 117, 255)
+
+    g.lineWidth = 1
+    circle(g, cx, cy, radius * 1.48); g.strokeStyle = rgba(55, 192, 170, 255); g.stroke()
+    circle(g, cx, cy, radius * 1.22); g.strokeStyle = rgba(88, 183, 157, 255); g.stroke()
+
+    const orb = g.createRadialGradient(cx - radius * 0.22, cy - radius * 0.28, 0, cx, cy, radius)   // PathGradientBrush
+    orb.addColorStop(0, rgba(218, 180, 151, 255)); orb.addColorStop(1, rgba(170, 51, 39, 92))
+    circle(g, cx, cy, radius); g.fillStyle = orb; g.fill()
+
+    const phasePx = Math.max(10, radius * 0.13) * PT, countPx = Math.max(18, radius * 0.3) * PT
+    textIn(g, [phase], cx - radius, cy - 27, radius * 2, 25, phasePx, `${phasePx}px ${KO}`, rgba(220, 225, 218, 244))
+    if (guidedBreathing) textIn(g, [String(count)], cx - radius, cy - 2, radius * 2, 44, countPx, `${countPx}px ${KO}`, '#fff')
+  }
+
+  const TITLE = '오늘은 잠시, 아무것도 되지 않아도 좋아요.'
+  const GUIDE_ON = 'SPACE  호흡 멈추기     C  별빛 비우기     S  장면 저장     F11  화면 전환     ESC  나가기'
+  const GUIDE_OFF = 'SPACE  호흡 시작     C  별빛 비우기     S  장면 저장     F11  화면 전환     ESC  나가기'
+
+  function measure(g, s, font) { g.font = font; return g.measureText(s).width }
+
+  // 좁은 화면(휴대폰)에서는 제목을 두 줄로 나누고, 그래도 넘치면 넘치지 않을 만큼만 줄입니다.
+  function fitLines(g, text, px, maxW, minPx) {
+    const f = p => `${p}px ${KO}`
+    if (measure(g, text, f(px)) + px / 3 <= maxW) return { lines: [text], px }
+    let best = null
+    for (let i = text.indexOf(' '); i > 0; i = text.indexOf(' ', i + 1)) {
+      const parts = [text.slice(0, i), text.slice(i + 1)]
+      const w = Math.max(measure(g, parts[0], f(px)), measure(g, parts[1], f(px)))
+      if (!best || w < best.w) best = { lines: parts, w }
+    }
+    const scale = Math.min(1, (maxW - px / 3) / best.w)
+    return { lines: best.lines, px: Math.max(minPx, px * scale) }
+  }
+
+  function drawText(g, seconds, includeSnapshotMessage) {
+    const titleSize = Math.max(22, Math.min(52, W / 30))
+    const smallPx = Math.max(12, Math.max(8, titleSize * 0.25) * PT)
+    const left = 40 + inset.l, width = W - 80 - inset.l - inset.r
+    const top = Math.max(H * 0.13, inset.t + 6)
+    const t = fitLines(g, TITLE, titleSize * PT, width, 16)
+    const extra = (t.lines.length - 1) * LINE * t.px
+    textIn(g, t.lines, left, top, width, titleSize * 1.7 + extra, t.px, `${t.px}px ${KO}`, rgba(238, 244, 240, 255))
+    textIn(g, ['빈 곳을 눌러 별빛을 남겨보세요'], left, top + titleSize * 1.65 + extra, width, 32, smallPx, `${smallPx}px ${KO}`, rgba(150, 170, 164, 192))
+
+    const gl = 30 + inset.l, gw = W - 60 - inset.l - inset.r
+    let msgBottom = H - 64 - inset.b
+    if (!touchUI) {
+      const guide = guidedBreathing ? GUIDE_ON : GUIDE_OFF
+      let lines = [guide], px = smallPx
+      if (measure(g, guide, `${px}px ${KO}`) > gw) {
+        px = Math.max(12, px * gw / measure(g, guide, `${px}px ${KO}`))
+        if (measure(g, guide, `${px}px ${KO}`) > gw) { const k = guide.indexOf('S  '); lines = [guide.slice(0, k).trim(), guide.slice(k)] }
+      }
+      textIn(g, lines, gl, H - 55 - inset.b - (lines.length - 1) * LINE * px / 2, gw, 30, px, `${px}px ${KO}`, rgba(100, 150, 143, 167))
+    } else {
+      const bar = document.getElementById('bar').getBoundingClientRect()
+      if (bar.height) msgBottom = bar.top - 8
+    }
+
+    if (includeSnapshotMessage && seconds < snapshotMessageUntil && snapshotMessage.length > 0)
+      textIn(g, [snapshotMessage], gl, msgBottom - 28, gw, 28, smallPx, `${smallPx}px ${KO}`, rgba(195, 143, 255, 213))
+  }
+
+  function ease(value) {
+    return value < 0.5 ? 2 * value * value : 1 - Math.pow(-2 * value + 2, 2) / 2
+  }
+
+  function drawScene(g, seconds, includeSnapshotMessage) {
+    g.drawImage(bgCanvas, 0, 0, W, H)
+    drawStars(g, seconds)
+    drawLights(g, seconds)
+    drawBreathingOrb(g, seconds)
+    drawText(g, seconds, includeSnapshotMessage)
+  }
+
+  function render() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    drawScene(ctx, clock(), true)
+  }
+
+  // ---- 입력 ----
+  function addLight(x, y) {
+    if (W <= 0 || H <= 0) return
+    lights.push({
+      X: x / W,
+      Y: y / H,
+      Size: 7 + random.nextDouble() * 8,
+      Born: clock(),
+      Phase: random.nextDouble() * 6.28318
+    })
+    if (lights.length > 60) lights.shift()
+  }
+
+  function toggleBreathing() {
+    guidedBreathing = !guidedBreathing
+    guideStarted = clock()
+    const b = document.getElementById('bBreath')
+    b.textContent = guidedBreathing ? '호흡 멈추기' : '호흡 시작'
+    b.classList.toggle('on', guidedBreathing)
+  }
+
+  function pad(n, k) { return String(n).padStart(k || 2, '0') }
+  function saveSnapshot() {
+    try {
+      const seconds = clock()
+      const off = document.createElement('canvas')
+      off.width = canvas.width; off.height = canvas.height
+      const g = off.getContext('2d')
+      g.setTransform(dpr, 0, 0, dpr, 0, 0)
+      drawScene(g, seconds, false)
+      const d = new Date()
+      const fileName = '별빛-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' +
+        pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()) + '-' + pad(d.getMilliseconds(), 3) + '.png'
+      const a = document.createElement('a')
+      a.href = off.toDataURL('image/png'); a.download = fileName
+      document.body.appendChild(a); a.click(); a.remove()
+      // 원본은 '내 사진 > 작은 정원' 폴더에 저장했지만, 웹에서는 브라우저의 다운로드로 내려받습니다.
+      snapshotMessage = '다운로드 폴더에 저장했습니다 · ' + fileName
+      snapshotMessageUntil = seconds + 4.5
+    } catch (error) {
+      alert('별빛 장면을 저장하지 못했습니다.\n\n' + (error && error.message || error))
+    }
+  }
+
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement
+  function toggleFullscreen() {
+    const d = document, el = d.documentElement
+    try {
+      const p = fsEl() ? (d.exitFullscreen || d.webkitExitFullscreen).call(d) : (el.requestFullscreen || el.webkitRequestFullscreen).call(el)
+      if (p && p.catch) p.catch(() => {})
+    } catch (e) {}
+  }
+  function leave() {                                   // 원본의 Esc(창 닫기) → 들어온 곳으로 돌아가기
+    const go = () => {
+      try { if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) { history.back(); return } } catch (e) {}
+      location.href = '../'
+    }
+    if (fsEl() && document.exitFullscreen) document.exitFullscreen().then(go, go); else go()
+  }
+
+  function setTouch(on) {
+    touchUI = on
+    document.body.classList.toggle('touch', on)
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return
+    if (e.pointerType === 'touch' && !touchUI) setTouch(true)
+    addLight(e.clientX, e.clientY)
+  })
+  canvas.addEventListener('contextmenu', e => e.preventDefault())
+
+  function onKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    switch (e.code) {
+      case 'Escape': leave(); break
+      case 'Space': toggleBreathing(); e.preventDefault(); break
+      case 'KeyC': lights.length = 0; break
+      case 'KeyS': saveSnapshot(); e.preventDefault(); break
+      // F11: 브라우저의 전체화면 전환이 원본의 F11과 같은 일을 합니다.
+    }
+  }
+  addEventListener('keydown', onKey)
+
+  function bindButton(id, fn) {
+    const b = document.getElementById(id)
+    b.addEventListener('pointerdown', e => e.stopPropagation())
+    b.addEventListener('mousedown', e => e.preventDefault())          // 버튼에 포커스가 남아 Space가 버튼을 누르지 않도록
+    b.addEventListener('click', e => { e.preventDefault(); fn(); b.blur() })
+  }
+  bindButton('bBreath', toggleBreathing)
+  bindButton('bClear', () => { lights.length = 0 })
+  bindButton('bSave', saveSnapshot)
+  bindButton('bFull', toggleFullscreen)
+  bindButton('bExit', leave)
+  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) document.getElementById('bFull').hidden = true
+
+  setTouch(matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0)
+  addEventListener('resize', resize)
+  if (window.visualViewport) visualViewport.addEventListener('resize', resize)
+  resize()
+  function frame() { render(); requestAnimationFrame(frame) }
+  requestAnimationFrame(frame)
+
+  // 시험용 창구 (게임 동작에는 쓰지 않음)
+  window.__port = {
+    get lights() { return lights.length },
+    get breathing() { return guidedBreathing },
+    get message() { return snapshotMessage },
+    get touchUI() { return touchUI },
+    freeze(t) { frozen = t; render() },
+    click(x, y) { addLight(x, y) },
+    key(code) { onKey({ code, preventDefault() {} }) },
+    render
+  }
+})()
+</script>
+</body>
+</html>

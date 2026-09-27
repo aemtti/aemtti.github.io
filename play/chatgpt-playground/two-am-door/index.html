@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>새벽 두 시의 문</title>
+<meta name="description" content="다섯 번의 선택으로 결말이 달라지는 짧은 인터랙티브 단편소설">
+<meta name="theme-color" content="#070714">
+<link rel="icon" href="data:,">
+<!--
+  새벽 두 시의 문 — TwoAmDoor.cs(WinForms)를 웹으로 옮긴 판입니다. 한 파일, 외부 파일 없음.
+  이야기·선택지·결말 문장과 조합 규칙(문의 색·소리·손님·물건)은 원본 그대로입니다.
+  숫자 1, 2, 3: 선택지 고르기 · R: 새 이야기 · Esc: 나가기 — 모두 화면의 버튼으로도 됩니다.
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none;
+    background: #070714 linear-gradient(232deg, rgb(15,10,34), rgb(5,6,17)); }
+  body { -webkit-tap-highlight-color: transparent; color: rgb(244,240,255);
+    font-family: 'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',system-ui,sans-serif; }
+  canvas { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+  #ui { box-sizing: border-box; }
+  #eyebrow { font: bold 12px/normal 'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Roboto,Arial,sans-serif; color: rgba(154,137,205,.647); white-space: nowrap; }
+  #title { font-size: 29.333px; line-height: normal; color: rgba(244,240,255,.941); white-space: nowrap; }
+  #chapter { font-weight: bold; font-size: 12px; color: rgb(170,140,255); text-align: center; display: flex; align-items: center; justify-content: center; }
+  #story { box-sizing: border-box; background: rgba(17,14,38,.451); color: rgb(235,232,248); text-align: center; white-space: pre-line;
+    display: flex; align-items: center; justify-content: center; overflow: hidden; -webkit-user-select: text; user-select: text; }
+  #trait { color: rgb(151,143,170); font-size: 12px; white-space: pre-wrap; text-align: center; display: flex; align-items: center; justify-content: center; }
+  #trait .g { white-space: pre; }
+  #progress { color: rgb(143,255,213); font: 12px 'Segoe UI Symbol','Segoe UI','Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;
+    white-space: pre-wrap; text-align: center; display: flex; align-items: center; justify-content: center; }
+  button { box-sizing: border-box; margin: 0; border: 1px solid; border-radius: 0; font-family: inherit; cursor: pointer; touch-action: manipulation; outline: none; }
+  .choice { background: rgb(28,23,51); border-color: rgba(122,108,153,.392); color: rgb(226,220,240); font-size: 12px; line-height: 1.33;
+    padding: 8px; white-space: pre-line; text-align: center; }
+  #restart { background: rgb(24,21,46); border-color: rgba(115,108,135,.373); color: rgb(185,178,207); font-weight: bold; font-size: 12px; white-space: pre; padding: 0 8px; }
+  @media (hover: hover) { .choice:hover { background: rgb(33,27,61); } #restart:hover { background: rgb(28,25,55); } }
+  .choice:active { background: rgb(108,94,169); }
+  #restart:active { background: rgb(102,92,167); }
+  .choice[hidden] { display: none; }
+  body:not(.window):not(.flow) #ui { visibility: hidden; }
+
+  /* 넓은 화면: 원본 창(920×660) 배치 그대로 */
+  body.window #ui { position: absolute; width: 920px; height: 660px; }
+  body.window #top, body.window #head, body.window #choices { display: contents; }
+  body.window #eyebrow { position: absolute; left: 57px; top: 35px; }
+  body.window #title { position: absolute; left: 56.9px; top: 58px; }
+  body.window #restart { position: absolute; left: 745px; top: 55px; width: 120px; height: 36px; }
+  body.window #chapter { position: absolute; left: 80px; top: 135px; width: 760px; height: 28px; }
+  body.window #story { position: absolute; left: 105px; top: 174px; width: 710px; height: 225px; padding: 24px 38px; font-size: 18.667px; line-height: 25px; }
+  body.window .choice { position: absolute; top: 435px; width: 240px; height: 82px; }
+  body.window #c0 { left: 82px; } body.window #c1 { left: 340px; } body.window #c2 { left: 598px; }
+  body.window #trait { position: absolute; left: 120px; top: 552px; width: 680px; height: 25px; }
+  body.window #progress { position: absolute; left: 120px; top: 583px; width: 680px; height: 22px; }
+
+  /* 휴대폰 세로: 위에서 아래로 (넘치면 세로로 넘겨 읽기) */
+  body.flow #ui { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 10px;
+    padding: calc(14px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)); }
+  body.flow #top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: auto; }
+  body.flow #head { min-width: 0; }
+  body.flow #restart { flex: none; min-width: 120px; min-height: 44px; }
+  body.flow #chapter { min-height: 28px; }
+  body.flow #story { padding: 18px 20px; font-size: 16px; line-height: 1.55; min-height: 170px; }
+  body.flow #story, body.flow .choice { word-break: keep-all; overflow-wrap: break-word; }   /* 좁은 화면: 한국어를 낱말 단위로 줄바꿈 */
+  body.flow #choices { display: flex; flex-direction: column; gap: 10px; }
+  body.flow .choice { min-height: 62px; }
+  body.flow #trait { min-height: 25px; }
+  body.flow #progress { min-height: 22px; margin-bottom: auto; }
+
+  /* 휴대폰 가로: 왼쪽 이야기, 오른쪽 선택지 */
+  body.flow.land #ui { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); column-gap: 16px; row-gap: 8px;
+    grid-template-rows: auto auto 1fr auto auto; align-content: center;
+    grid-template-areas: "top top" "chapter choices" "story choices" "story trait" "story progress"; }
+  body.flow.land #top { grid-area: top; margin: 0; }
+  body.flow.land #title { font-size: 24px; }
+  body.flow.land #chapter { grid-area: chapter; }
+  body.flow.land #story { grid-area: story; min-height: 0; font-size: 15px; line-height: 1.5; padding: 14px 18px; }
+  body.flow.land #choices { grid-area: choices; gap: 8px; }
+  body.flow.land .choice { min-height: 52px; padding: 4px 8px; }
+  body.flow.land #trait { grid-area: trait; }
+  body.flow.land #progress { grid-area: progress; margin: 0; }
+</style>
+</head>
+<body>
+<canvas id="c" aria-hidden="true"></canvas>
+<div id="ui">
+  <div id="top">
+    <div id="head"><div id="eyebrow">AN IMPOSSIBLE DOOR AT 2:00 AM</div><div id="title">새벽 두 시의 문</div></div>
+    <button type="button" id="restart">새 이야기  R</button>
+  </div>
+  <div id="chapter"></div>
+  <div id="story" aria-live="polite"></div>
+  <div id="choices">
+    <button type="button" class="choice" id="c0"></button>
+    <button type="button" class="choice" id="c1"></button>
+    <button type="button" class="choice" id="c2"></button>
+  </div>
+  <div id="trait"></div>
+  <div id="progress"></div>
+</div>
+<script>
+(function () {
+  'use strict'
+
+  // ---- .NET Framework System.Random (원본과 같은 알고리즘; 시드는 원본처럼 시각에서) ----
+  function NetRandom(seed) {
+    const MBIG = 2147483647, a = new Array(56).fill(0)
+    seed |= 0
+    let mj = (161803398 - (seed === -2147483648 ? 2147483647 : Math.abs(seed))) | 0, mk = 1
+    a[55] = mj
+    for (let i = 1; i < 55; i++) {
+      const ii = (21 * i) % 55
+      a[ii] = mk; mk = (mj - mk) | 0; if (mk < 0) mk += MBIG; mj = a[ii]
+    }
+    for (let k = 1; k < 5; k++)
+      for (let i = 1; i < 56; i++) { a[i] = (a[i] - a[1 + (i + 30) % 55]) | 0; if (a[i] < 0) a[i] += MBIG }
+    let inext = 0, inextp = 21
+    this.nextDouble = function () {
+      if (++inext >= 56) inext = 1
+      if (++inextp >= 56) inextp = 1
+      let r = a[inext] - a[inextp]
+      if (r === MBIG) r--
+      if (r < 0) r += MBIG
+      a[inext] = r
+      return r * (1 / MBIG)
+    }
+    this.next = (lo, hi) => hi === undefined ? Math.floor(this.nextDouble() * lo) : Math.floor(this.nextDouble() * (hi - lo)) + lo
+  }
+
+  const Colors = [
+    '젖은 청록색', '오래된 자주색', '새벽 직전의 주황색', '달빛을 닮은 은색',
+    '막 피어난 이끼색', '아주 옅은 복숭아색'
+  ]
+  const Sounds = [
+    '멀리서 찻잔 부딪히는 소리', '누군가 책장을 넘기는 소리', '눈이 지붕에 내려앉는 소리',
+    '아직 태어나지 않은 노래', '느린 열차의 방향지시등 소리', '고래가 꿈꾸는 듯한 낮은 숨'
+  ]
+  const Visitors = [
+    '우산을 든 여우', '한쪽 날개가 투명한 새', '손바닥만 한 우체부', '모자를 쓴 검은 고양이',
+    '자기 그림자를 잃어버린 아이', '별자리 무늬의 작은 사슴'
+  ]
+  const Keepsakes = [
+    '따뜻한 유리 단추', '아무 글자도 없는 엽서', '한 번만 울리는 은방울', '조그만 구름 씨앗',
+    '잊은 이름을 비추는 거울 조각', '내일의 냄새가 나는 종이별'
+  ]
+
+  function ChoiceOption(text, response, wonder, courage, kindness) {
+    return { Text: text, Response: response, Wonder: wonder, Courage: courage, Kindness: kindness }
+  }
+
+  // ---- 상태 (원본 StoryForm 필드) ----
+  const Q = new URLSearchParams(location.search)
+  let frozen = Q.has('t') ? +Q.get('t') : null
+  const t0 = performance.now()
+  const clock = () => frozen != null ? frozen : (performance.now() - t0) / 1000     // animationTime
+  const random = new NetRandom(Q.has('seed') ? +Q.get('seed') : (Date.now() % 2147483647))
+  const dust = []
+  const $ = id => document.getElementById(id)
+  const chapterLabel = $('chapter'), storyLabel = $('story'), traitLabel = $('trait'), progressLabel = $('progress')
+  const choiceButtons = [$('c0'), $('c1'), $('c2')], restartButton = $('restart')
+  const choiceTags = [null, null, null]
+
+  let step = 0, wonder = 0, courage = 0, kindness = 0, ended = false
+  let color = '', sound = '', visitor = '', keepsake = '', lastResponse = ''
+
+  for (let index = 0; index < 72; index++) {
+    dust.push({
+      X: random.nextDouble(),
+      Y: random.nextDouble(),
+      Size: 0.6 + random.nextDouble() * 1.7,
+      Phase: random.nextDouble() * 6.28318
+    })
+  }
+
+  function startNewStory() {
+    step = 0
+    wonder = 0
+    courage = 0
+    kindness = 0
+    ended = false
+    lastResponse = ''
+    color = pick(Colors)
+    sound = pick(Sounds)
+    visitor = pick(Visitors)
+    keepsake = pick(Keepsakes)
+    showScene(buildScene(step))
+  }
+
+  function pick(options) {
+    return options[random.next(options.length)]
+  }
+
+  function buildScene(sceneStep) {
+    if (sceneStep === 0) {
+      return {
+        Chapter: '첫 번째 장 · 없던 문',
+        Text: '새벽 두 시 정각, 방 한가운데에 ' + color + ' 문이 생겼습니다.\n' +
+          '문 너머에서는 ' + sound + '가 들립니다. 손잡이는 이상하게도 따뜻합니다.',
+        Choices: [
+          ChoiceOption('1\n망설이지 않고 연다', '문은 기다렸다는 듯 조용히 열렸습니다.', 0, 2, 0),
+          ChoiceOption('2\n귀를 대고 먼저 듣는다', '소리 사이에서 당신의 이름과 비슷한 음절을 들었습니다.', 2, 0, 0),
+          ChoiceOption('3\n문에게 인사한다', '문고리가 작은 진동으로 인사를 돌려주었습니다.', 0, 0, 2)
+        ]
+      }
+    }
+    if (sceneStep === 1) {
+      return {
+        Chapter: '두 번째 장 · 복도',
+        Text: '문 뒤에는 끝이 보이지 않는 복도가 있습니다. 바닥의 타일마다 다른 밤하늘이 비칩니다.\n' +
+          '세 갈래 길 가운데 하나만 아주 희미하게 빛납니다.',
+        Choices: [
+          ChoiceOption('1\n가장 어두운 길', '어둠 속에서 별 하나가 발밑까지 따라왔습니다.', 1, 2, 0),
+          ChoiceOption('2\n희미하게 빛나는 길', '빛은 길이 아니라 작은 생명들의 행렬이었습니다.', 2, 0, 1),
+          ChoiceOption('3\n뒤에 올 누군가를 기다린다', '잠시 뒤 발소리 하나가 당신 옆에서 멈췄습니다.', 0, 0, 3)
+        ]
+      }
+    }
+    if (sceneStep === 2) {
+      return {
+        Chapter: '세 번째 장 · 길을 잃은 손님',
+        Text: '모퉁이에서 ' + visitor + '를 만났습니다. 손님은 자신의 집으로 가는 지도를 잃었다고 합니다.\n' +
+          '대신 당신이 찾는 곳까지 동행할 수 있다고 말합니다.',
+        Choices: [
+          ChoiceOption('1\n함께 지도를 찾는다', '둘이서 찾으니 지도는 생각보다 가까운 곳에 있었습니다.', 1, 0, 3),
+          ChoiceOption('2\n내 길을 먼저 묻는다', '손님은 정직한 질문이 마음에 든다며 앞장섰습니다.', 1, 2, 0),
+          ChoiceOption('3\n지도를 새로 그려준다', '정확하지 않은 지도였지만 둘 다 크게 웃었습니다.', 3, 0, 2)
+        ]
+      }
+    }
+    if (sceneStep === 3) {
+      return {
+        Chapter: '네 번째 장 · 보관실',
+        Text: '복도 끝에는 사람들이 놓고 간 마음을 보관하는 방이 있습니다.\n' +
+          '선반 위에는 잊은 용기, 지나친 걱정, 말하지 못한 고마움이 병에 담겨 있습니다.',
+        Choices: [
+          ChoiceOption('1\n잊은 용기를 한 모금', '목이 뜨거워지고, 미뤄둔 한 가지가 떠올랐습니다.', 0, 3, 0),
+          ChoiceOption('2\n지나친 걱정을 내려놓는다', '병이 가벼워지자 당신의 어깨도 조금 내려갔습니다.', 2, 1, 0),
+          ChoiceOption('3\n고마움을 누군가에게 보낸다', '보낼 주소가 없어도 마음은 제 갈 길을 아는 듯했습니다.', 0, 0, 3)
+        ]
+      }
+    }
+
+    return {
+      Chapter: '다섯 번째 장 · 돌아오는 문',
+      Text: '마지막 방에는 처음 보았던 문과 똑같은 문이 서 있습니다.\n' + visitor + '가 ' + keepsake + '을 건네며 묻습니다. ‘무엇을 기억하고 싶나요?’',
+      Choices: [
+        ChoiceOption('1\n모르는 것을 향한 마음', '당신은 아직 이름 없는 길 하나를 마음에 접어 넣었습니다.', 3, 1, 0),
+        ChoiceOption('2\n두려워도 움직인 순간', '손잡이를 잡은 손이 처음보다 훨씬 편안했습니다.', 0, 3, 1),
+        ChoiceOption('3\n함께 걸었던 존재', visitor + '는 대답 대신 아주 오래 손을 흔들었습니다.', 0, 0, 4)
+      ]
+    }
+  }
+
+  function showScene(scene) {
+    chapterLabel.textContent = scene.Chapter.toUpperCase()
+    storyLabel.textContent = (lastResponse.length > 0 ? lastResponse + '\n\n' : '') + scene.Text
+    for (let index = 0; index < choiceButtons.length; index++) {
+      choiceButtons[index].textContent = scene.Choices[index].Text
+      choiceTags[index] = scene.Choices[index]
+      choiceButtons[index].hidden = false
+      choiceButtons[index].disabled = false
+    }
+    updateStatus()
+  }
+
+  function choose(index) {
+    if (ended || index < 0 || index >= choiceButtons.length) return
+    const choice = choiceTags[index]
+    if (!choice) return
+
+    wonder += choice.Wonder
+    courage += choice.Courage
+    kindness += choice.Kindness
+    lastResponse = choice.Response
+    step++
+
+    if (step >= 5) showEnding()
+    else showScene(buildScene(step))
+  }
+
+  function showEnding() {
+    ended = true
+    let endingTitle, ending
+
+    if (kindness >= wonder && kindness >= courage) {
+      endingTitle = '결말 · 돌아오는 불빛'
+      ending = '아침에 눈을 떴을 때 ' + keepsake + '은 보이지 않았습니다.\n' +
+        '하지만 누군가의 하루가 조금 덜 외로워졌다는 것을, 이상하게도 알 수 있었습니다.'
+    } else if (wonder >= courage) {
+      endingTitle = '결말 · 아직 닫히지 않은 문'
+      ending = '방은 원래 모습으로 돌아왔지만 벽 한쪽에 ' + color + ' 금이 가 있습니다.\n' +
+        '귀를 가까이 대면 여전히 ' + sound + '가 들립니다. 다음 문은 다른 곳에 생길 것입니다.'
+    } else {
+      endingTitle = '결말 · 내일의 첫걸음'
+      ending = '문을 나선 뒤, 미뤄두었던 일을 아주 작게 시작했습니다.\n' +
+        keepsake + '의 온도가 손바닥에 남아 있어 첫걸음은 생각보다 어렵지 않았습니다.'
+    }
+
+    chapterLabel.textContent = endingTitle.toUpperCase()
+    storyLabel.textContent = lastResponse + '\n\n' + ending
+    for (let index = 0; index < choiceButtons.length; index++) {
+      choiceButtons[index].hidden = index !== 1
+      choiceButtons[index].disabled = index !== 1
+      if (index === 1) {
+        choiceButtons[index].textContent = 'R\n다른 문을 열기'
+        choiceTags[index] = null
+      }
+    }
+    updateStatus()
+  }
+
+  function updateStatus() {
+    // 글자는 원본과 똑같이 '호기심  ●●○○○        용기  …' 이고, 좁은 화면에서는 항목 사이의 빈칸에서만 줄을 바꿉니다
+    const groups = ['호기심  ' + dots(wonder), '용기  ' + dots(courage), '다정함  ' + dots(kindness)]
+    const line = document.createElement('span')
+    groups.forEach((text, i) => {
+      if (i > 0) line.appendChild(document.createTextNode('        '))
+      const g = document.createElement('span'); g.className = 'g'; g.textContent = text; line.appendChild(g)
+    })
+    traitLabel.replaceChildren(line)
+
+    let progress = ''
+    for (let index = 0; index < 5; index++) {
+      if (index > 0) progress += '   '
+      progress += index < step ? '●' : index === step && !ended ? '◆' : '○'
+    }
+    progressLabel.textContent = progress + (ended ? '     이야기 끝' : '     숫자 1·2·3으로 선택')
+  }
+
+  function dots(value) {
+    const shown = Math.max(0, Math.min(5, Math.trunc((value + 1) / 2)))
+    return '●'.repeat(shown) + '○'.repeat(5 - shown)
+  }
+
+  // ---- 입력 ----
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement
+  function leave() {                                   // 원본의 Esc(창 닫기) → 들어온 곳으로 돌아가기
+    const go = () => {
+      try { if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) { history.back(); return } } catch (e) {}
+      location.href = '../'
+    }
+    if (fsEl() && document.exitFullscreen) document.exitFullscreen().then(go, go); else go()
+  }
+
+  function bindButton(b, fn) {
+    b.addEventListener('mousedown', e => e.preventDefault())          // 포커스가 남아 키보드가 버튼을 다시 누르지 않도록
+    b.addEventListener('click', e => { e.preventDefault(); fn(); b.blur() })
+  }
+  choiceButtons.forEach((b, i) => bindButton(b, () => {
+    if (ended && i === 1) startNewStory()           // 결말에서 가운데 버튼 = RestartFromEnding
+    else choose(i)
+  }))
+  bindButton(restartButton, startNewStory)
+
+  addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    const c = e.code
+    if (c === 'Escape') leave()
+    else if (c === 'KeyR') startNewStory()
+    else if (!ended && (c === 'Digit1' || c === 'Numpad1')) choose(0)
+    else if (!ended && (c === 'Digit2' || c === 'Numpad2')) choose(1)
+    else if (!ended && (c === 'Digit3' || c === 'Numpad3')) choose(2)
+    else return
+    e.preventDefault()
+  })
+
+  // ---- 배경 (원본 OnPaint: 그라데이션, 빛무리 두 개, 먼지 72개) ----
+  const canvas = $('c'), ctx = canvas.getContext('2d'), ui = $('ui')
+  const TAU = Math.PI * 2
+  let W = 1, H = 1, dpr = 1, ox = 0, oy = 0, sw = 920, sh = 660
+  const rgba = (a, r, g, b) => `rgba(${r},${g},${b},${+(a / 255).toFixed(4)})`
+  const dustTint = []
+  function circle(g, x, y, r) { g.beginPath(); g.arc(x, y, r > 0 ? r : 0, 0, TAU) }
+  function drawGlow(g, x, y, radius, A, r, gg, b) {
+    for (let ring = 7; ring >= 1; ring--) {
+      circle(g, x, y, radius * ring / 7); g.fillStyle = rgba(Math.max(1, Math.floor(A / (10 - ring))), r, gg, b); g.fill()
+    }
+  }
+  function render() {
+    const g = ctx
+    g.setTransform(dpr, 0, 0, dpr, 0, 0)
+    const a = 142 * Math.PI / 180, dx = Math.cos(a), dy = Math.sin(a), half = (Math.abs(W * dx) + Math.abs(H * dy)) / 2
+    const lg = g.createLinearGradient(W / 2 - dx * half, H / 2 - dy * half, W / 2 + dx * half, H / 2 + dy * half)
+    lg.addColorStop(0, 'rgb(15,10,34)'); lg.addColorStop(1, 'rgb(5,6,17)')
+    g.fillStyle = lg; g.fillRect(0, 0, W, H)
+    drawGlow(g, ox + sw * 0.1, oy + sh * 0.82, 280, 28, 87, 225, 184)
+    drawGlow(g, ox + sw * 0.9, oy + sh * 0.12, 240, 24, 151, 107, 255)
+    const animationTime = clock()
+    for (const mote of dust) {
+      const pulse = 0.45 + Math.sin(animationTime * 0.45 + mote.Phase) * 0.35
+      const alpha = 30 + Math.trunc(Math.max(0, pulse) * 125)
+      circle(g, mote.X * W + mote.Size / 2, mote.Y * H + mote.Size / 2, mote.Size / 2)
+      g.fillStyle = dustTint[alpha] || (dustTint[alpha] = rgba(alpha, 231, 225, 255)); g.fill()
+    }
+  }
+
+  function layout() {
+    // 핀치 확대와 상관없는 레이아웃 뷰포트 크기
+    W = Math.max(1, document.documentElement.clientWidth); H = Math.max(1, document.documentElement.clientHeight)
+    const land = W > H
+    // 원본 창(920 폭)이 가로로 다 들어가고, 글자·버튼이 있는 y 35~605가 보이면 원본 배치 그대로 씁니다.
+    const windowMode = W >= 920 && H >= 616
+    document.body.className = windowMode ? 'window' : land ? 'flow land' : 'flow'
+    if (windowMode) {
+      ox = Math.round((W - 920) / 2); oy = Math.round((H - 660) / 2); sw = 920; sh = 660
+      ui.style.left = ox + 'px'; ui.style.top = oy + 'px'
+    } else {
+      ox = 0; oy = 0; sw = W; sh = H
+      ui.style.left = ui.style.top = ''
+    }
+    dpr = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr)
+    render()
+  }
+
+  startNewStory()
+  addEventListener('resize', layout)
+  if (window.visualViewport) visualViewport.addEventListener('resize', layout)
+  layout()
+  let lastDraw = -1
+  function frame(ts) {                                  // 원본 타이머 50ms
+    if (lastDraw < 0 || ts - lastDraw >= 48) { lastDraw = ts; render() }
+    requestAnimationFrame(frame)
+  }
+  requestAnimationFrame(frame)
+
+  // 시험용 창구
+  window.__port = {
+    state: () => ({ step, wonder, courage, kindness, ended, color, sound, visitor, keepsake, chapter: chapterLabel.textContent,
+      story: storyLabel.textContent, choices: choiceButtons.map(b => b.hidden ? null : b.textContent), trait: traitLabel.textContent,
+      progress: progressLabel.textContent, mode: document.body.className }),
+    freeze(t) { frozen = t; render() },
+    choose,
+    restart: startNewStory,
+    render
+  }
+})()
+</script>
+</body>
+</html>
