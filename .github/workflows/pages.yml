@@ -5,13 +5,17 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    - cron: '17 * * * *'   # every hour: collect works marked with site.json in other repos (deploy only if something changed)
-                           # and re-check that private tools are still private
+    # three times an hour: collect works marked with site.json in other repos (deploy only if something changed)
+    # and re-check that private tools are still private. GitHub often delays or drops scheduled runs,
+    # so several slots an hour keep new works within about an hour. To publish right away, run this
+    # workflow by hand (Actions → Guard and deploy → Run workflow, or `gh workflow run pages.yml -R aemtti/aemtti.github.io`).
+    - cron: '7,27,47 * * * *'
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write   # only for the keep-alive step below
 
 concurrency:
   group: pages
@@ -23,6 +27,14 @@ jobs:
     outputs:
       changed: ${{ steps.collect.outputs.changed }}
     steps:
+      # GitHub switches off scheduled workflows in public repos after 60 days without commits. Collected works are
+      # never committed, so re-enable this workflow on every run to keep the schedule alive.
+      - name: Keep the schedule alive
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/pages.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
