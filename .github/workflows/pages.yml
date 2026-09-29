@@ -39,6 +39,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # works draw Korean text with system fonts (system-ui, sans-serif, canvas), and the runner has none,
+      # so screenshot thumbnails showed empty boxes instead of letters
+      - name: Korean fonts for thumbnail screenshots
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk fonts-noto-color-emoji
+          fc-cache -f
+          fc-list :lang=ko family | head -3
       - name: Collect works that other repositories mark with site.json
         id: collect
         run: node tools/collect.mjs
