@@ -8,13 +8,18 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const site = JSON.parse(fs.readFileSync(path.join(root, 'works.json'), 'utf8'))
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
-const KIND = { game: '게임', art: '아트', program: '프로그램', sim: '시뮬레이션', toy: '인터랙티브', film: '영상', music: '음악', collection: '모음' }
+const KIND = { game: '게임', art: '아트', program: '프로그램', sim: '시뮬레이션', edu: '교육 & 연구', toy: '인터랙티브', film: '영상', music: '음악', collection: '모음' }
 const BASE = 'https://aemtti.github.io/'
+// a work shows under its main kind and every kind in "also" (a game that is half simulation: kind "game", also ["sim"]);
+// a collection shows under every kind its items have
+const kindsOf = w => w.kind === 'collection'
+  ? [...new Set((w.items || []).filter(i => !i.hidden).flatMap(kindsOf))]
+  : [...new Set([w.kind, ...(Array.isArray(w.also) ? w.also : [])].filter(k => KIND[k] && k !== 'collection'))]
 
 function card(w, rel) {
   const href = w.external ? w.url : rel + w.url
-  const kinds = w.kind === 'collection' ? [...new Set((w.items || []).map(i => i.kind))] : [w.kind]
-  const badges = [`<span class="b k">${esc(KIND[w.kind] || w.kind)}</span>`]
+  const kinds = kindsOf(w)
+  const badges = (w.kind === 'collection' ? ['collection'] : kinds).map(k => `<span class="b k">${esc(KIND[k] || k)}</span>`)
   if (w.kind === 'collection') badges.push(`<span class="b">${(w.items || []).length}개</span>`)
   if (w.orientation === 'landscape') badges.push('<span class="b" title="휴대폰은 가로로">가로 ⟲</span>')
   if (w.needs === 'webgpu') badges.push('<span class="b" title="WebGPU 지원 브라우저 필요 (최신 크롬 등)">WebGPU</span>')
@@ -63,9 +68,9 @@ ${cards.join('\n')}
 
 const works = site.works.filter(w => !w.hidden)
 const counts = {}
-for (const w of works) for (const k of (w.kind === 'collection' ? [...new Set(w.items.map(i => i.kind))] : [w.kind])) counts[k] = (counts[k] || 0) + 1
-const order = ['game', 'art', 'program', 'sim', 'toy', 'film', 'music']
-const chips = `<nav class="chips" aria-label="분류"><button type="button" data-f="all" aria-pressed="true">전체</button>${order.filter(k => counts[k]).map(k => `<button type="button" data-f="${k}" aria-pressed="false">${KIND[k]}</button>`).join('')}</nav>`
+for (const w of works) for (const k of kindsOf(w)) counts[k] = (counts[k] || 0) + 1
+const order = ['game', 'art', 'program', 'sim', 'edu', 'toy', 'film', 'music']
+const chips = `<nav class="chips" aria-label="분류"><button type="button" data-f="all" aria-pressed="true">전체</button>${order.filter(k => counts[k]).map(k => `<button type="button" data-f="${k}" aria-pressed="false">${esc(KIND[k])}</button>`).join('')}</nav>`
 
 fs.writeFileSync(path.join(root, 'index.html'), page({
   title: 'aemtti — 코드로 만든 작품들', desc: site.description, rel: '', heading: 'aemtti',

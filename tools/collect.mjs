@@ -9,7 +9,8 @@
 // { "works": [ {
 //     "slug": "one-more-floor",            // lowercase-kebab, becomes play/<slug>/
 //     "title": "한 층 더", "en": "One More Floor",
-//     "kind": "game",                      // game · art · program · sim · toy · film · music
+//     "kind": "game",                      // game · art · program · sim · edu · toy · film · music
+//     "also": ["sim"],                     // optional: more categories it belongs to (a game that is half simulation)
 //     "orientation": "portrait",           // any · portrait · landscape
 //     "desc": "…", "mobile": "…", "desktop": "…",
 //     "entry": "2026-09-26-one-more-floor", // a folder with index.html, or a single .html file (committed, already built)
@@ -42,12 +43,13 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const OWNER = 'aemtti', SELF = 'aemtti.github.io'
 const TOKEN = process.env.SITE_COLLECT_TOKEN || ''
-const KINDS = new Set(['game', 'art', 'program', 'sim', 'toy', 'film', 'music'])
+const KINDS = new Set(['game', 'art', 'program', 'sim', 'edu', 'toy', 'film', 'music'])
 const MAX_FILE = 45 * 1024 * 1024, MAX_WORK = 150 * 1024 * 1024
 const SKIP_NAME = /^(\.git|node_modules|\.openai|\.env.*|site\.json|CLAUDE\.md|AGENTS\.md|README\.md)$|\.(md|map|pem|key)$/i
 const log = (...a) => console.log('collect:', ...a)
 const safeRel = p => typeof p === 'string' && p && !path.isAbsolute(p) && !p.split(/[\\/]/).includes('..')
 const text = v => (typeof v === 'string' && v.trim() ? v.trim() : '')
+const alsoOf = w => (Array.isArray(w?.also) ? [...new Set(w.also.filter(k => KINDS.has(k) && k !== w.kind))] : [])
 
 // thumb is read from the repository root; a path relative to the entry folder is accepted too
 function thumbCandidates(w) {
@@ -82,6 +84,7 @@ function checkWork(w, dir) {
     if (!thumb) notes.push(`thumb "${w.thumb}" not found (write the path from the repository root) — a screenshot is used instead`)
     else if (thumb !== w.thumb) notes.push(`thumb found at "${thumb}" — write that path from the repository root`)
   }
+  if (w?.also !== undefined && (!Array.isArray(w.also) || w.also.some(k => !KINDS.has(k)))) notes.push('also should be a list of categories (' + [...KINDS].join('/') + ') — unknown ones are ignored')
   for (const k of ['mobile', 'desktop']) if (w?.[k] !== undefined && !text(w[k])) notes.push(`${k} should be a short how-to-play text — ignored`)
   if (w?.orientation !== undefined && !['any', 'portrait', 'landscape'].includes(w.orientation)) notes.push('orientation should be any/portrait/landscape — using any')
   return { slug, problems, notes, src, isFile, thumb }
@@ -211,7 +214,7 @@ for (const repo of repos) {
     }
     taken.add(slug); slugs.push(slug)
     found.push({ date, entry: {
-      slug, title: text(w.title), ...(text(w.en) ? { en: text(w.en) } : {}), kind: w.kind,
+      slug, title: text(w.title), ...(text(w.en) ? { en: text(w.en) } : {}), kind: w.kind, ...(alsoOf(w).length ? { also: alsoOf(w) } : {}),
       orientation: ['any', 'portrait', 'landscape'].includes(w.orientation) ? w.orientation : 'any',
       desc: text(w.desc), ...(text(w.mobile) ? { mobile: text(w.mobile) } : {}), ...(text(w.desktop) ? { desktop: text(w.desktop) } : {}),
       url: `play/${slug}/`, thumb, ...(w.needs === 'webgpu' ? { needs: 'webgpu' } : {}), auto: name,
