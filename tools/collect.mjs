@@ -9,7 +9,7 @@
 // { "works": [ {
 //     "slug": "one-more-floor",            // lowercase-kebab, becomes play/<slug>/
 //     "title": "한 층 더", "en": "One More Floor",
-//     "kind": "game",                      // game · toy · art · film · music
+//     "kind": "game",                      // game · art · program · sim · toy · film · music
 //     "orientation": "portrait",           // any · portrait · landscape
 //     "desc": "…", "mobile": "…", "desktop": "…",
 //     "entry": "2026-09-26-one-more-floor", // a folder with index.html, or a single .html file (committed, already built)
@@ -42,7 +42,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const OWNER = 'aemtti', SELF = 'aemtti.github.io'
 const TOKEN = process.env.SITE_COLLECT_TOKEN || ''
-const KINDS = new Set(['game', 'toy', 'art', 'film', 'music'])
+const KINDS = new Set(['game', 'art', 'program', 'sim', 'toy', 'film', 'music'])
 const MAX_FILE = 45 * 1024 * 1024, MAX_WORK = 150 * 1024 * 1024
 const SKIP_NAME = /^(\.git|node_modules|\.openai|\.env.*|site\.json|CLAUDE\.md|AGENTS\.md|README\.md)$|\.(md|map|pem|key)$/i
 const log = (...a) => console.log('collect:', ...a)

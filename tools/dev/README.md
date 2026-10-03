@@ -13,7 +13,7 @@
 1. 소스는 각 작품의 (비공개) 저장소에서 고친다. 모바일 기준은 아래.
 2. 빌드한 실행 파일만 `play/<slug>/`에 넣는다(시작 파일 `index.html`, 상대 경로). 문서·테스트·원본 자료·개인 정보·45MB 넘는 파일은 넣지 않는다.
 3. 썸네일 `thumbs/<slug>.jpg` (1280×720, 실제 플레이 화면, 조작부 없이).
-4. `works.json`에 항목을 추가/수정한다. 필드: `slug`, `title`(한국어), `en`, `kind`(game·toy·art·film·music·collection), `orientation`(any·landscape·portrait), `desc`, `mobile`, `desktop`, `url`(`play/<slug>/`), `thumb`, 선택 `needs`("webgpu"). 모음은 `kind: "collection"` + `items`(슬러그 `모음/항목`, 폴더 `play/모음/항목/`).
+4. `works.json`에 항목을 추가/수정한다. 필드: `slug`, `title`(한국어), `en`, `kind`(game 게임·art 아트·program 프로그램·sim 시뮬레이션·toy 인터랙티브·film 영상·music 음악·collection 모음), `orientation`(any·landscape·portrait), `desc`, `mobile`, `desktop`, `url`(`play/<slug>/`), `thumb`, 선택 `needs`("webgpu"). 모음은 `kind: "collection"` + `items`(슬러그 `모음/항목`, 폴더 `play/모음/항목/`).
 5. `node tools/build-site.mjs` → `node tools/guard.mjs` (로컬 금지 규칙 파일 `tools/.guard.local.json`이 있으면 전체 검사).
 6. `cdp.mjs`로 폰 세로·가로·PC에서 시작→조작→일시정지까지 확인하고 오류 0을 본다.
 7. 커밋·푸시하면 GitHub Actions가 검사(guard)를 먼저 하고, 통과해야만 배포한다. 목록(works.json)에 없는 폴더가 `play/`에 있으면 배포되지 않는다.
