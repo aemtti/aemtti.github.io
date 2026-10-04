@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const site = JSON.parse(fs.readFileSync(path.join(root, 'works.json'), 'utf8'))
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
-const KIND = { game: '게임', art: '아트', program: '프로그램', sim: '시뮬레이션', edu: '교육 & 연구', toy: '인터랙티브', film: '영상', music: '음악', collection: '모음' }
+const KIND = { game: '게임', art: '아트', book: '소설', program: '프로그램', sim: '시뮬레이션', edu: '교육 & 연구', toy: '인터랙티브', film: '영상', music: '음악', collection: '모음' }
 const BASE = 'https://aemtti.github.io/'
 // a work shows under its main kind and every kind in "also" (a game that is half simulation: kind "game", also ["sim"]);
 // a collection shows under every kind its items have
@@ -69,7 +69,7 @@ ${cards.join('\n')}
 const works = site.works.filter(w => !w.hidden)
 const counts = {}
 for (const w of works) for (const k of kindsOf(w)) counts[k] = (counts[k] || 0) + 1
-const order = ['game', 'art', 'program', 'sim', 'edu', 'toy', 'film', 'music']
+const order = ['game', 'art', 'book', 'program', 'sim', 'edu', 'toy', 'film', 'music']
 const chips = `<nav class="chips" aria-label="분류"><button type="button" data-f="all" aria-pressed="true">전체</button>${order.filter(k => counts[k]).map(k => `<button type="button" data-f="${k}" aria-pressed="false">${esc(KIND[k])}</button>`).join('')}</nav>`
 
 fs.writeFileSync(path.join(root, 'index.html'), page({

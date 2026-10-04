@@ -9,7 +9,7 @@
 // { "works": [ {
 //     "slug": "one-more-floor",            // lowercase-kebab, becomes play/<slug>/
 //     "title": "한 층 더", "en": "One More Floor",
-//     "kind": "game",                      // game · art · program · sim · edu · toy · film · music
+//     "kind": "game",                      // game · art · book (소설) · program · sim · edu · toy · film · music
 //     "also": ["sim"],                     // optional: more categories it belongs to (a game that is half simulation)
 //     "orientation": "portrait",           // any · portrait · landscape
 //     "desc": "…", "mobile": "…", "desktop": "…",
@@ -43,7 +43,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const OWNER = 'aemtti', SELF = 'aemtti.github.io'
 const TOKEN = process.env.SITE_COLLECT_TOKEN || ''
-const KINDS = new Set(['game', 'art', 'program', 'sim', 'edu', 'toy', 'film', 'music'])
+const KINDS = new Set(['game', 'art', 'book', 'program', 'sim', 'edu', 'toy', 'film', 'music'])
 const MAX_FILE = 45 * 1024 * 1024, MAX_WORK = 150 * 1024 * 1024
 const SKIP_NAME = /^(\.git|node_modules|\.openai|\.env.*|site\.json|CLAUDE\.md|AGENTS\.md|README\.md)$|\.(md|map|pem|key)$/i
 const log = (...a) => console.log('collect:', ...a)

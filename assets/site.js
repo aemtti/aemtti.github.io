@@ -8,5 +8,7 @@
   }
   chips.forEach(b => b.addEventListener('click', () => apply(b.dataset.f)))
   let saved = 'all'; try { saved = sessionStorage.getItem('aemtti-filter') || 'all' } catch (e) {}
+  // a link like https://aemtti.github.io/#book opens the gallery on that category (the book reader's shelf uses it)
+  const fromHash = location.hash.slice(1); if (fromHash && [...chips].some(b => b.dataset.f === fromHash)) saved = fromHash
   if (chips.length && [...chips].some(b => b.dataset.f === saved)) apply(saved)
 })()
