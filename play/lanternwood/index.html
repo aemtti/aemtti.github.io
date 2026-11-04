@@ -6,7 +6,7 @@
 <title>등불숲 이야기</title>
 <link rel="icon" href="data:,">
 <style>
-html,body{margin:0;height:100%;background:#070a14;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#070a14;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 body{display:flex;align-items:center;justify-content:center;font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#f3ead7}
 #wrap{position:relative;overflow:hidden}
 canvas{display:block}
@@ -395,9 +395,9 @@ const SK={A:{n:'회오리 베기',lv:2,mp:8,cd:.75},S:{n:'별빛 연투',lv:4,mp
 // ===== maps =====
 function mkSurf(m){m.surf=[{x:-50,w:m.w+100,y:m.ground,solid:1},...m.plats];return m}
 const MAPS={
-  town:()=>mkSurf({id:'town',name:'등불마을',w:2000,h:720,ground:620,plats:[{x:760,y:500,w:200}],ropes:[],
+  town:()=>mkSurf({id:'town',name:'등불마을',w:2200,h:720,ground:620,plats:[{x:760,y:500,w:200}],ropes:[],
     portals:[{x:1900,to:'hunt',tx:150,label:'이끼등불 숲'}],npcs:[{id:'smith',x:500,n:'대장장이 두리'},{id:'shop',x:1180,n:'잡화상 포포'}],spawns:[]}),
-  hunt:()=>mkSurf({id:'hunt',name:'이끼등불 숲',w:4400,h:1100,ground:1000,
+  hunt:()=>mkSurf({id:'hunt',name:'이끼등불 숲',w:4600,h:1100,ground:1000,
     plats:[{x:360,y:880,w:420},{x:860,y:750,w:460},{x:1560,y:880,w:480},{x:2160,y:870,w:560},{x:1820,y:720,w:520},{x:2980,y:870,w:520},{x:3420,y:730,w:560},{x:3000,y:590,w:380}],
     ropes:[{x:1290,top:750,bot:1000},{x:2300,top:720,bot:870},{x:3950,top:730,bot:1000},{x:3050,top:590,bot:870}],
     portals:[{x:90,to:'town',tx:1800,label:'등불마을'},{x:2930,to:'town',tx:1800,label:'등불마을'},{x:4300,to:'boss',tx:120,label:'고목의 심장부',boss:true}],npcs:[],
@@ -427,7 +427,7 @@ function mkMon(t,g){const T=MON[t];const m={t,T,g,x:rnd(g.x1,g.x2),y:g.y,vx:0,vy
 
 function enterMap(id,tx){map=MAPS[id]();mons=[];drops=[];projs=[];hz=[];parts=[];nums=[];boss=null;
   for(const g of map.spawns){g.timer=0;for(let i=0;i<g.n;i++){const m=mkMon(g.t,g);m.born=1;mons.push(m)}}
-  P.x=tx!=null?tx:150;P.y=map.ground;P.vx=0;P.vy=0;P.rope=null;P.onG=true;P.slam=0;P.spin=0;
+  P.x=tx!=null?tx:150;P.y=map.ground;P.vx=0;P.vy=0;P.rope=null;P.onG=true;P.slam=0;P.spin=0;P.atkT=0;P.inv=Math.max(P.inv,.9);P.hurtT=0;
   if(id==='boss'){startBoss();P.backX=4180}
   cam.x=clamp(P.x-W/2,0,map.w-W);cam.y=clamp(P.y-H*.62,0,map.h-H);
   bgSeed=[];let s=id.length*977;const rr=()=>{s=(s*16807)%2147483647;return s/2147483647};
@@ -485,8 +485,8 @@ function updPlayer(dt){const p=P,st=stats();p.time+=dt;p.anim+=dt;
   const L=held('ArrowLeft'),Rt=held('ArrowRight'),U=held('ArrowUp'),D=held('ArrowDown');
   const ctl=p.hurtT<=0;
   // potions
-  if(take('Digit1')){if(p.hpPot>0&&p.hp<st.mhp&&p.potCd<=0){p.hpPot--;p.potCd=.25;const h=Math.min(80,st.mhp-p.hp);p.hp+=h;num(p.x,p.y-p.h-14,Math.round(h),'heal');SFX.pot();burst(p.x,p.y-30,10,'#ff7a8a',140,4,-200)}else if(p.hpPot<=0){log('빨간 물약이 없습니다','#ff9a8a');SFX.denied()}}
-  if(take('Digit2')){if(p.mpPot>0&&p.mp<st.mmp&&p.potCd<=0){p.mpPot--;p.potCd=.25;const h=Math.min(50,st.mmp-p.mp);p.mp+=h;num(p.x,p.y-p.h-14,Math.round(h),'mana');SFX.pot();burst(p.x,p.y-30,10,'#7ab0ff',140,4,-200)}else if(p.mpPot<=0){log('파란 물약이 없습니다','#ff9a8a');SFX.denied()}}
+  if(take('Digit1')){if(p.hpPot>0&&p.hp<st.mhp&&p.potCd<=0){p.hpPot--;p.potCd=.25;const h=Math.min(80,st.mhp-p.hp);p.hp+=h;num(p.x,p.y-p.h-14,Math.round(h),'heal');SFX.pot();burst(p.x,p.y-30,10,'#ff7a8a',140,4,-200)}else if(p.hpPot<=0){log('빨간 물약이 없습니다','#ff9a8a');SFX.denied()}else if(p.hp>=st.mhp)log('체력이 가득합니다','#ddd')}
+  if(take('Digit2')){if(p.mpPot>0&&p.mp<st.mmp&&p.potCd<=0){p.mpPot--;p.potCd=.25;const h=Math.min(50,st.mmp-p.mp);p.mp+=h;num(p.x,p.y-p.h-14,Math.round(h),'mana');SFX.pot();burst(p.x,p.y-30,10,'#7ab0ff',140,4,-200)}else if(p.mpPot<=0){log('파란 물약이 없습니다','#ff9a8a');SFX.denied()}else if(p.mp>=st.mmp)log('마나가 가득합니다','#ddd')}
   // rope
   if(p.rope){const r=p.rope;p.x=r.x;p.vx=0;p.vy=0;p.dj=false;p.fj=false;
     if(ctl){if(U)p.y-=210*dt;if(D)p.y+=230*dt;if(U||D)p.anim+=dt}
@@ -522,7 +522,7 @@ function updPlayer(dt){const p=P,st=stats();p.time+=dt;p.anim+=dt;
   }
   if(!p.onG&&p.vy<-200&&!held('Space','KeyC')&&!p.dj)p.vy+=2600*dt;
   // rope grab
-  if(ctl&&(U||(D&&p.onG))&&!busy&&p.atkT<=0){const r=ropeNear();if(r&&!(U&&p.onG&&Math.abs(p.y-r.top)<3)&&!(D&&Math.abs(p.y-r.bot)<3)){p.rope=r;p.x=r.x;p.vx=0;p.vy=0;p.onG=false;if(D&&p.y<=r.top+2)p.y=r.top+6;return}}
+  if(ctl&&(U||(D&&p.onG))&&!busy&&p.atkT<=0&&p.spin<=0){const r=ropeNear();if(r&&!(U&&p.onG&&Math.abs(p.y-r.top)<3)&&!(D&&Math.abs(p.y-r.bot)<3)){p.rope=r;p.x=r.x;p.vx=0;p.vy=0;p.onG=false;if(D&&p.y<=r.top+2)p.y=r.top+6;return}}
   // gravity / move
   p.vy=Math.min(1150,p.vy+2200*dt*(p.slam>0&&p.slamUp<=0?2.2:1));
   const py=p.y;p.x+=p.vx*dt;p.y+=p.vy*dt;p.x=clamp(p.x,20,map.w-20);
@@ -636,7 +636,7 @@ function updBoss(dt){const b=boss,p=P;b.t+=dt;b.flash-=dt;b.nT-=dt;b.sway+=dt;
   if(b.st==='idle'&&b.x-p.x>300)b.x=Math.max(820,b.x-50*dt);
   if(b.st==='idle'){b.cd-=dt;b.arm=approach(b.arm,0,3*dt);if(b.cd<=0){const opts=b.ph===2?['spikes','slam','seeds','spikes','slam']:['spikes','slam','spikes','seeds'];
       b.st=opts[b.next++%opts.length];b.t=0;b.fired=0}}
-  else if(b.st==='spikes'){if(b.t<.05&&!b.fired){b.fired=1;const n=b.ph===2?5:3;const xs=[p.x];for(let i=1;i<n;i++)xs.push(clamp(p.x+(i%2?1:-1)*Math.ceil(i/2)*rnd(150,210),60,b.x-120));
+  else if(b.st==='spikes'){if(b.t<.05&&!b.fired){b.fired=1;const n=b.ph===2?5:3;const xs=[p.x];for(let i=1;i<n;i++)xs.push(clamp(p.x+(i%2?1:-1)*Math.ceil(i/2)*rnd(150,210),60,map.w-60));
       for(const x of xs)hz.push({k:'spike',x,y:map.ground,t:0,warn:(b.ph===2?.75:.95),dur:.45,hit:false})}
     b.arm=Math.min(1,b.t*2);if(b.t>1.4*fast+.3){b.st='idle';b.cd=1.3*fast}}
   else if(b.st==='slam'){b.arm=b.t<.8*fast?-b.t/(.8*fast):1;if(b.t>=.8*fast&&!b.fired){b.fired=1;SFX.boom();shake=Math.max(shake,14);
@@ -676,6 +676,7 @@ const talkEl=$('talk');
 function nearNpc(){if(!map.npcs)return null;for(const n of map.npcs)if(Math.abs(P.x-n.x)<80)return n;return null}
 function nearPortal(){for(const pt of map.portals)if(Math.abs(P.x-pt.x)<64&&P.onG&&P.y>=map.ground-2)return pt;return null}
 function onKey(c){
+  if(c==='Enter'){if($('confirm').classList.contains('on')){show('confirm',false);SFX.portal();fadeTo={to:'boss',tx:120};return}if($('dead').classList.contains('on')){revive();return}if($('end').classList.contains('on')){show('end',false);state='play';fadeTo={to:'town',tx:1300};return}if(paused){paused=false;show('pause',false);return}}
   if(c==='Escape'){if(panel){closePanel();return}if(state==='play'&&!$('confirm').classList.contains('on')){paused=!paused;show('pause',paused);return}if($('confirm').classList.contains('on')){show('confirm',false);return}}
   if(state==='title'&&(c==='Enter'||c==='Space')&&$('title').classList.contains('on')){startGame(!!loadSave()&&$('contBtn').style.display!=='none');return}
   if(state!=='play'||panel||paused)return;
@@ -718,13 +719,13 @@ function renderSmith(){const p=P;let h=`<div class="tabs"><button class="tab ${s
 function doEnh(slot){if(busyEnh)return;const it=P[slot],G=GEAR[it.id];if(it.e>=MAXE)return;const c=enhCost(it);if(P.gold<c.g||P.mats[c.m]<c.mn){SFX.denied();return}
   P.gold-=c.g;P.mats[c.m]-=c.mn;busyEnh=true;renderSmith();$('psay').textContent='"후우... 간다!"';
   const res=$('res');res.style.opacity=0;let k=0;const pnl=$('panel');
-  const clank=()=>{SFX.clank();pnl.classList.remove('shk');void pnl.offsetWidth;pnl.classList.add('shk');res.textContent='쾅!'.repeat(1);res.style.color='#fff';res.style.opacity=.55};
+  const clank=()=>{SFX.clank();if(panel!=='smith')return;pnl.classList.remove('shk');void pnl.offsetWidth;pnl.classList.add('shk');res.textContent='쾅!'.repeat(1);res.style.color='#fff';res.style.opacity=.55};
   clank();setTimeout(clank,330);setTimeout(clank,660);
   setTimeout(()=>{busyEnh=false;const roll=R()*100;let msg,col;
-    if(roll<RATE[it.e]){const great=it.e<5&&R()<.1;it.e=Math.min(MAXE,it.e+(great?2:1));msg=great?'대성공! +'+it.e:'강화 성공! +'+it.e;col=great?'#ffd45a':'#9fe9ff';SFX.ok();$('psay').textContent=great?'"이, 이건...! 내 평생 최고의 망치질이야!"':'"좋아, 잘 붙었어."'}
-    else{msg='강화 실패...';col='#ff8a7a';SFX.fail();$('psay').textContent='"쳇, 쇠가 말을 안 듣네. 재료는 날아갔지만 장비는 멀쩡해."'}
-    res.textContent=msg;res.style.color=col;res.style.opacity=1;setTimeout(()=>{res.style.opacity=0},1100);
-    P.hp=Math.min(P.hp,stats().mhp);renderSmith()},1000)}
+    if(roll<RATE[it.e]){const great=it.e<5&&R()<.1;it.e=Math.min(MAXE,it.e+(great?2:1));msg=great?'대성공! +'+it.e:'강화 성공! +'+it.e;col=great?'#ffd45a':'#9fe9ff';SFX.ok();if(panel==='smith')$('psay').textContent=great?'"이, 이건...! 내 평생 최고의 망치질이야!"':'"좋아, 잘 붙었어."'}
+    else{msg='강화 실패...';col='#ff8a7a';SFX.fail();if(panel==='smith')$('psay').textContent='"쳇, 쇠가 말을 안 듣네. 재료는 날아갔지만 장비는 멀쩡해."'}
+    if(panel==='smith'){res.textContent=msg;res.style.color=col;res.style.opacity=1}else log(GEAR[it.id].n+' '+msg,col);setTimeout(()=>{res.style.opacity=0},1100);
+    P.hp=Math.min(P.hp,stats().mhp);if(panel==='smith')renderSmith();else res.style.opacity=0},1000)}
 function doCraft(id){const r=RECIPES.find(x=>x.id===id),G=GEAR[id];if(P.gold<r.g||!Object.entries(r.need).every(([k,v])=>P.mats[k]>=v)){SFX.denied();return}
   P.gold-=r.g;for(const[k,v]of Object.entries(r.need))P.mats[k]-=v;P[G.slot]={id,e:0};SFX.clank();setTimeout(SFX.ok,200);
   const res=$('res');res.textContent=G.n+' 완성!';res.style.color='#ffd45a';res.style.opacity=1;setTimeout(()=>{res.style.opacity=0},1300);
@@ -755,7 +756,7 @@ else{P=newPlayer();map=MAPS.hunt();cam.x=600;cam.y=380;for(let i=0;i<60;i++)bgSe
 
 // ===== main loop =====
 let last=performance.now();
-function frame(t){let dt=Math.min(.033,(t-last)/1000);last=t;
+function frame(t){let dt=Math.min(.033,(t-last)/1000);last=t;FDT=dt;
   for(const k in buf)buf[k]-=dt;
   if(state==='play'&&!panel&&!paused&&!$('confirm').classList.contains('on')){
     if(slowT>0){slowT-=dt;if(slowT<=0)slow=1}
@@ -923,9 +924,9 @@ function drawMon(m,t){const T=m.T;let a=1,sc=m.born<1?m.born:1;if(m.dead){a=1-m.
   cx.restore();
   if((m.showHp>0)&&!m.dead){const w=50,y=m.y-(T.fly?m.h/2+18:m.h+16);cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(m.x-w/2-2,y-2,w+4,9);cx.fillStyle='#ff4a4a';cx.fillRect(m.x-w/2,y,w*Math.max(0,m.hp/m.mhp),5);
     cx.font='bold 15px '+F;cx.textAlign='center';cx.lineWidth=3;cx.strokeStyle='#000';const lb='Lv.'+T.lv+' '+T.n;cx.strokeText(lb,m.x,y-6);cx.fillStyle='#fff';cx.fillText(lb,m.x,y-6)}}
-let ghosts=[];
+let ghosts=[],FDT=1/60;
 function drawPlayer(t){const p=P;if(p.fj&&!p.onG&&!p.rope&&state==='play')ghosts.push({x:p.x,y:p.y,f:p.face,l:.22});
-  for(const g of ghosts){g.l-=1/60;if(g.l<=0)continue;const a=g.l/.22*.35;cx.fillStyle=`rgba(170,220,255,${a})`;cx.beginPath();cx.arc(g.x+2*g.f,g.y-64,18,0,7);cx.fill();rr(g.x-13,g.y-46,26,40,8);cx.fill()}ghosts=ghosts.filter(g=>g.l>0);if(p.inv>0&&p.hurtT<=0&&Math.floor(p.inv*16)%2&&!won)return;
+  for(const g of ghosts){g.l-=FDT;if(g.l<=0)continue;const a=g.l/.22*.35;cx.fillStyle=`rgba(170,220,255,${a})`;cx.beginPath();cx.arc(g.x+2*g.f,g.y-64,18,0,7);cx.fill();rr(g.x-13,g.y-46,26,40,8);cx.fill()}ghosts=ghosts.filter(g=>g.l>0);if(p.inv>0&&p.hurtT<=0&&Math.floor(p.inv*16)%2&&!won)return;
   cx.save();cx.translate(p.x,p.y);
   if(!p.rope){cx.fillStyle='rgba(0,0,0,.25)';cx.beginPath();cx.ellipse(0,0,18,5,0,0,7);cx.fill()}
   cx.scale(p.face,1);
@@ -1010,7 +1011,7 @@ function drawHud(){const p=P,st=stats();
   if(boss&&!boss.dead){cx.fillStyle='#ff3a2a';cx.fillRect(mx+boss.x*kx-4,my+boss.y*ky-8,8,8)}
   cx.fillStyle='#ffe95a';cx.fillRect(mx+p.x*kx-2.5,my+p.y*ky-5,5,5);
   // goal
-  const gt=goal();if(gt!==lastGoal){if(lastGoal){goalFlash=2.2;tone(880,.12,'triangle',.08);tone(1320,.18,'triangle',.08,null,.08)}lastGoal=gt}goalFlash=Math.max(0,goalFlash-1/60);
+  const gt=goal();if(gt!==lastGoal){if(lastGoal){goalFlash=2.2;tone(880,.12,'triangle',.08);tone(1320,.18,'triangle',.08,null,.08)}lastGoal=gt}goalFlash=Math.max(0,goalFlash-FDT);
   cx.font='bold 17px '+F;const gw=cx.measureText(gt).width+64,gy0=my+mh+14;cx.fillStyle=goalFlash>0?`rgba(120,90,20,${.6+.3*Math.sin(goalFlash*12)})`:'rgba(10,14,20,.65)';rr(mx-4,gy0,gw,34,8);cx.fill();
   cx.fillStyle='#ffd45a';cx.textAlign='left';cx.fillText('목표',mx+6,gy0+23);cx.fillStyle='#fff';cx.fillText(gt,mx+52,gy0+23);
   // materials (top right)
