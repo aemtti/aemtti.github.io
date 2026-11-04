@@ -22,6 +22,9 @@ canvas{display:block}
 .btn:disabled{filter:grayscale(1) brightness(.7);cursor:default}
 .keys{margin-top:34px;font-size:22px;line-height:1.75;color:#d8cdb4;background:rgba(0,0,0,.35);padding:16px 30px;border-radius:14px}
 .keys b{color:#ffd98a}
+.help{display:grid;grid-template-columns:auto auto;gap:2px 24px;text-align:left;font-size:18px;line-height:1.3;margin:0 0 14px;padding:12px 26px}
+.help b{white-space:nowrap}
+#pause .box{padding:18px 36px;max-width:1060px}#pause .box h2{font-size:32px;margin-bottom:8px}#pause .btn{min-height:60px;padding:10px 40px}
 #panel{position:absolute;left:170px;top:28px;width:940px;height:620px;display:none;pointer-events:auto;background:linear-gradient(#2c2218,#1c150f);border:4px solid #c89a5a;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.6);padding:22px 28px;box-sizing:border-box;flex-direction:column}
 #panel.on{display:flex}
 #panel h2{margin:0 0 6px;font-size:34px;color:#ffd98a}
@@ -61,12 +64,12 @@ canvas{display:block}
     <h1>등불숲 이야기</h1>
     <div class="sub">숲의 등불이 꺼져 간다 — 고목왕을 쓰러뜨리고 빛을 되찾아라</div>
     <div><button class="btn" data-act="start">새로 시작</button><button class="btn gray" data-act="cont" id="contBtn" style="display:none">이어하기</button></div>
-    <div class="keys"><b>← →</b> 이동 &nbsp; <b>Space</b> 점프 (공중에서 한 번 더 = 도약) &nbsp; <b>↑ ↓</b> 줄 타기 · 포탈 · 대화<br><b>Z</b> 공격 (누르고 있으면 연속) &nbsp; <b>X</b> 단검 던지기 &nbsp; <b>A S D</b> 기술 &nbsp; <b>1 2</b> 물약 &nbsp; <b>Esc</b> 일시정지</div>
+    <div class="keys"><b>← →</b> 이동 &nbsp; <b>Space</b> 또는 <b>C</b> 점프 · 공중에서 한 번 더 = 도약(대시) &nbsp; <b>↓ + Space</b> 발판 아래로<br><b>↑ ↓</b> 줄 타기 · 포탈 · 대화 &nbsp; <b>Z</b> 공격 (누르고 있으면 연속) &nbsp; <b>X</b> 단검 던지기 &nbsp; <b>A S D</b> 기술 &nbsp; <b>1 2</b> 물약<br><b>Enter</b> 시작 · 확인 &nbsp; <b>Esc</b> 일시정지 · 창 닫기 &nbsp;— 게임 중 <b>Esc</b>를 누르면 모든 조작법을 볼 수 있어요</div>
   </div>
   <div id="panel"><button class="x" data-act="close">✕</button><h2 id="ptitle"></h2><div class="say" id="psay"></div><div id="pbody"></div><div id="res"></div></div>
   <div id="confirm" class="scr"><div class="box"><h2>고목의 심장부</h2><p id="cmsg"></p><button class="btn" data-act="goboss">들어간다</button><button class="btn gray" data-act="nogo">아직이다</button></div></div>
   <div id="dead" class="scr"><div class="box"><h2>쓰러졌습니다</h2><p>마을의 등불 아래에서 다시 눈을 뜹니다.<br>(현재 경험치의 10%를 잃습니다)</p><button class="btn" data-act="revive">마을에서 일어나기</button></div></div>
-  <div id="pause" class="scr"><div class="box"><h2>일시정지</h2><div class="keys" style="margin:0 0 22px"><b>← →</b> 이동 &nbsp; <b>Space</b> 점프 · 공중 도약 &nbsp; <b>↓+Space</b> 발판 아래로<br><b>↑ ↓</b> 줄 타기 · 포탈 · 대화 &nbsp; <b>Z</b> 공격 &nbsp; <b>X</b> 단검 던지기<br><b>A</b> 회오리 베기(Lv2) &nbsp; <b>S</b> 별빛 연투(Lv4) &nbsp; <b>D</b> 등불 낙하(Lv6)<br><b>1</b> 빨간 물약 &nbsp; <b>2</b> 파란 물약</div><button class="btn" data-act="resume">계속하기</button><button class="btn gray" data-act="mute" id="muteBtn">소리 끄기</button></div></div>
+  <div id="pause" class="scr"><div class="box"><h2>일시정지 · 조작법</h2><div class="keys help" id="help"></div><button class="btn" data-act="resume">계속하기</button><button class="btn gray" data-act="mute" id="muteBtn">소리 끄기</button></div></div>
   <div id="end" class="scr"><div class="box"><h2>등불숲에 빛이 돌아왔다</h2><p>고목왕 오르둔이 쓰러지자, 숲 곳곳의 등불이 하나둘 다시 켜졌습니다.<br><span style="color:#c9b996;font-size:20px">끝까지 함께해 줘서 고마워요.</span></p><div class="stat" id="estat"></div><button class="btn" data-act="totown">마을로 돌아가기</button><button class="btn gray" data-act="restart">처음부터</button></div></div>
 </div>
 </div>
@@ -433,7 +436,7 @@ function enterMap(id,tx){map=MAPS[id]();mons=[];drops=[];projs=[];hz=[];parts=[]
   bgSeed=[];let s=id.length*977;const rr=()=>{s=(s*16807)%2147483647;return s/2147483647};
   for(let i=0;i<60;i++)bgSeed.push({x:rr()*map.w,s:rr(),k:rr(),l:rr()});
   banner(map.name,1.6,'#ffe7a8',40);
-  if(id==='hunt'&&!hints.hunt){hints.hunt=1;setTimeout(()=>banner('Z 공격 · Space 점프 · 공중에서 Space 한 번 더 = 도약',4,'#fff',26),900)}
+  if(id==='hunt'&&!hints.hunt){hints.hunt=1;setTimeout(()=>banner('Z 공격 · Space/C 점프 · 공중에서 한 번 더 = 도약',4,'#fff',26),900);setTimeout(()=>banner('Esc를 누르면 모든 조작법을 볼 수 있어요',3.5,'#ffe7a8',24),5200)}
   save()}
 
 function startBoss(){boss={x:1180,y:map.ground,w:230,h:270,hp:14000,mhp:14000,ph:1,st:'intro',t:0,cd:2.5,flash:0,sway:0,arm:0,eye:0,nStack:0,nT:0,dead:false,deadT:0,summon:[.6,.3],next:0,rage:0};
@@ -451,7 +454,7 @@ function num(x,y,v,kind,stackOn){let oy=0;if(stackOn){if(stackOn.nT>0)stackOn.nS
 function hitMon(m,mult,kb,dir,tag){if(m.dead)return;if(tag!=null){if(m.hitBy===tag)return;m.hitBy=tag}
   const st=stats();let d=st.atk*mult*rnd(.9,1.1);const crit=R()<.12;if(crit)d*=1.6;d=Math.max(1,Math.round(d));
   m.hp-=d;m.flash=.12;m.showHp=3;m.aggro=5;
-  if(!m.T.fly){m.vx=dir*kb;if(kb>200)m.vy=-kb*.5;m.stun=.28}else{m.vx=dir*kb*1.1;m.vy=-60;m.stun=.3;m.st='float'}
+  if(!m.T.fly){m.vx=dir*kb;if(kb>200)m.vy=-kb*.5;m.stun=.28}else{m.vx=dir*kb*1.1;m.vy=-60;m.stun=.3;if(m.st!=='float')m.cd=Math.max(m.cd,1.2);m.st='float'}
   num(m.x,m.y-m.h-12,d,crit?'crit':'dmg',m);parts.push({x:m.x-dir*10,y:m.y-m.h/2,vx:0,vy:0,l:.16,max:.16,c:crit?'#ffd0e8':'#fff',sz:crit?46:32,g:0,type:4,r:R()*3});cam.x+=dir*3;
   for(let i=0;i<6;i++)part(m.x-dir*8,m.y-m.h/2,dir*rnd(100,380),rnd(-260,120),rnd(.15,.32),crit?'#ffb0d0':'#fff6c8',rnd(2,4),0,1);
   hitstop=Math.max(hitstop,crit?.07:.045);shake=Math.max(shake,crit?7:4);SFX.hit(crit);
@@ -641,10 +644,11 @@ function updBoss(dt){const b=boss,p=P;b.t+=dt;b.flash-=dt;b.nT-=dt;b.sway+=dt;
     b.arm=Math.min(1,b.t*2);if(b.t>1.4*fast+.3){b.st='idle';b.cd=1.3*fast}}
   else if(b.st==='slam'){b.arm=b.t<.8*fast?-b.t/(.8*fast):1;if(b.t>=.8*fast&&!b.fired){b.fired=1;SFX.boom();shake=Math.max(shake,14);
       for(const dir of[-1,1])hz.push({k:'wave',x:b.x+dir*100,y:map.ground,vx:dir*620,t:0,dur:3});
-      if(b.ph===2)setTimeout(()=>{if(boss&&!boss.dead){for(const dir of[-1,1])hz.push({k:'wave',x:boss.x+dir*100,y:map.ground,vx:dir*520,t:0,dur:3});SFX.boom()}},550)}
+}
+    if(b.ph===2&&b.fired===1&&b.t>=.8*fast+.55){b.fired=2;for(const dir of[-1,1])hz.push({k:'wave',x:b.x+dir*100,y:map.ground,vx:dir*520,t:0,dur:3});SFX.boom()}
     if(b.t>1.6*fast+.4){b.st='idle';b.cd=1.2*fast}}
   else if(b.st==='seeds'){b.arm=.5;if(b.t>.5&&b.fired<(b.ph===2?7:5)&&b.t>.5+b.fired*.12){const i=b.fired++;const tx=p.x+rnd(-160,160)+(i-2)*30,T=1.05;
-      hz.push({k:'seed',x:b.x-60,y:b.y-200,vx:(tx-(b.x-60))/T,vy:-((map.ground-(b.y-200))/T)-0.5*1100*T,t:0,dur:4});tone(500,.08,'square',.05,300)}
+      hz.push({k:'seed',x:b.x-60,y:b.y-200,vx:(tx-(b.x-60))/T,vy:(map.ground-(b.y-200))/T-0.5*1100*T,t:0,dur:4});tone(500,.08,'square',.05,300)}
     if(b.t>1.8){b.st='idle';b.cd=1.1*fast}}
   // contact
   if(Math.abs(p.x-b.x)<b.w/2-10&&p.y>b.y-b.h+30)hurtP(26,b.x)}
@@ -658,7 +662,7 @@ function updHz(dt){const p=P;for(const h of hz){h.t+=dt;
     if(!h.hit&&Math.hypot(p.x-h.x,p.y-30-h.y)<34){h.hit=true;h.done=1;hurtP(22,h.x);burst(h.x,h.y,10,'#c8ff8a',200,4)}
     if(h.y>=map.ground){h.done=1;burst(h.x,map.ground-4,12,'#c8ff8a',220,4,400);if(Math.abs(p.x-h.x)<55&&p.y>map.ground-60&&!h.hit)hurtP(22,h.x)}}}
   hz=hz.filter(h=>!h.done)}
-function onHeart(){if(won)return;won=true;setTimeout(()=>{state='end';const p=P;const m=Math.floor(p.time/60),s=Math.floor(p.time%60);
+function onHeart(){if(won)return;won=true;setTimeout(()=>{paused=false;show('pause',false);if(panel)closePanel();state='end';const p=P;const m=Math.floor(p.time/60),s=Math.floor(p.time%60);
   $('estat').innerHTML=`<span>걸린 시간</span><span>${m}분 ${s}초</span><span>레벨</span><span>Lv.${p.lv}</span><span>쓰러뜨린 적</span><span>${fmt(p.kills)}마리</span><span>모은 골드</span><span>${fmt(p.earned)} G</span><span>무기</span><span>${GEAR[p.wep.id].n} +${p.wep.e}</span><span>쓰러진 횟수</span><span>${p.deaths}번</span>`;
   show('end',true);SFX.ok()},1800)}
 
@@ -677,7 +681,7 @@ function nearNpc(){if(!map.npcs)return null;for(const n of map.npcs)if(Math.abs(
 function nearPortal(){for(const pt of map.portals)if(Math.abs(P.x-pt.x)<64&&P.onG&&P.y>=map.ground-2)return pt;return null}
 function onKey(c){
   if(c==='Enter'){if($('confirm').classList.contains('on')){show('confirm',false);SFX.portal();fadeTo={to:'boss',tx:120};return}if($('dead').classList.contains('on')){revive();return}if($('end').classList.contains('on')){show('end',false);state='play';fadeTo={to:'town',tx:1300};return}if(paused){paused=false;show('pause',false);return}}
-  if(c==='Escape'){if(panel){closePanel();return}if(state==='play'&&!$('confirm').classList.contains('on')){paused=!paused;show('pause',paused);return}if($('confirm').classList.contains('on')){show('confirm',false);return}}
+  if(c==='Escape'){if(panel){closePanel();return}if(state==='play'&&!$('confirm').classList.contains('on')){paused=!paused;if(paused)fillHelp();show('pause',paused);return}if($('confirm').classList.contains('on')){show('confirm',false);return}}
   if(state==='title'&&(c==='Enter'||c==='Space')&&$('title').classList.contains('on')){startGame(!!loadSave()&&$('contBtn').style.display!=='none');return}
   if(state!=='play'||panel||paused)return;
   if(c==='ArrowUp'){const n=nearNpc();if(n){openNpc(n.id);return}const pt=nearPortal();if(pt)usePortal(pt)}}
@@ -1048,6 +1052,10 @@ function skillIcon(k,x,y,lock){cx.save();cx.translate(x,y);if(k==='A'){cx.stroke
   else if(k==='S'){cx.fillStyle='#d8f0ff';star(-8,4,8,4);star(8,4,8,4);star(0,-8,8,4)}else{cx.fillStyle='#ffd27a';cx.beginPath();cx.moveTo(-6,-16);cx.lineTo(6,-16);cx.lineTo(0,6);cx.fill();cx.strokeStyle='#ffd27a';cx.lineWidth=3;cx.beginPath();cx.ellipse(0,10,16,5,0,0,7);cx.stroke()}cx.restore()}
 
 
+// ===== help table =====
+function fillHelp(){const PC=[['← →','이동'],['Space 또는 C','점프'],['공중에서 Space/C 한 번 더','도약 — 바라보는 쪽으로 빠르게 날아가기(대시)'],['↓ + Space','밟고 있는 발판 아래로 내려가기'],['↑ ↓','줄 타기 (줄 앞에서 ↑, 줄 위 발판에서 ↓)'],['줄에서 Space (+ ← →)','줄에서 뛰어내리기'],['↑','포탈 이동 · 마을 사람과 대화 (말풍선을 클릭해도 돼요)'],['Z','공격 — 누르고 있으면 3단 연속 베기, ← →로 방향 전환'],['X','투척 단검 던지기 (단검 1개 사용)'],['A','회오리 베기 (Lv2 · 마나 8)'],['S','별빛 연투 — 단검 3개 부채꼴 관통 (Lv4 · 마나 12 · 단검 3개)'],['D','등불 낙하 — 뛰어올라 내려찍기 (Lv6 · 마나 20)'],['1 / 2','빨간 물약(체력 80) / 파란 물약(마나 50)'],['Esc','일시정지 · 상점/대장간 창 닫기'],['Enter','시작 · 보스 입장 확인 · 부활 · 계속하기'],['자동','골드와 재료는 가까이 가면 저절로 주워요']];
+  const TOUCH=[['왼쪽 화면 끌기','이동'],['위로 끌기','줄 타기 · 포탈 · 대화 (말풍선을 눌러도 돼요)'],['아래로 끌기','줄 타고 내려가기'],['아래로 끌고 + 점프','발판 아래로 내려가기'],['점프','점프 · 공중에서 한 번 더 = 도약(대시) · 줄에서 뛰어내리기'],['공격','누르고 있으면 3단 연속 베기, 이동 스틱으로 방향 전환'],['던지기','투척 단검 던지기'],['A 회오리 / S 연투 / D 낙하','기술 (Lv2 / Lv4 / Lv6)'],['HP물약 / MP물약','물약 마시기'],['오른쪽 위 Ⅱ','일시정지 · 조작법'],['자동','골드와 재료는 가까이 가면 저절로 주워요']];
+  const el=$('help');if(el)el.innerHTML=(isT?TOUCH:PC).map(([k,v])=>'<b>'+k+'</b><span>'+v+'</span>').join('')}
 // ===== touch controls =====
 let kit=null,isT=false;
 try{if(window.TouchKit){isT=TouchKit.isTouch();kit=TouchKit.create({show:'never',landscape:true,rotateText:'휴대폰을 가로로 돌려 주세요',
@@ -1060,6 +1068,7 @@ try{if(window.TouchKit){isT=TouchKit.isTouch();kit=TouchKit.create({show:'never'
 if(isT){const k=document.querySelector('#title .keys');if(k)k.innerHTML='<b>왼쪽 화면을 끌어</b> 이동 · 위로 끌면 줄 타기·포탈·대화 · 아래로 끌고 점프 = 발판 아래로<br><b>점프</b> 두 번 = 공중 도약 · <b>공격</b> 누르고 있으면 연속 · 기술·물약은 오른쪽 버튼'}
 function syncKit(){if(!kit)return;const want=isT&&state==='play'&&!panel&&!paused&&!$('confirm').classList.contains('on');if(want!==kit.visible)kit.show(want)}
 setInterval(syncKit,150);
+fillHelp();
 requestAnimationFrame(frame);
 })();
 </script>

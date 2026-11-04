@@ -11,7 +11,7 @@
    "orientation": "landscape",
    "desc": "꺼져 가는 등불숲에서 사냥하고, 모은 재료로 단검을 벼리고 강화해 고목왕을 쓰러뜨리는 15분짜리 횡스크롤 액션 RPG",
    "mobile": "왼쪽 화면을 끌어 이동(위로 끌면 줄 타기·포탈·대화) · 공격·점프·던지기·기술·물약 버튼 · 가로 화면",
-   "desktop": "←→ 이동 · Space 점프(공중에서 한 번 더 = 도약) · ↑↓ 줄·포탈·대화 · Z 공격 · X 던지기 · A S D 기술 · 1 2 물약 · Esc 일시정지",
+   "desktop": "←→ 이동 · Space 또는 C 점프(공중에서 한 번 더 = 도약) · ↓+Space 발판 아래로 · ↑↓ 줄·포탈·대화 · Z 공격 · X 던지기 · A S D 기술 · 1 2 물약 · Esc 일시정지·전체 조작법",
    "url": "play/lanternwood/",
    "thumb": "thumbs/lanternwood.jpg"
   },
