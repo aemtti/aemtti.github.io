@@ -4,6 +4,18 @@
  "ogImage": "thumbs/_og.jpg",
  "works": [
   {
+   "slug": "zero-heart",
+   "title": "제로 하트",
+   "en": "Zero Heart",
+   "kind": "game",
+   "orientation": "any",
+   "desc": "♥A는 0점, 퀸은 ♥A를 잡는 두 장 카드 대결. 성격이 다른 봇이나 친구와 서버 없이 브라우저끼리 대전 (Gold는 현금 가치가 없는 놀이용 돈)",
+   "mobile": "아래 버튼으로 체크·삥·콜·하프·다이 · 친구방은 방 만들기 → 초대 링크 보내기",
+   "desktop": "버튼 또는 C 체크·콜 · P 삥 · H 하프 · D 다이 · 결과 창 Enter",
+   "url": "play/zero-heart/",
+   "thumb": "thumbs/zero-heart.jpg"
+  },
+  {
    "slug": "nocturne",
    "title": "녹턴",
    "en": "NOCTURNE",
