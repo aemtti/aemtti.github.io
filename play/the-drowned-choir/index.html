@@ -1,0 +1,3212 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#112724" />
+    <meta
+      name="description"
+      content="바다에 부표를 띄우고 메아리를 따라 가라앉은 마을의 종 여덟 개를 찾는 해도 퍼즐 게임."
+    />
+    <title>물밑의 합창</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --sea: #112724;
+        --deep: #0b1d1b;
+        --cream: #eee6cb;
+        --muted: #adc0ac;
+        --brass: #e3b473;
+        --thin: #3a5045;
+        --mono: "IBM Plex Mono", Consolas, "Courier New", "Malgun Gothic", "Apple SD Gothic Neo", monospace;
+        --serif: "Baskervville", Georgia, "Times New Roman", "Noto Serif KR", "AppleMyungjo", "Batang", serif;
+        --sans: "Instrument Sans", "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background-color: var(--sea);
+        background-image:
+          radial-gradient(ellipse at 22% 18%, #27413955, transparent 65%),
+          repeating-linear-gradient(
+            112deg,
+            #ffffff02 0 1px,
+            transparent 1px 4px
+          );
+        color: var(--cream);
+        font-family: var(--sans);
+        min-height: 100vh;
+        word-break: keep-all;
+        overflow-wrap: break-word;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      canvas:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid #ffd396;
+        outline-offset: 4px;
+      }
+      button:disabled {
+        cursor: default;
+      }
+      button {
+        background: none;
+        border: none;
+      }
+      .wrap {
+        width: min(1540px, 100%);
+        padding: 0 clamp(16px, 3.6vw, 64px) 24px;
+        margin: auto;
+      }
+      .mast {
+        min-height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--thin);
+        gap: 12px;
+      }
+      .office,
+      .caps,
+      .coord,
+      .mode kbd,
+      .folio,
+      .stations button,
+      .tally,
+      .volume,
+      .tiny,
+      .scope-title,
+      .maplegend,
+      .index,
+      .navlink {
+        font-family: var(--mono);
+        font-size: 11px;
+        line-height: 1.4;
+        letter-spacing: 0.1em;
+      }
+      .office,
+      .caps,
+      .tiny,
+      .scope-title,
+      .index,
+      .folio,
+      .maplegend {
+        text-transform: uppercase;
+      }
+      .office {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        color: #cbd6c1;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+      }
+      .mast-actions {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+      }
+      .navlink {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        letter-spacing: 0;
+        color: #d1d8c4;
+        padding: 8px 3px;
+      }
+      .navlink:hover {
+        color: var(--brass);
+      }
+      .icon {
+        width: 19px;
+        height: 19px;
+        vertical-align: middle;
+        flex: none;
+      }
+      .office .icon {
+        width: 30px;
+        height: 30px;
+        color: var(--brass);
+      }
+      .titlebar {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 20px;
+        padding: clamp(24px, 3.5vh, 44px) 0 clamp(22px, 3vh, 34px);
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: var(--serif);
+        font-weight: 400;
+      }
+      h1 {
+        font-size: clamp(44px, 5.4vw, 90px);
+        line-height: 0.98;
+        letter-spacing: -0.058em;
+      }
+      h1 em {
+        font-weight: 400;
+        color: #e8c18c;
+      }
+      .course {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 4px;
+      }
+      .course > .caps {
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .folio {
+        font-size: 11px;
+        padding: 5px 0;
+        min-width: 23px;
+        text-align: center;
+        color: #92aa99;
+        border-bottom: 1px solid var(--thin);
+      }
+      .folio.current {
+        color: var(--brass);
+        border-bottom: 2px solid var(--brass);
+      }
+      .folio.done {
+        color: #d7dbc0;
+      }
+      .station-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) clamp(260px, 23vw, 345px);
+        gap: clamp(20px, 2.8vw, 45px);
+        align-items: start;
+      }
+      .chart-column {
+        min-width: 0;
+      }
+      .chartcase {
+        padding: 5px;
+        border: 1px solid #83917970;
+        background: #233b32;
+        box-shadow: 0 14px 35px #0003;
+        position: relative;
+      }
+      .paper {
+        background: #e2dfc0;
+        color: #344c43;
+      }
+      .charthead,
+      .chartfoot {
+        font: 10px/1.3 var(--mono);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        background: #e2dfc2;
+      }
+      .charthead {
+        border-bottom: 1px solid #72847780;
+      }
+      .chartfoot {
+        border-top: 1px solid #72847780;
+        min-height: 32px;
+        font-size: 9px;
+        letter-spacing: 0.06em;
+      }
+      .plate {
+        font-weight: bold;
+      }
+      .maplegend {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-size: 9px;
+        letter-spacing: 0.06em;
+      }
+      .maplegend span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .maplegend i {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border: 1.5px solid #255d55;
+        border-radius: 50%;
+        background: #315f51;
+      }
+      .maplegend .ring {
+        width: 10px;
+        height: 10px;
+        background: none;
+        border-style: dashed;
+      }
+      .maplegend .mark {
+        border: 0;
+        border-radius: 0;
+        background: #994b33;
+        width: 6px;
+        height: 6px;
+        transform: rotate(45deg);
+      }
+      #map {
+        display: block;
+        width: 100%;
+        aspect-ratio: 840/535;
+        touch-action: none;
+        cursor: crosshair;
+        outline-offset: -5px;
+      }
+      .coord {
+        white-space: nowrap;
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        font-variant-numeric: tabular-nums;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .mode {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 11px 15px;
+        border: 1px solid #5d7263;
+        background: #20372f;
+        color: #e5e8d3;
+        border-radius: 3px;
+        font-size: 14px;
+        font-weight: 600;
+        transition: background 0.18s;
+      }
+      .mode:hover {
+        background: #2f493d;
+      }
+      .mode.active,
+      .primary {
+        background: #e6bc82;
+        color: #203027;
+        border-color: #e6bc82;
+      }
+      .mode.active:hover,
+      .primary:hover {
+        background: #f0cc96;
+      }
+      .mode kbd {
+        font-size: 10px;
+        letter-spacing: 0;
+        border: 1px solid currentColor;
+        border-radius: 2px;
+        opacity: 0.65;
+        min-width: 15px;
+        line-height: 15px;
+      }
+      .mode .icon {
+        width: 17px;
+        height: 17px;
+      }
+      .toolhelp {
+        color: var(--muted);
+        font: italic 14px/1.4 var(--serif);
+        margin-left: auto;
+        text-align: right;
+        max-width: 165px;
+      }
+      .sidebar {
+        min-width: 0;
+      }
+      .index {
+        color: var(--brass);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .index:before {
+        content: "";
+        width: 27px;
+        height: 1px;
+        background: var(--brass);
+      }
+      h2 {
+        font-size: clamp(32px, 2.9vw, 48px);
+        letter-spacing: -0.05em;
+        line-height: 1.08;
+        margin: 10px 0;
+      }
+      .brief {
+        color: #cfdbc8;
+        font-family: var(--serif);
+        font-size: clamp(16px, 1.18vw, 19px);
+        line-height: 1.42;
+      }
+      .section {
+        margin-top: 19px;
+        border-top: 1px solid var(--thin);
+        padding-top: 14px;
+      }
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .caps,
+      .tiny {
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.13em;
+      }
+      .count {
+        font: 11px var(--mono);
+        color: var(--brass);
+      }
+      .register {
+        list-style: none;
+        margin: 7px 0 0;
+        padding: 0;
+      }
+      .register li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 0;
+        color: #dce3cd;
+        font-family: var(--serif);
+        font-size: 17px;
+      }
+      .register .icon {
+        color: var(--brass);
+        width: 18px;
+        height: 18px;
+      }
+      .register .recovered {
+        color: #eac38c;
+      }
+      .register .weak {
+        margin-left: auto;
+        text-transform: uppercase;
+        font: 9px var(--mono);
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .instrument {
+        background: #0a1b19;
+        border: 1px solid #485f4e;
+        border-radius: 3px;
+        box-shadow: inset 0 0 20px #0004;
+        padding: 10px 11px 5px;
+        margin-top: 8px;
+      }
+      .scope-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 5px;
+        color: #a7baa0;
+        font-size: 9px;
+        letter-spacing: 0.1em;
+      }
+      .scope-title b {
+        font-weight: 400;
+        color: #ead29b;
+      }
+      .scope {
+        width: 100%;
+        height: 48px;
+        display: block;
+      }
+      .stations {
+        display: flex;
+        gap: 6px;
+        margin: 8px 0 0;
+      }
+      .stations button {
+        font-size: 10px;
+        letter-spacing: 0.02em;
+        border: 1px solid #506557;
+        border-radius: 2px;
+        padding: 5px 6px;
+        color: #e0e4c9;
+        flex: 1;
+        white-space: nowrap;
+        background: #1b332b;
+      }
+      .stations button:disabled {
+        color: #82988a;
+        border-style: dashed;
+        background: transparent;
+      }
+      .stations button[aria-pressed="true"] {
+        color: var(--brass);
+        border-color: var(--brass);
+      }
+      .stations button:hover:enabled {
+        border-color: #c5d0b6;
+      }
+      .instruction {
+        display: grid;
+        grid-template-columns: 19px 1fr;
+        align-items: start;
+        gap: 9px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #e2e7d2;
+      }
+      .instruction > .icon {
+        color: var(--brass);
+        margin-top: 2px;
+      }
+      .feedback {
+        color: #e9c58e;
+        font: italic 15px/1.45 var(--serif);
+        margin: 8px 0 0;
+      }
+      .feedback:empty {
+        display: none;
+      }
+      .complete-card {
+        border-top: 1px solid #bb955a;
+        margin-top: 16px;
+        padding-top: 13px;
+      }
+      .complete-card h3 {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+      .primary {
+        border: 1px solid #e6bc82;
+        border-radius: 3px;
+        padding: 10px 15px;
+        font-weight: 600;
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+      }
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 24px;
+        border-top: 1px solid var(--thin);
+        padding-top: 13px;
+        color: #a3b5a5;
+        font: 10px/1.4 var(--mono);
+        letter-spacing: 0.06em;
+      }
+      .footnote {
+        font-family: var(--serif);
+        font-size: 13px;
+        font-style: italic;
+        letter-spacing: 0;
+      }
+      .tally {
+        font-size: 10px;
+        letter-spacing: 0.04em;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      dialog {
+        color: var(--cream);
+        background: #18312b;
+        border: 1px solid #81927a;
+        box-shadow: 0 25px 100px #0009;
+        padding: 0;
+        width: min(520px, calc(100% - 28px));
+        max-height: 88dvh;
+        border-radius: 3px;
+      }
+      dialog::backdrop {
+        background: #071714ba;
+        backdrop-filter: blur(3px);
+      }
+      .dialog-body {
+        padding: clamp(22px, 4vw, 38px);
+        position: relative;
+      }
+      .dialog-body h2 {
+        font-size: 40px;
+        margin: 12px 0 18px;
+      }
+      .dialog-body p,
+      .dialog-body li {
+        font-size: 15px;
+        line-height: 1.5;
+        color: #d8e1ce;
+      }
+      .dialog-body ol {
+        padding-left: 21px;
+      }
+      .dialog-body li {
+        margin: 10px 0;
+      }
+      .dialog-body strong {
+        color: #f2d09d;
+      }
+      .close {
+        position: absolute;
+        top: 15px;
+        right: 14px;
+        font-size: 23px;
+        color: var(--muted);
+        width: 32px;
+        height: 32px;
+      }
+      .manual-figure {
+        width: 100%;
+        height: 105px;
+        background: #d4d9b9;
+        border: 1px solid #728774;
+        display: block;
+      }
+      .dialog-body .smallprint {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 15px 0;
+      }
+      .archive-list {
+        list-style: none;
+        padding: 0;
+        margin: 12px 0 18px;
+      }
+      .archive-list li {
+        padding: 6px 0;
+        border-bottom: 1px solid var(--thin);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .archive-list em {
+        color: var(--brass);
+        font-size: 13px;
+      }
+      .final-actions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .linkbutton {
+        text-decoration: underline;
+        text-underline-offset: 4px;
+        color: var(--muted);
+        padding: 7px 0;
+      }
+      .archive-note {
+        font-family: var(--serif);
+        font-style: italic;
+      }
+      .sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      @media (min-width: 1550px) {
+        .section {
+          margin-top: 25px;
+          padding-top: 18px;
+        }
+        .scope {
+          height: 60px;
+        }
+        .wrap {
+          padding-top: 6px;
+        }
+      }
+      @media (max-width: 1000px) {
+        .station-layout {
+          grid-template-columns: minmax(0, 1fr) 242px;
+          gap: 18px;
+        }
+        .wrap {
+          padding-left: 22px;
+          padding-right: 22px;
+        }
+        .toolhelp {
+          display: none;
+        }
+        .section {
+          margin-top: 13px;
+          padding-top: 11px;
+        }
+        .brief {
+          font-size: 16px;
+        }
+        .charthead,
+        .chartfoot {
+          padding: 8px;
+        }
+        .chartfoot {
+          gap: 6px;
+        }
+        .maplegend {
+          gap: 8px;
+        }
+      }
+      @media (max-width: 760px) {
+        .wrap {
+          padding: 0 14px 18px;
+        }
+        .mast {
+          min-height: 52px;
+        }
+        .office {
+          font-size: 9px;
+          letter-spacing: 0.08em;
+          gap: 6px;
+        }
+        .office .icon {
+          width: 25px;
+          height: 25px;
+        }
+        .mast-actions {
+          gap: 8px;
+        }
+        .navlink {
+          font-size: 10px;
+          gap: 4px;
+        }
+        .navlink .icon {
+          width: 15px;
+          height: 15px;
+        }
+        .station-layout {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+        .chart-column,
+        .sidebar {
+          width: 100%;
+        }
+        .titlebar {
+          padding: 22px 0 18px;
+        }
+        .course {
+          gap: 6px;
+        }
+        .course > .caps {
+          display: none;
+        }
+        .folio {
+          min-width: 16px;
+          font-size: 10px;
+        }
+        .chartcase {
+          padding: 3px;
+        }
+        .charthead,
+        .chartfoot {
+          font-size: 8px;
+        }
+        .chartfoot {
+          min-height: 25px;
+        }
+        .coord,
+        .maplegend {
+          font-size: 8px;
+        }
+        .controls {
+          margin-top: 10px;
+          gap: 8px;
+        }
+        .mode {
+          flex: 1;
+          padding: 11px 6px;
+          font-size: 13px;
+        }
+        .mode kbd {
+          display: none;
+        }
+        .toolhelp {
+          display: none;
+        }
+        .sidebar {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          column-gap: 19px;
+        }
+        .sidebar .intro,
+        .sidebar .guidance,
+        .complete-card {
+          grid-column: 1/-1;
+        }
+        .guidance {
+          grid-row: 1;
+          border-top: 0;
+          margin: 0 0 16px;
+          padding: 0 0 14px;
+          border-bottom: 1px solid var(--thin);
+        }
+        .intro h2 {
+          font-size: 31px;
+        }
+        .brief {
+          font-size: 16px;
+        }
+        .scope {
+          height: 38px;
+        }
+        .footer {
+          margin-top: 18px;
+        }
+        .footnote {
+          display: none;
+        }
+        .stations {
+          gap: 3px;
+        }
+        .stations button {
+          font-size: 9px;
+          padding: 5px 2px;
+        }
+        .instruction {
+          font-size: 13px;
+        }
+        .charthead .edition {
+          display: none;
+        }
+        .scope-title {
+          font-size: 8px;
+        }
+        .intro .index {
+          font-size: 9px;
+        }
+        .register li {
+          font-size: 15px;
+        }
+      }
+      @media (max-width: 430px) {
+        h1 {
+          font-size: clamp(35px, 9vw, 42px);
+        }
+        .titlebar {
+          gap: 7px;
+        }
+        .office {
+          max-width: 150px;
+        }
+        .course {
+          gap: 3px;
+        }
+        .folio {
+          min-width: 13px;
+        }
+        .maplegend {
+          gap: 7px;
+        }
+        .mast-actions {
+          gap: 4px;
+        }
+        .sidebar {
+          column-gap: 11px;
+        }
+        .scope-title {
+          letter-spacing: 0;
+        }
+        .register .weak {
+          font-size: 8px;
+        }
+        .register li {
+          gap: 4px;
+        }
+        .footer {
+          font-size: 9px;
+        }
+      }
+      .register .bell-entry {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        text-align: left;
+        padding: 0;
+        font: inherit;
+        color: inherit;
+      }
+      .bell-entry:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .complete-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .complete-card h3 {
+        margin: 0;
+      }
+      @media (max-width: 370px) {
+        .course {
+          display: none;
+        }
+        .titlebar {
+          padding: 17px 0;
+        }
+        .navlink {
+          font-size: 9px;
+          white-space: nowrap;
+        }
+        .office {
+          font-size: 8px;
+          max-width: 108px;
+        }
+        .mast-actions {
+          gap: 7px;
+        }
+        .maplegend {
+          gap: 5px;
+        }
+        .chartfoot {
+          padding: 6px;
+        }
+        .mode {
+          font-size: 12px;
+        }
+        .complete-card h3 {
+          font-size: 20px;
+        }
+        .primary {
+          font-size: 13px;
+        }
+      }
+      @media (min-width: 1001px) and (min-height: 610px) and (max-height: 880px) {
+        .mast {
+          min-height: 49px;
+        }
+        .titlebar {
+          padding: 16px 0 19px;
+        }
+        h1 {
+          font-size: clamp(48px, 4.9vw, 69px);
+        }
+        .wrap {
+          width: min(
+            100%,
+            calc(157svh - 470px + clamp(260px, 23vw, 345px) + 10vw)
+          );
+        }
+        .footer {
+          margin-top: 15px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="mast">
+        <div class="office">
+          <canvas class="icon" data-icon="office" aria-hidden="true"></canvas>
+          해양측량국
+        </div>
+        <div class="mast-actions">
+          <button class="navlink" id="manualBtn">
+            <canvas class="icon" data-icon="book" aria-hidden="true"></canvas
+            >조사 안내서</button
+          ><button class="navlink" id="soundBtn" aria-pressed="true">
+            <canvas
+              class="icon"
+              id="audioIcon"
+              data-icon="sound"
+              aria-hidden="true"
+            ></canvas
+            ><span id="soundLabel">소리 켜짐</span>
+          </button>
+        </div>
+      </header>
+      <div class="titlebar">
+        <h1>물밑의 <em>합창</em></h1>
+        <div class="course" aria-label="조사 진행 상황">
+          <span class="caps">해도 목록</span><span class="folio">I</span
+          ><span class="folio">II</span><span class="folio">III</span
+          ><span class="folio">IV</span>
+        </div>
+      </div>
+      <main class="station-layout">
+        <div class="chart-column">
+          <div class="chartcase">
+            <div class="paper">
+              <div class="charthead">
+                <span id="plate" class="plate"></span
+                ><span class="edition">해군 수로국 측량도 · 1936년</span>
+              </div>
+              <canvas
+                id="map"
+                tabindex="0"
+                role="application"
+                aria-label="조사용 해도. 방향키로 이동하고 Shift를 함께 누르면 크게 이동합니다. 1은 부표 놓기, 2는 종 표시입니다. Enter로 선택한 도구를 사용하세요."
+              ></canvas>
+              <div class="chartfoot">
+                <div class="maplegend">
+                  <span><i></i>부표</span><span><i class="ring"></i>메아리</span
+                  ><span><i class="mark"></i>종</span>
+                </div>
+                <div class="coord" id="coord"></div>
+              </div>
+            </div>
+          </div>
+          <div class="controls" aria-label="해도 도구">
+            <button class="mode active" id="listenBtn" aria-pressed="true">
+              <canvas
+                class="icon"
+                data-icon="listen"
+                aria-hidden="true"
+              ></canvas
+              >부표 놓기 <kbd>1</kbd></button
+            ><button class="mode" id="markBtn" aria-pressed="false">
+              <canvas class="icon" data-icon="mark" aria-hidden="true"></canvas
+              >종 표시 <kbd>2</kbd></button
+            ><span class="toolhelp">해도에서 원하는 지점을 누르세요.</span>
+          </div>
+          <div class="complete-card" id="completeCard" hidden>
+            <h3>이 해역 조사 완료</h3>
+            <button class="primary" id="nextBtn">다음 해도 펼치기 →</button>
+          </div>
+        </div>
+        <aside class="sidebar" aria-label="조사 기록과 계기">
+          <section class="intro">
+            <div class="index" id="sheetIndex"></div>
+            <h2 id="sheetName"></h2>
+            <p class="brief" id="brief"></p>
+          </section>
+          <section class="section">
+            <div class="section-title">
+              <span class="caps">종 기록부</span
+              ><span class="count" id="foundCount"></span>
+            </div>
+            <ul class="register" id="register"></ul>
+          </section>
+          <section class="section">
+            <div class="section-title">
+              <span class="caps">음향 탐지기</span
+              ><span class="count" id="hydroState"></span>
+            </div>
+            <div class="instrument">
+              <div class="scope-title">
+                <span>거리별 반향</span><b id="traceLabel">대기 중</b>
+              </div>
+              <canvas
+                id="scope"
+                class="scope"
+                aria-label="거리에 따른 메아리 파형"
+              ></canvas>
+            </div>
+            <div
+              id="stations"
+              class="stations"
+              aria-label="부표별 메아리 원 보기"
+            ></div>
+          </section>
+          <section class="section guidance">
+            <p class="instruction">
+              <canvas class="icon" data-icon="nib" aria-hidden="true"></canvas
+              ><span id="instruction"></span>
+            </p>
+            <p class="feedback" id="feedback" aria-live="polite"></p>
+          </section>
+        </aside>
+      </main>
+      <footer class="footer">
+        <span id="stats" class="tally"></span
+        ><span class="footnote"
+          >“그곳의 소리를 기억하는 이가 없을 때, 마을은 비로소 사라진다.”</span
+        >
+      </footer>
+    </div>
+    <dialog id="manual">
+      <div class="dialog-body">
+        <button class="close" aria-label="조사 안내서 닫기">×</button>
+        <div class="index">해양측량국</div>
+        <h2>조사 안내서</h2>
+        <canvas
+          id="manualFig"
+          class="manual-figure"
+          aria-label="서로 다른 부표에서 그린 원 세 개가 물밑의 종이 있는 한 점에서 만납니다."
+        ></canvas>
+        <ol>
+          <li>
+            <strong>부표 놓기</strong>를 선택하고 해도에서 바다를 한 번 누르세요. 부표에 종소리가 닿으면 원이 그려집니다. 종은 그 원의 테두리 어딘가에 있어요.
+          </li>
+          <li>
+            첫 부표에서 떨어진 곳에 두 번째 부표를 놓으세요. 두 원이 두 곳에서 만난다면, 부표 세 개가 삼각형을 이루도록 세 번째 부표를 놓으세요.
+          </li>
+          <li>
+            <strong>종 표시</strong>를 선택하고 세 원이 모두 지나는 점을 누르세요. 종이 여러 개면 원도 많아집니다. 서로 다른 부표의 원을 하나씩 골라 겹치는 점을 찾으세요.
+          </li>
+        </ol>
+        <p>
+          해도 한 장에는 부표를 세 개까지 놓을 수 있어요. 네 번째 부표를 놓으면 가장 오래된 부표를 회수합니다. 파형 아래의 A·B·C를 누르면 해당 부표의 원만 보이고, 다시 누르면 모두 보입니다. 소리가 희미한 종은 가까이에 부표를 놓아야 들려요.
+        </p>
+        <p class="smallprint">
+          키보드로도 플레이할 수 있어요. 1은 부표 놓기, 2는 종 표시입니다. 방향키로 지점을 고르고 Enter를 누르세요. Shift와 방향키를 함께 누르면 더 멀리 이동합니다. Esc를 누르면 안내서가 닫힙니다. 브라우저에서 저장을 허용하면 진행 상황이 자동으로 저장돼요.
+        </p>
+        <button class="primary close-manual">해도로 돌아가기</button>
+      </div>
+    </dialog>
+    <dialog id="archive">
+      <div class="dialog-body">
+        <button class="close" aria-label="조사 일지 닫기">×</button>
+        <div class="index">조사 일지 · 1936년</div>
+        <h2>마을에 다시 종이 울린다</h2>
+        <p>
+          네 장의 해도에 담긴 여덟 목소리. 물살이 잠잠해지자 통신사가 모든 채널을 연다. 꼭 일 분 동안, 마을은 예전처럼 시간을 알린다.
+        </p>
+        <ul class="archive-list" id="archiveList"></ul>
+        <p class="archive-note" id="finalStats"></p>
+        <div class="final-actions" style="margin-top: 18px">
+          <button id="choirBtn" class="primary">합창 듣기 ♫</button
+          ><button id="replayBtn" class="linkbutton">새 조사 시작</button>
+        </div>
+      </div>
+    </dialog>
+    <script>
+      "use strict";
+      const W = 840,
+        H = 535,
+        ROMAN = ["I", "II", "III", "IV"],
+        LETTER = ["A", "B", "C"];
+      const $ = (s) => document.querySelector(s);
+      const chart = $("#map"),
+        ctx = chart.getContext("2d"),
+        scope = $("#scope");
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+      const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+      const ink = ["#245d56", "#9a5037", "#45496c"],
+        traceInk = ["#b6d8ab", "#e6ad7c", "#b3b8e2"];
+      const dashes = [[], [8, 4], [2.5, 3.5]];
+      const sheets = [
+        {
+          name: "애도의 만",
+          brief:
+            "나룻배가 끊긴 지 삼십 년. 옛 나루터에서는 아직도 손님을 부르는 종이 울린다.",
+          seed: 301,
+          tag: "서쪽 진입 수로",
+          water: "애도의 만",
+          seaLabel: [440, 118, -0.09],
+          home: [372, 322],
+          islands: [
+            [-52, 20, 235, 146, -0.2],
+            [55, 92, 104, 71, -0.6],
+            [116, 46, 106, 62, 0.3],
+            [217, 100, 35, 16, 0.4],
+            [790, 511, 158, 98, -0.2],
+            [789, 417, 67, 66, -0.6],
+            [715, 444, 58, 30, 0.3],
+            [721, 234, 24, 12, -0.4],
+            [750, 221, 12, 7, -0.3],
+          ],
+          names: [
+            [87, 48, "서쪽 곶"],
+            [775, 489, "그레이윅"],
+          ],
+          villages: [
+            [78, 85],
+            [755, 454],
+          ],
+          beacon: [169, 80],
+          bells: [
+            {
+              name: "나루터 종",
+              place: [511, 247],
+              note: 196,
+              story:
+                "낮게 한 번 울린다. 늦은 손님이 달려올 때면 뱃사공은 세 번을 쳐 주었다.",
+            },
+          ],
+        },
+        {
+          name: "탤로 수로",
+          brief:
+            "학교에서 물길을 건너면 기름 시장이 있었다. 이곳에 부표를 띄우면 두 종이 응답한다.",
+          seed: 612,
+          tag: "탤로강 하구",
+          water: "탤로 수로",
+          seaLabel: [366, 173, -0.13],
+          home: [421, 340],
+          islands: [
+            [-40, 397, 179, 192, -0.23],
+            [43, 495, 211, 72, 0.1],
+            [24, 287, 96, 61, -0.15],
+            [780, 3, 202, 100, -0.22],
+            [673, 42, 64, 43, -0.4],
+            [507, 379, 39, 17, -0.4],
+            [544, 370, 13, 8, 0.2],
+            [190, 69, 24, 11, -0.55],
+          ],
+          names: [
+            [64, 390, "낮은 둑"],
+            [735, 46, "탤로 곶"],
+          ],
+          villages: [
+            [49, 335],
+            [713, 58],
+          ],
+          beacon: [518, 377],
+          bells: [
+            {
+              name: "시장 종",
+              place: [336, 305],
+              note: 246.94,
+              story:
+                "첫 종이 울리면 기름 장이 섰다. 두 번째 종이 울리면 그날의 값이 정해졌다.",
+            },
+            {
+              name: "학교 종",
+              place: [592, 193],
+              note: 293.66,
+              story:
+                "맑고 짧은 울림. 물길 건너에서 놀던 아이들에게도 들리는 소리였다.",
+            },
+          ],
+        },
+        {
+          name: "렌 여울",
+          brief:
+            "금이 간 손종 소리는 렌 모래곶 너머까지 닿지 않는다. 곶 가까운 바다에 부표를 띄워 보자.",
+          seed: 185,
+          tag: "안쪽 여울",
+          water: "렌 여울",
+          seaLabel: [392, 395, -0.09],
+          home: [395, 277],
+          islands: [
+            [8, -48, 173, 178, 0.15],
+            [49, 36, 104, 89, 0.35],
+            [825, 266, 142, 95, -0.31],
+            [715, 302, 112, 29, -0.3],
+            [674, 323, 36, 16, -0.34],
+            [224, 451, 62, 23, 0.1],
+            [189, 459, 22, 9, 0.4],
+            [537, 43, 28, 13, -0.3],
+          ],
+          names: [
+            [76, 59, "북쪽 포구"],
+            [754, 286, "렌 모래곶"],
+          ],
+          villages: [
+            [78, 74],
+            [767, 254],
+          ],
+          beacon: [680, 309],
+          bells: [
+            {
+              name: "예배당 종",
+              place: [301, 201],
+              note: 329.63,
+              story:
+                "소금기에 닳은 청동. 종을 치고도 한참 동안 그 울림이 남는다.",
+            },
+            {
+              name: "렌 손종",
+              place: [589, 343],
+              range: 232,
+              note: 392,
+              story:
+                "주머니에 쏙 들어갈 만큼 작은 종이다. 누군가는 그 작은 종을 울렸다.",
+            },
+          ],
+        },
+        {
+          name: "저녁종 해협",
+          brief:
+            "마지막 세 종은 마을에 저녁을 알렸다. 등불섬 앞바다에 귀를 기울이면 당직종이 희미하게 두 번 울린다.",
+          seed: 909,
+          tag: "바깥 정박지",
+          water: "저녁종 해협",
+          seaLabel: [448, 156, -0.07],
+          home: [481, 349],
+          islands: [
+            [-38, 150, 149, 149, 0.1],
+            [53, 188, 58, 80, -0.3],
+            [15, 69, 77, 82, 0.1],
+            [862, 459, 142, 177, -0.24],
+            [758, 501, 114, 60, -0.1],
+            [628, 81, 60, 24, -0.26],
+            [573, 101, 21, 11, -0.6],
+            [661, 62, 28, 13, -0.4],
+            [251, 400, 28, 15, -0.2],
+          ],
+          names: [
+            [52, 133, "종곶"],
+            [766, 468, "동쪽 둑"],
+            [622, 49, "등불섬"],
+          ],
+          villages: [
+            [63, 176],
+            [768, 447],
+          ],
+          beacon: [625, 83],
+          bells: [
+            {
+              name: "주물 공장의 종",
+              place: [347, 294],
+              note: 220,
+              story:
+                "이 공장에서 종을 부을 때마다 남겨 둔 쇳조각을 모아 만든 종이다.",
+            },
+            {
+              name: "시계탑 종",
+              place: [561, 392],
+              note: 261.63,
+              story:
+                "시계는 여섯 시에 멎었다. 그다음에 무슨 일이 있었는지 종은 기억한다.",
+            },
+            {
+              name: "당직종",
+              doubleStrike: true,
+              place: [556, 184],
+              range: 239,
+              note: 440,
+              story: "두 번 울리면 당직을 교대할 시간이었다. 다음 당직자는 오지 않았다.",
+            },
+          ],
+        },
+      ];
+      function randomFrom(seed) {
+        let t = seed >>> 0;
+        return () => {
+          t += 0x6d2b79f5;
+          let v = Math.imul(t ^ (t >>> 15), 1 | t);
+          v ^= v + Math.imul(v ^ (v >>> 7), 61 | v);
+          return ((v ^ (v >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      function noiseHash(x, y, s) {
+        let n =
+          (Math.imul(x, 374761393) +
+            Math.imul(y, 668265263) +
+            Math.imul(s, 1274126177)) |
+          0;
+        n = Math.imul(n ^ (n >>> 13), 1274126177);
+        return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+      }
+      function noise(x, y, s) {
+        const i = Math.floor(x),
+          j = Math.floor(y);
+        let u = x - i,
+          v = y - j;
+        u = u * u * (3 - 2 * u);
+        v = v * v * (3 - 2 * v);
+        const a = noiseHash(i, j, s),
+          b = noiseHash(i + 1, j, s),
+          c = noiseHash(i, j + 1, s),
+          d = noiseHash(i + 1, j + 1, s);
+        return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
+      }
+      function makeHeight(sheet) {
+        const ellipses = sheet.islands.map(([x, y, rx, ry, angle]) => ({
+          x,
+          y,
+          rx,
+          ry,
+          c: Math.cos(angle),
+          s: Math.sin(angle),
+          r: Math.min(rx, ry),
+        }));
+        return (x, y) => {
+          const a = x + 25 * (noise(x / 77, y / 77, sheet.seed) - 0.5),
+            b = y + 24 * (noise(x / 62, y / 62, sheet.seed + 1) - 0.5);
+          let best = -1000;
+          for (const e of ellipses) {
+            const dx = a - e.x,
+              dy = b - e.y,
+              u = (dx * e.c + dy * e.s) / e.rx,
+              v = (dy * e.c - dx * e.s) / e.ry;
+            best = Math.max(best, (1 - Math.hypot(u, v)) * e.r);
+          }
+          return (
+            best +
+            7 * (noise(x / 20, y / 20, 2) - 0.5) +
+            2.4 * (noise(x / 6, y / 6, 5) - 0.5)
+          );
+        };
+      }
+      function line(g, points, color, width = 1, dash = []) {
+        g.save();
+        g.strokeStyle = color;
+        g.lineWidth = width;
+        g.setLineDash(dash);
+        g.beginPath();
+        points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+        g.stroke();
+        g.restore();
+      }
+      function circle(g, x, y, r, stroke, fill, width = 1) {
+        g.beginPath();
+        g.arc(x, y, r, 0, Math.PI * 2);
+        if (fill) {
+          g.fillStyle = fill;
+          g.fill();
+        }
+        if (stroke) {
+          g.strokeStyle = stroke;
+          g.lineWidth = width;
+          g.stroke();
+        }
+      }
+      function poly(g, points, fill, stroke, width = 1) {
+        g.beginPath();
+        points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+        g.closePath();
+        if (fill) {
+          g.fillStyle = fill;
+          g.fill();
+        }
+        if (stroke) {
+          g.strokeStyle = stroke;
+          g.lineWidth = width;
+          g.stroke();
+        }
+      }
+      function label(g, t, x, y, font, color, align = "center") {
+        g.font = font;
+        g.fillStyle = color;
+        g.textAlign = align;
+        g.textBaseline = "middle";
+        g.fillText(t, x, y);
+      }
+      function surface(w, h) {
+        const el = document.createElement("canvas");
+        el.width = w;
+        el.height = h;
+        return el;
+      }
+      function compass(g, x, y) {
+        g.save();
+        g.translate(x, y);
+        const dark = "#4e6558",
+          light = "#d9d8b7";
+        circle(g, 0, 0, 19, dark, null, 0.7);
+        circle(g, 0, 0, 16, dark, null, 0.55);
+        for (let i = 0; i < 8; i++) {
+          g.save();
+          g.rotate((i * Math.PI) / 4);
+          const len = i % 2 ? 15 : 25,
+            half = i % 2 ? 2 : 3.4;
+          poly(
+            g,
+            [
+              [0, -len],
+              [-half, 0],
+              [0, -3],
+            ],
+            dark,
+            dark,
+            0.7,
+          );
+          poly(
+            g,
+            [
+              [0, -len],
+              [half, 0],
+              [0, -3],
+            ],
+            light,
+            dark,
+            0.7,
+          );
+          g.restore();
+        }
+        circle(g, 0, 0, 2, null, dark);
+        label(g, "북", 0, -34, "bold 11px Georgia", dark);
+        g.restore();
+      }
+      function house(g, x, y, s, church = false) {
+        g.save();
+        g.translate(x, y);
+        g.scale(s, s);
+        const pen = "#596151";
+        poly(
+          g,
+          [
+            [-5, 0],
+            [2, -2],
+            [7, 0],
+            [7, 5],
+            [0, 7],
+            [-5, 5],
+          ],
+          "#e7dfbc",
+          pen,
+          0.8,
+        );
+        poly(
+          g,
+          [
+            [-6, 0],
+            [-2, -5],
+            [5, -5],
+            [8, 0],
+            [1, 2],
+            [-2, -2],
+          ],
+          "#89917a",
+          pen,
+          0.7,
+        );
+        line(
+          g,
+          [
+            [1, 2],
+            [1, 6],
+          ],
+          pen,
+          0.7,
+        );
+        line(
+          g,
+          [
+            [4, 2],
+            [4, 4],
+          ],
+          pen,
+          0.8,
+        );
+        if (church) {
+          poly(
+            g,
+            [
+              [-8, 3],
+              [-8, -7],
+              [-4, -8],
+              [-4, 3],
+            ],
+            "#eae1bd",
+            pen,
+            0.7,
+          );
+          poly(
+            g,
+            [
+              [-9, -7],
+              [-6, -17],
+              [-3, -8],
+            ],
+            pen,
+            pen,
+            0.7,
+          );
+        }
+        g.restore();
+      }
+      function lighthouse(g, x, y) {
+        g.save();
+        g.translate(x, y);
+        const p = "#425849";
+        poly(
+          g,
+          [
+            [-4, 1],
+            [-2.5, -11],
+            [2, -11],
+            [4, 1],
+          ],
+          "#f4e6be",
+          p,
+          0.9,
+        );
+        poly(
+          g,
+          [
+            [-3, -4],
+            [-2.5, -7],
+            [2.5, -7],
+            [3, -4],
+          ],
+          "#936748",
+        );
+        poly(
+          g,
+          [
+            [-3, -12],
+            [-3, -16],
+            [3, -16],
+            [3, -12],
+          ],
+          "#d8cb9b",
+          p,
+          0.8,
+        );
+        poly(
+          g,
+          [
+            [-4, -16],
+            [0, -19],
+            [4, -16],
+          ],
+          p,
+        );
+        line(
+          g,
+          [
+            [-5, 2],
+            [5, 2],
+          ],
+          p,
+        );
+        g.restore();
+      }
+      function vessel(g, x, y, scale = 1) {
+        g.save();
+        g.translate(x, y);
+        g.scale(scale, scale);
+        const p = "#2e5149",
+          cream = "#eae4c6",
+          rust = "#a55d42";
+        for (let i = 0; i < 4; i++) {
+          const q = i * 4;
+          line(
+            g,
+            [
+              [-35 - q, 8 + i * 2],
+              [-13 - q, 8 + i * 2],
+            ],
+            "#537a6770",
+            0.85,
+          );
+          line(
+            g,
+            [
+              [5 + q, 8 + i * 2],
+              [18 + q, 8 + i * 2],
+            ],
+            "#537a675a",
+            0.65,
+          );
+        }
+        poly(
+          g,
+          [
+            [-26, -3],
+            [-16, 0],
+            [17, 0],
+            [30, -6],
+            [22, 5],
+            [-18, 5],
+          ],
+          p,
+          p,
+          1,
+        );
+        line(
+          g,
+          [
+            [-18, 4],
+            [19, 4],
+            [25, 0],
+          ],
+          rust,
+          1.5,
+        );
+        poly(
+          g,
+          [
+            [-12, 0],
+            [-11, -8],
+            [5, -8],
+            [8, 0],
+          ],
+          cream,
+          p,
+          1,
+        );
+        poly(
+          g,
+          [
+            [-5, -8],
+            [-5, -12],
+            [4, -12],
+            [4, -8],
+          ],
+          cream,
+          p,
+          0.9,
+        );
+        poly(
+          g,
+          [
+            [-12, -8],
+            [-14, -15],
+            [-10, -16],
+            [-8, -8],
+          ],
+          rust,
+          p,
+          0.8,
+        );
+        for (let i = -8; i <= 4; i += 4)
+          line(
+            g,
+            [
+              [i, -6],
+              [i, -3],
+            ],
+            p,
+            1.6,
+          );
+        line(
+          g,
+          [
+            [13, -1],
+            [13, -23],
+          ],
+          p,
+          1,
+        );
+        poly(
+          g,
+          [
+            [13, -23],
+            [22, -21],
+            [13, -18],
+          ],
+          rust,
+          p,
+          0.4,
+        );
+        line(
+          g,
+          [
+            [13, -20],
+            [25, -5],
+          ],
+          p,
+          0.6,
+        );
+        line(
+          g,
+          [
+            [13, -20],
+            [1, -8],
+          ],
+          p,
+          0.6,
+        );
+        line(
+          g,
+          [
+            [-22, -3],
+            [-22, -8],
+          ],
+          p,
+          0.8,
+        );
+        g.restore();
+      }
+      function buildTerrain(sheet, height) {
+        const art = surface(W * 2, H * 2),
+          g = art.getContext("2d");
+        g.scale(2, 2);
+        const rand = randomFrom(sheet.seed),
+          step = 4,
+          cols = Math.ceil(W / step) + 1,
+          rows = Math.ceil(H / step) + 1,
+          grid = new Float32Array(cols * rows);
+        for (let j = 0; j < rows; j++)
+          for (let i = 0; i < cols; i++)
+            grid[j * cols + i] = height(i * step, j * step);
+        const raster = surface(W, H),
+          rg = raster.getContext("2d"),
+          pix = rg.createImageData(W, H),
+          out = pix.data;
+        for (let y = 0; y < H; y++) {
+          const j = (y / step) | 0,
+            v = y / step - j;
+          for (let x = 0; x < W; x++) {
+            const i = (x / step) | 0,
+              u = x / step - i,
+              k = j * cols + i,
+              h =
+                (grid[k] * (1 - u) + grid[k + 1] * u) * (1 - v) +
+                (grid[k + cols] * (1 - u) + grid[k + cols + 1] * u) * v;
+            const n =
+              (rand() - 0.5) * 8 +
+              2.3 * Math.sin(y * 0.48 + x * 0.16) +
+              1.65 * Math.sin(x * 0.021 + y * 0.037);
+            const t = clamp((-h - 1) / 117, 0, 1),
+              l = clamp(h / 35, 0, 1);
+            let a, b, c;
+            if (h > 0) {
+              a = 215 + 8 * l;
+              b = 208 + 4 * l;
+              c = 169 + 4 * l;
+            } else if (h > -5) {
+              a = 199;
+              b = 201;
+              c = 170;
+            } else {
+              a = 194 - 34 * t;
+              b = 209 - 15 * t;
+              c = 186 - 8 * t;
+            }
+            const o = (y * W + x) * 4;
+            out[o] = a + n;
+            out[o + 1] = b + n;
+            out[o + 2] = c + n;
+            out[o + 3] = 255;
+          }
+        }
+        rg.putImageData(pix, 0, 0);
+        g.drawImage(raster, 0, 0, W, H);
+        // Isobaths and coastlines are contours of the same relief used to test buoy placement.
+        function contour(level, color, width, dash = []) {
+          g.beginPath();
+          g.setLineDash(dash);
+          g.strokeStyle = color;
+          g.lineWidth = width;
+          for (let j = 0; j < rows - 1; j++)
+            for (let i = 0; i < cols - 1; i++) {
+              const k = j * cols + i,
+                a = grid[k],
+                b = grid[k + 1],
+                c = grid[k + cols + 1],
+                d = grid[k + cols],
+                pts = [];
+              if (
+                a > level === b > level &&
+                a > level === c > level &&
+                a > level === d > level
+              )
+                continue;
+              const x = i * step,
+                y = j * step;
+              if (a > level !== b > level)
+                pts.push([x + (step * (level - a)) / (b - a), y]);
+              if (b > level !== c > level)
+                pts.push([x + step, y + (step * (level - b)) / (c - b)]);
+              if (c > level !== d > level)
+                pts.push([x + (step * (level - d)) / (c - d), y + step]);
+              if (d > level !== a > level)
+                pts.push([x, y + (step * (level - a)) / (d - a)]);
+              for (let q = 1; q < pts.length; q += 2) {
+                g.moveTo(...pts[q - 1]);
+                g.lineTo(...pts[q]);
+              }
+            }
+          g.stroke();
+          g.setLineDash([]);
+        }
+        [-195, -142, -102, -73, -47, -28, -16, -8].forEach((v, i) =>
+          contour(
+            v,
+            i % 2 ? "#557e745e" : "#648a7959",
+            i % 3 === 0 ? 0.95 : 0.65,
+          ),
+        );
+        contour(-3, "#53716480", 0.8);
+        contour(0, "#496251", 1.4);
+        [5, 12, 22, 36, 55].forEach((v) => contour(v, "#8b90756b", 0.75));
+        for (let x = 70; x < W; x += 70)
+          line(
+            g,
+            [
+              [x, 0],
+              [x, H],
+            ],
+            "#426d602e",
+            0.7,
+            [3, 3],
+          );
+        for (let y = 67; y < H; y += 67)
+          line(
+            g,
+            [
+              [0, y],
+              [W, y],
+            ],
+            "#426d602e",
+            0.7,
+            [3, 3],
+          );
+        // A pen-and-ink hatch follows the slope of the headlands.
+        for (let i = 0; i < 6100; i++) {
+          const x = rand() * W,
+            y = rand() * H,
+            h = height(x, y);
+          if (h < 1) continue;
+          const dx = height(x + 2, y) - h,
+            dy = height(x, y + 2) - h,
+            a = Math.atan2(dy, dx) + 0.32 * (rand() - 0.5),
+            len = 2 + 5 * rand();
+          line(
+            g,
+            [
+              [x, y],
+              [x + Math.cos(a) * len, y + Math.sin(a) * len],
+            ],
+            h < 12 ? "#656e5087" : "#70795360",
+            0.55 + rand() * 0.35,
+          );
+        }
+        for (let i = 0; i < 600; i++) {
+          const x = rand() * W,
+            y = rand() * H,
+            h = height(x, y);
+          if (h < 7 || h > 41) continue;
+          const s = rand() * 1.8 + 0.8;
+          line(
+            g,
+            [
+              [x - 2 * s, y + s],
+              [x, y - 2 * s],
+              [x + 1.6 * s, y + s],
+            ],
+            "#65745390",
+            0.7,
+          );
+          line(
+            g,
+            [
+              [x, y - 2 * s],
+              [x, y + 2 * s],
+            ],
+            "#65745399",
+            0.55,
+          );
+        }
+        const reserved = (x, y) =>
+          sheet.names.some(
+            ([u, v]) => Math.abs(u - x) < 51 && Math.abs(v - y) < 14,
+          ) || Math.hypot(x - (W - 58), y - 57) < 46;
+        for (let j = 0; j < 8; j++)
+          for (let i = 0; i < 12; i++) {
+            const x = 26 + i * 70 + (rand() - 0.5) * 38,
+              y = 28 + j * 66 + (rand() - 0.5) * 34,
+              h = height(x, y);
+            if (
+              h > -14 ||
+              reserved(x, y) ||
+              x < 23 ||
+              x > W - 20 ||
+              y < 21 ||
+              y > H - 30 ||
+              (Math.abs(x - sheet.seaLabel[0]) < 90 &&
+                Math.abs(y - sheet.seaLabel[1]) < 19)
+            )
+              continue;
+            const num = Math.round(3 - h * 0.29);
+            label(g, String(num), x, y, "italic 10px Georgia", "#436d626e");
+            if (rand() > 0.66)
+              label(
+                g,
+                String(Math.floor(rand() * 9)),
+                x + 7,
+                y + 2,
+                "italic 6px Georgia",
+                "#436d6270",
+              );
+          }
+        for (const [vx, vy] of sheet.villages) {
+          const sites = [];
+          for (let i = 0; i < 24; i++) {
+            const x = vx + (rand() - 0.5) * 67,
+              y = vy + (rand() - 0.5) * 34;
+            if (height(x, y) > 6) sites.push([x, y]);
+          }
+          sites.sort((a, b) => a[1] - b[1]);
+          for (const [i, p] of sites.entries())
+            house(g, p[0], p[1], 0.48 + rand() * 0.35, i === 3);
+        }
+        lighthouse(g, ...sheet.beacon);
+        for (const [x, y, t] of sheet.names) {
+          g.save();
+          g.shadowColor = "#e3debb";
+          g.shadowBlur = 3;
+          label(g, t, x, y, 'bold 11px "Noto Serif KR", Batang, serif', "#55634f");
+          g.restore();
+        }
+        g.save();
+        g.translate(sheet.seaLabel[0], sheet.seaLabel[1]);
+        g.rotate(sheet.seaLabel[2]);
+        g.font = '24px "Noto Serif KR", Batang, serif';
+        g.textAlign = "center";
+        g.fillStyle = "#446d6166";
+        g.fillText(sheet.water, 0, 0);
+        g.restore();
+        compass(g, W - 58, 61);
+        const bx = 31,
+          by = H - 32;
+        g.fillStyle = "#d7d9bba8";
+        g.fillRect(bx - 9, by - 14, 105, 29);
+        for (let i = 0; i < 4; i++) {
+          g.fillStyle = i % 2 ? "#ced3b4" : "#4e6657";
+          g.fillRect(bx + i * 20, by, 20, 3.5);
+        }
+        g.strokeStyle = "#4e6657";
+        g.lineWidth = 0.7;
+        g.strokeRect(bx, by, 80, 3.5);
+        label(g, "0", bx, by - 5, "8px Georgia", "#425e52");
+        label(
+          g,
+          "400패덤",
+          bx + 80,
+          by - 6,
+          "italic 9px Georgia",
+          "#425e52",
+          "right",
+        );
+        g.strokeStyle = "#49665099";
+        g.lineWidth = 0.7;
+        g.strokeRect(8, 8, W - 16, H - 16);
+        for (let x = 18; x < W - 12; x += 10) {
+          const length = (x - 18) % 50 === 0 ? 5 : 2.5;
+          line(
+            g,
+            [
+              [x, 8],
+              [x, 8 + length],
+            ],
+            "#4e6c5d",
+            0.7,
+          );
+          line(
+            g,
+            [
+              [x, H - 8],
+              [x, H - 8 - length],
+            ],
+            "#4e6c5d",
+            0.7,
+          );
+        }
+        for (let y = 18; y < H - 12; y += 10) {
+          const l = (y - 18) % 50 === 0 ? 5 : 2.5;
+          line(
+            g,
+            [
+              [8, y],
+              [8 + l, y],
+            ],
+            "#4e6c5d",
+            0.7,
+          );
+          line(
+            g,
+            [
+              [W - 8, y],
+              [W - 8 - l, y],
+            ],
+            "#4e6c5d",
+            0.7,
+          );
+        }
+        return art;
+      }
+      const SAVE = "drowned-choir.survey.v1",
+        SOUND = "drowned-choir.audio.v1";
+      function freshSurvey() {
+        return { buoys: [], found: [], drops: 0, misses: 0 };
+      }
+      function freshGame() {
+        const seed = new Uint32Array(1);
+        crypto.getRandomValues(seed);
+        return { seed: seed[0], sheet: 0, surveys: sheets.map(freshSurvey) };
+      }
+      function readGame() {
+        try {
+          const v = JSON.parse(localStorage.getItem(SAVE));
+          if (
+            !Number.isInteger(v.seed) ||
+            !Number.isInteger(v.sheet) ||
+            v.sheet < 0 ||
+            v.sheet >= sheets.length ||
+            v.surveys.length !== 4
+          )
+            throw Error();
+          for (const [i, s] of v.surveys.entries()) {
+            if (
+              !Number.isInteger(s.drops) ||
+              s.drops < 0 ||
+              !Number.isInteger(s.misses) ||
+              s.misses < 0 ||
+              !Array.isArray(s.found) ||
+              !s.found.every(
+                (n, j) =>
+                  Number.isInteger(n) &&
+                  n >= 0 &&
+                  n < sheets[i].bells.length &&
+                  s.found.indexOf(n) === j,
+              ) ||
+              !Array.isArray(s.buoys) ||
+              s.buoys.length > 3 ||
+              !s.buoys.every(
+                (b) =>
+                  Number.isInteger(b.slot) &&
+                  b.slot >= 0 &&
+                  b.slot < 3 &&
+                  Number.isFinite(b.x) &&
+                  b.x >= 0 &&
+                  b.x <= W &&
+                  Number.isFinite(b.y) &&
+                  b.y >= 0 &&
+                  b.y <= H,
+              )
+            )
+              throw Error();
+          }
+          return v;
+        } catch {
+          return freshGame();
+        }
+      }
+      let state = readGame(),
+        audible = true,
+        sheet,
+        survey,
+        height,
+        terrain,
+        targets,
+        tool = "listen",
+        isolated = null,
+        cursor = null,
+        scanning = null,
+        flash = null,
+        frame = 0,
+        audioCtx = null,
+        mixer = null,
+        ship = null,
+        touchDown = false;
+      let keyboardPoint = { x: W / 2, y: H / 2 },
+        lastReport = "",
+        choirTimers = [],
+        choirVoices = [];
+      try {
+        audible = localStorage.getItem(SOUND) !== "off";
+      } catch {}
+      function save() {
+        try {
+          localStorage.setItem(SAVE, JSON.stringify(state));
+        } catch {}
+      }
+      function isDone() {
+        return survey.found.length === targets.length;
+      }
+      function heard(b, t) {
+        return !t.range || dist(b, t) <= t.range;
+      }
+      function liveTargets() {
+        return targets.filter((t) => !survey.found.includes(t.id));
+      }
+      function echoes(b) {
+        return liveTargets()
+          .filter((t) => heard(b, t))
+          .map((t) => ({ r: dist(b, t), t }))
+          .sort((a, b) => a.r - b.r);
+      }
+      function initSheet() {
+        sheet = sheets[state.sheet];
+        survey = state.surveys[state.sheet];
+        height = makeHeight(sheet);
+        terrain = buildTerrain(sheet, height);
+        const rand = randomFrom((state.seed ^ sheet.seed) >>> 0);
+        targets = sheet.bells.map((bell, id) => {
+          let point;
+          for (let i = 0; i < 80; i++) {
+            point = {
+              x: Math.round(bell.place[0] + (rand() - 0.5) * 96),
+              y: Math.round(bell.place[1] + (rand() - 0.5) * 78),
+            };
+            if (height(point.x, point.y) < -17) break;
+            point = { x: bell.place[0], y: bell.place[1] };
+          }
+          return { ...bell, ...point, id };
+        });
+        keyboardPoint = { x: sheet.home[0], y: sheet.home[1] };
+        ship = survey.buoys.at(-1) || keyboardPoint;
+        cursor = null;
+        touchDown = false;
+        scanning = null;
+        flash = null;
+        isolated = null;
+        tool = "listen";
+        lastReport = "";
+        update();
+        render();
+        save();
+      }
+      function ensureAudio() {
+        if (!audible) return false;
+        try {
+          if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            mixer = audioCtx.createGain();
+            mixer.gain.value = 0.6;
+            mixer.connect(audioCtx.destination);
+          }
+          if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      function tone(
+        freq,
+        duration,
+        amp,
+        delay = 0,
+        shape = "sine",
+        rise = 0.012,
+      ) {
+        if (!audible || !audioCtx || !mixer) return;
+        const now = audioCtx.currentTime + delay,
+          osc = audioCtx.createOscillator(),
+          env = audioCtx.createGain();
+        osc.type = shape;
+        osc.frequency.value = freq;
+        env.gain.setValueAtTime(0.00001, now);
+        env.gain.exponentialRampToValueAtTime(
+          Math.max(0.00002, amp),
+          now + rise,
+        );
+        env.gain.exponentialRampToValueAtTime(0.00001, now + duration);
+        osc.connect(env);
+        env.connect(mixer);
+        osc.onended = () => {
+          osc.disconnect();
+          env.disconnect();
+        };
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+        return osc;
+      }
+      function bellTone(f, intensity = 1, delay = 0, track = false) {
+        for (const [mul, len, vol] of [
+          [1, 2.7, 0.19],
+          [2.01, 1.65, 0.064],
+          [2.78, 0.92, 0.036],
+          [4.16, 0.45, 0.021],
+        ]) {
+          const v = tone(f * mul, len, vol * intensity, delay);
+          if (track && v) choirVoices.push(v);
+        }
+      }
+      function voice(bell, intensity = 1, delay = 0, track = false) {
+        bellTone(bell.note, intensity, delay, track);
+        if (bell.doubleStrike)
+          bellTone(bell.note, 0.65 * intensity, delay + 0.24, track);
+      }
+      function stopChoir() {
+        choirTimers.forEach(clearTimeout);
+        choirTimers = [];
+        for (const v of choirVoices) {
+          try {
+            v.stop();
+          } catch {}
+        }
+        choirVoices = [];
+        $("#choirBtn").textContent = "합창 듣기 ♫";
+        document
+          .querySelectorAll("#archiveList li")
+          .forEach((el) => (el.style.background = ""));
+      }
+      function setAudio(on) {
+        audible = on;
+        if (mixer) {
+          mixer.gain.cancelScheduledValues(audioCtx.currentTime);
+          mixer.gain.setTargetAtTime(on ? 0.6 : 0, audioCtx.currentTime, 0.025);
+        }
+        if (!on) stopChoir();
+        else ensureAudio();
+        try {
+          localStorage.setItem(SOUND, on ? "on" : "off");
+        } catch {}
+        paintSoundButton();
+      }
+      function paintIcon(canvas, name) {
+        const size = 72;
+        canvas.width = size;
+        canvas.height = size;
+        const g = canvas.getContext("2d");
+        g.scale(3, 3);
+        const c = getComputedStyle(canvas).color;
+        g.strokeStyle = c;
+        g.fillStyle = c;
+        g.lineWidth = 1.5;
+        g.lineJoin = "round";
+        g.lineCap = "round";
+        const ln = (p, w = 1.5) => line(g, p, c, w);
+        if (name === "office") {
+          circle(g, 12, 12, 10, c, null, 0.85);
+          circle(g, 12, 12, 7.8, c, null, 0.7);
+          ln(
+            [
+              [6, 12],
+              [8, 12],
+              [9.5, 8],
+              [11.5, 16],
+              [13, 6],
+              [15, 15],
+              [16, 11],
+              [18, 11],
+            ],
+            1.35,
+          );
+        }
+        if (name === "book") {
+          ln([
+            [12, 6],
+            [7, 4],
+            [2, 5],
+            [2, 19],
+            [7, 18],
+            [12, 20],
+            [17, 18],
+            [22, 18],
+            [22, 5],
+            [17, 4],
+            [12, 6],
+            [12, 20],
+          ]);
+        }
+        if (name === "sound" || name === "mute") {
+          poly(
+            g,
+            [
+              [3, 9],
+              [7, 9],
+              [12, 5],
+              [12, 19],
+              [7, 15],
+              [3, 15],
+            ],
+            null,
+            c,
+            1.5,
+          );
+          if (name === "mute") {
+            ln([
+              [16, 9],
+              [22, 15],
+            ]);
+            ln([
+              [22, 9],
+              [16, 15],
+            ]);
+          } else {
+            g.beginPath();
+            g.arc(12, 12, 5, -0.85, 0.85);
+            g.stroke();
+            g.beginPath();
+            g.arc(12, 12, 9, -0.82, 0.82);
+            g.stroke();
+          }
+        }
+        if (name === "listen") {
+          circle(g, 12, 12, 2, null, c);
+          for (const r of [6, 10]) {
+            g.beginPath();
+            g.arc(12, 12, r, -1, 1);
+            g.stroke();
+            g.beginPath();
+            g.arc(12, 12, r, Math.PI - 1, Math.PI + 1);
+            g.stroke();
+          }
+        }
+        if (name === "mark") {
+          circle(g, 12, 12, 6, c, null, 1.3);
+          ln([
+            [12, 2],
+            [12, 7],
+          ]);
+          ln([
+            [12, 17],
+            [12, 22],
+          ]);
+          ln([
+            [2, 12],
+            [7, 12],
+          ]);
+          ln([
+            [17, 12],
+            [22, 12],
+          ]);
+          circle(g, 12, 12, 1, null, c);
+        }
+        if (name === "nib") {
+          ln([
+            [3, 20],
+            [5, 14],
+            [15, 4],
+            [20, 9],
+            [10, 19],
+            [3, 20],
+          ]);
+          ln([
+            [5, 14],
+            [10, 19],
+          ]);
+          ln([
+            [12.5, 6.5],
+            [17.5, 11.5],
+          ]);
+        }
+        if (name === "bell" || name === "found") {
+          g.beginPath();
+          g.moveTo(4, 17);
+          g.quadraticCurveTo(7, 16, 7, 11);
+          g.quadraticCurveTo(7, 6, 12, 5);
+          g.quadraticCurveTo(17, 6, 17, 11);
+          g.quadraticCurveTo(17, 16, 20, 17);
+          g.closePath();
+          if (name === "found") g.fill();
+          else g.stroke();
+          circle(g, 12, 19, 1.5, null, c);
+          ln([
+            [12, 3],
+            [12, 5],
+          ]);
+        }
+      }
+      function paintSoundButton() {
+        $("#soundBtn").setAttribute("aria-pressed", String(audible));
+        $("#soundLabel").textContent = audible ? "소리 켜짐" : "소리 꺼짐";
+        paintIcon($("#audioIcon"), audible ? "sound" : "mute");
+      }
+      function sizeCanvas(canvas, ratio = 2) {
+        const r = canvas.getBoundingClientRect(),
+          d = Math.min(ratio, window.devicePixelRatio || 1);
+        const w = Math.max(1, Math.round(r.width * d)),
+          h = Math.max(1, Math.round(r.height * d));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+        return { w, h };
+      }
+      function chartCoord(p) {
+        const lat = 51 * 60 + 38 + (H - p.y) * 0.013,
+          lon = 4 * 60 + 41 + (W - p.x) * 0.016;
+        return (
+          `북위 ${Math.floor(lat / 60)}° ${(lat % 60).toFixed(1)}′ · ` +
+          `서경 ${Math.floor(lon / 60)}° ${(lon % 60).toFixed(1)}′`
+        );
+      }
+      function drawPin(g, t) {
+        const p = "#954d37";
+        g.save();
+        g.translate(t.x, t.y);
+        circle(g, 0, 0, 10, "#efe3bd", null, 3.2);
+        circle(g, 0, 0, 10, p, null, 1.1);
+        poly(
+          g,
+          [
+            [0, -5],
+            [5, 0],
+            [0, 5],
+            [-5, 0],
+          ],
+          p,
+          "#f2e4bf",
+          0.8,
+        );
+        for (let i = 0; i < 4; i++) {
+          g.rotate(Math.PI / 2);
+          line(
+            g,
+            [
+              [0, -11],
+              [0, -15],
+            ],
+            p,
+            1,
+          );
+        }
+        g.restore();
+      }
+      function drawBuoy(g, b, dim) {
+        g.save();
+        g.globalAlpha = dim ? 0.5 : 1;
+        const c = ink[b.slot];
+        circle(g, b.x, b.y, 5, "#eeebcc", c, 1.6);
+        line(
+          g,
+          [
+            [b.x, b.y - 5],
+            [b.x, b.y - 15],
+          ],
+          c,
+          1.5,
+        );
+        poly(
+          g,
+          [
+            [b.x, b.y - 16],
+            [b.x + 10, b.y - 14],
+            [b.x, b.y - 10],
+          ],
+          c,
+          "#eeebcc",
+          0.55,
+        );
+        g.fillStyle = "#e5e3c8";
+        g.fillRect(b.x - 14, b.y - 27, 15, 13);
+        g.strokeStyle = c;
+        g.lineWidth = 0.9;
+        g.strokeRect(b.x - 14, b.y - 27, 15, 13);
+        label(
+          g,
+          LETTER[b.slot],
+          b.x - 6.5,
+          b.y - 20,
+          "bold 10px Consolas, monospace",
+          c,
+        );
+        g.restore();
+      }
+      function drawTrace(now) {
+        const { w, h } = sizeCanvas(scope);
+        const g = scope.getContext("2d"),
+          vw = 260,
+          vh = 49;
+        g.setTransform(w / vw, 0, 0, h / vh, 0, 0);
+        g.clearRect(0, 0, vw, vh);
+        for (let x = 8; x < vw; x += 20)
+          line(
+            g,
+            [
+              [x, 3],
+              [x, vh - 4],
+            ],
+            "#33503b",
+            0.7,
+          );
+        for (let y = 8; y < vh; y += 10)
+          line(
+            g,
+            [
+              [3, y],
+              [vw - 3, y],
+            ],
+            "#34503d",
+            0.65,
+          );
+        const b =
+            survey.buoys.find((b) => b.slot === isolated) ||
+            survey.buoys.at(-1),
+          list = b ? echoes(b) : [],
+          span = b
+            ? Math.max(
+                ...[
+                  [0, 0],
+                  [W, 0],
+                  [W, H],
+                  [0, H],
+                ].map(([x, y]) => Math.hypot(x - b.x, y - b.y)),
+              )
+            : 1000;
+        const fresh =
+            scanning && b && scanning.b === b
+              ? clamp((now - scanning.start) / 1050, 0, 1)
+              : 1,
+          points = [];
+        for (let x = 3; x < vw - 2; x += 1) {
+          let amp = 0.55 + 0.22 * Math.sin(x * 0.18);
+          for (const e of list) {
+            const center = 7 + (e.r / span) * (vw - 15);
+            if (e.r <= fresh * 1040)
+              amp += 18 * Math.exp(-Math.pow((x - center) / 5.5, 2));
+          }
+          points.push([x, 28 + amp * Math.sin(x * 1.78 + 1.4)]);
+        }
+        line(g, points, b ? traceInk[b.slot] : "#729980", 1.15);
+      }
+      function drawChart(now) {
+        const { w, h } = sizeCanvas(chart);
+        ctx.setTransform(w / W, 0, 0, h / H, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.drawImage(terrain, 0, 0, W, H);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(9, 9, W - 18, H - 18);
+        ctx.clip();
+        let scanR = Infinity;
+        if (scanning) scanR = clamp((now - scanning.start) / 1050, 0, 1) * 1040;
+        const penScale = clamp(W / chart.clientWidth, 1, 3);
+        for (const b of survey.buoys) {
+          if (isolated !== null && b.slot !== isolated) continue;
+          const list = echoes(b);
+          for (const e of list) {
+            if (scanning && scanning.b === b && e.r > scanR) continue;
+            ctx.save();
+            ctx.globalAlpha = 0.57;
+            ctx.setLineDash(dashes[b.slot].map((length) => length * penScale));
+            circle(ctx, b.x, b.y, e.r, "#f5efd1", null, 3.4 * penScale);
+            ctx.globalAlpha = 0.95;
+            circle(ctx, b.x, b.y, e.r, ink[b.slot], null, 1.65 * penScale);
+            ctx.restore();
+          }
+          if (!list.length && liveTargets().length) {
+            circle(ctx, b.x, b.y, 10, ink[b.slot], null, 0.8);
+          }
+        }
+        if (scanning && scanR < 1039) {
+          const a = 1 - scanR / 1040;
+          ctx.save();
+          ctx.globalAlpha = 0.34 * a;
+          circle(
+            ctx,
+            scanning.b.x,
+            scanning.b.y,
+            scanR,
+            ink[scanning.b.slot],
+            null,
+            3,
+          );
+          ctx.globalAlpha = 0.09 * a;
+          circle(
+            ctx,
+            scanning.b.x,
+            scanning.b.y,
+            Math.max(0, scanR - 5),
+            ink[scanning.b.slot],
+            null,
+            6,
+          );
+          ctx.restore();
+        }
+        let bx = ship.x,
+          by = ship.y;
+        if (scanning) {
+          const t = clamp((now - scanning.start) / 500, 0, 1),
+            smooth = t * t * (3 - 2 * t);
+          bx = scanning.from.x + (ship.x - scanning.from.x) * smooth;
+          by = scanning.from.y + (ship.y - scanning.from.y) * smooth;
+        }
+        if (!survey.buoys.length) {
+          vessel(ctx, bx, by, 1.25);
+          label(
+            ctx,
+            "조사선 리닛호",
+            bx,
+            by + 26,
+            '10px "Malgun Gothic", sans-serif',
+            "#355d50",
+          );
+        } else {
+          vessel(
+            ctx,
+            clamp(bx + 32, 38, W - 41),
+            clamp(by - 8, 30, H - 23),
+            0.78,
+          );
+        }
+        survey.buoys.forEach((b) =>
+          drawBuoy(ctx, b, isolated !== null && isolated !== b.slot),
+        );
+        targets
+          .filter((t) => survey.found.includes(t.id))
+          .forEach((t) => drawPin(ctx, t));
+        if (flash) {
+          const t = (now - flash.start) / flash.duration;
+          if (t < 1) {
+            ctx.save();
+            ctx.globalAlpha = 1 - t;
+            circle(
+              ctx,
+              flash.x,
+              flash.y,
+              9 + 36 * t,
+              flash.good ? "#794730" : "#7b5547",
+              null,
+              1.5,
+            );
+            if (!flash.good) {
+              line(
+                ctx,
+                [
+                  [flash.x - 4, flash.y - 4],
+                  [flash.x + 4, flash.y + 4],
+                ],
+                "#7f4334",
+                1.5,
+              );
+              line(
+                ctx,
+                [
+                  [flash.x - 4, flash.y + 4],
+                  [flash.x + 4, flash.y - 4],
+                ],
+                "#7f4334",
+                1.5,
+              );
+            }
+            ctx.restore();
+          } else flash = null;
+        }
+        if (cursor && !isDone()) {
+          const { x, y } = cursor,
+            c = tool === "listen" ? "#1b514a" : "#893d29";
+          ctx.save();
+          ctx.globalAlpha = 0.84;
+          circle(ctx, x, y, tool === "listen" ? 7 : 10, c, null, 1);
+          for (const [dx, dy] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ])
+            line(
+              ctx,
+              [
+                [x + dx * 4, y + dy * 4],
+                [x + dx * 14, y + dy * 14],
+              ],
+              c,
+              1,
+            );
+          ctx.restore();
+        }
+        ctx.restore();
+        if (touchDown && cursor) {
+          const lx = clamp(cursor.x + 64, 48, W - 48),
+            ly = cursor.y > 96 ? cursor.y - 63 : cursor.y + 63,
+            rx = cursor.x,
+            ry = cursor.y,
+            sz = 57;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(lx, ly, 38, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(
+            chart,
+            ((rx - sz / 2) * w) / W,
+            ((ry - sz / 2) * h) / H,
+            (sz * w) / W,
+            (sz * h) / H,
+            lx - 39,
+            ly - 39,
+            78,
+            78,
+          );
+          ctx.restore();
+          circle(ctx, lx, ly, 38, "#344e41", null, 2);
+        }
+      }
+      function render() {
+        if (!terrain) return;
+        const now = performance.now();
+        drawChart(now);
+        drawTrace(now);
+        if (scanning && now - scanning.start >= 1050) scanning = null;
+        if ((scanning || flash) && !frame)
+          frame = requestAnimationFrame(() => {
+            frame = 0;
+            render();
+          });
+      }
+      function instructions() {
+        if (isDone())
+          return "이 해역의 종을 모두 찾았어요. 기록부에서 종 이름을 누르면 그 소리를 다시 들을 수 있어요.";
+        if (tool === "mark")
+          return "서로 다른 부표의 원 세 개가 한 점에서 만나는 곳을 누르세요. 그곳에 종이 있어요.";
+        if (survey.drops === 0)
+          return state.sheet === 0
+            ? "바다를 눌러 첫 부표를 놓으세요. 원이 하나 그려지면, 그 테두리 어딘가에 나루터 종이 있다는 뜻이에요."
+            : "바다를 눌러 부표를 놓으세요. 부표에 들리는 종소리마다 원이 하나씩 생겨요.";
+        if (isolated !== null)
+          return "지금은 부표 하나의 원만 보여요. 같은 부표 글자를 다시 누르면 모든 원이 보여요.";
+        if (survey.buoys.length === 1)
+          return "첫 부표에서 멀리 떨어진 바다를 눌러 두 번째 부표를 놓으세요. 같은 종소리로 그린 두 원은 종이 있는 곳에서 만나요.";
+        if (survey.buoys.length === 2)
+          return "두 원은 두 곳에서 만날 수 있어요. 앞선 두 부표와 삼각형을 이루는 곳에 세 번째 부표를 놓으세요.";
+        return "‘종 표시’를 선택하고 세 원이 함께 지나는 점을 누르세요. 새 부표를 놓으면 가장 오래된 부표가 교체돼요.";
+      }
+      function update() {
+        const idx = state.sheet,
+          done = isDone();
+        document.querySelectorAll(".folio").forEach((el, i) => {
+          el.classList.toggle("current", i === idx);
+          el.classList.toggle("done", i < idx);
+          if (i === idx) el.setAttribute("aria-current", "step");
+          else el.removeAttribute("aria-current");
+        });
+        $("#plate").textContent = "해도 " + ROMAN[idx] + "  /  " + sheet.tag;
+        $("#sheetIndex").textContent =
+          `조사 해역 ${idx + 1} / 4`;
+        $("#sheetName").textContent = sheet.name;
+        $("#brief").textContent = sheet.brief;
+        $("#foundCount").textContent =
+          survey.found.length + " / " + targets.length;
+        const ul = $("#register");
+        ul.replaceChildren();
+        for (const t of targets) {
+          const found = survey.found.includes(t.id),
+            li = document.createElement("li"),
+            icon = document.createElement("canvas");
+          icon.className = "icon";
+          icon.setAttribute("aria-hidden", "true");
+          let entry = li;
+          if (found) {
+            li.className = "recovered";
+            entry = document.createElement("button");
+            entry.className = "bell-entry";
+            entry.title = `${t.name} · 기록 읽기와 종소리 듣기`;
+            entry.onclick = () => {
+              ensureAudio();
+              voice(t, 0.7);
+              lastReport = `${t.name} — ${t.story}`;
+              $("#feedback").textContent = lastReport;
+              flash = {
+                x: t.x,
+                y: t.y,
+                good: true,
+                start: performance.now(),
+                duration: 550,
+              };
+              render();
+            };
+            li.append(entry);
+          }
+          entry.append(icon, document.createTextNode(t.name));
+          if (found || t.range) {
+            const tag = document.createElement("span");
+            tag.className = "weak";
+            tag.textContent = found ? "발견" : "희미함";
+            entry.append(tag);
+          }
+          ul.append(li);
+          paintIcon(icon, found ? "found" : "bell");
+        }
+        const latest =
+          survey.buoys.find((b) => b.slot === isolated) || survey.buoys.at(-1);
+        $("#hydroState").textContent = latest
+          ? "부표 " + LETTER[latest.slot]
+          : "—";
+        const count = latest ? echoes(latest).length : 0;
+        $("#traceLabel").textContent = done
+          ? "기록 완료"
+          : latest
+            ? `메아리 ${count}개`
+            : "대기 중";
+        const stationBar = $("#stations");
+        stationBar.replaceChildren();
+        for (let i = 0; i < 3; i++) {
+          const b = survey.buoys.find((b) => b.slot === i),
+            btn = document.createElement("button");
+          btn.textContent = LETTER[i] + (b ? " · " + echoes(b).length : " · —");
+          btn.disabled = !b || done;
+          btn.setAttribute(
+            "aria-label",
+            b
+              ? `부표 ${LETTER[i]}의 원만 보기 · 메아리 ${echoes(b).length}개`
+              : `부표 ${LETTER[i]} 미설치`,
+          );
+          btn.setAttribute("aria-pressed", String(isolated === i));
+          btn.onclick = () => {
+            isolated = isolated === i ? null : i;
+            lastReport =
+              isolated === null
+                ? "모든 부표의 원을 표시했어요."
+                : `부표 ${LETTER[i]}의 원만 표시했어요.`;
+            update();
+            render();
+            stationBar.children[i].focus();
+          };
+          stationBar.append(btn);
+        }
+        for (const [id, value] of [
+          ["#listenBtn", "listen"],
+          ["#markBtn", "mark"],
+        ]) {
+          const el = $(id),
+            active = tool === value;
+          el.classList.toggle("active", active);
+          el.setAttribute("aria-pressed", String(active));
+          el.disabled = done;
+          paintIcon(
+            el.querySelector("canvas"),
+            value === "listen" ? "listen" : "mark",
+          );
+        }
+        $("#instruction").textContent = instructions();
+        if ($("#feedback").textContent !== lastReport)
+          $("#feedback").textContent = lastReport;
+        $("#coord").textContent = chartCoord(cursor || ship);
+        $("#completeCard").hidden = !done;
+        $(".controls").hidden = done;
+        $("#nextBtn").textContent =
+          idx === 3 ? "조사 일지 열기 →" : "다음 해도 펼치기 →";
+        $("#stats").textContent =
+          `탐지 ${survey.drops}회 · 빗나간 표시 ${survey.misses}회`;
+      }
+      function choose(which) {
+        if (isDone()) return;
+        tool = which;
+        isolated = null;
+        lastReport = "";
+        update();
+        render();
+      }
+      function soundAt(p) {
+        if (survey.buoys.some((b) => dist(b, p) < 27)) {
+          lastReport =
+            "이 자리에는 이미 부표가 있어요. 조금 더 멀리 놓으면 원이 만나는 점을 찾기 쉬워요.";
+          update();
+          return;
+        }
+        const b = { x: p.x, y: p.y, slot: survey.drops % 3 };
+        const from = ship;
+        survey.buoys = survey.buoys.filter((old) => old.slot !== b.slot);
+        survey.buoys.push(b);
+        survey.drops++;
+        ship = b;
+        isolated = null;
+        const list = echoes(b);
+        const name = `부표 ${LETTER[b.slot]}`;
+        lastReport = list.length
+          ? `${name}에 종 ${list.length}개의 울림이 잡혔어요.`
+          : `${name}에는 아무 소리도 들리지 않아요. 조사 기록에 나온 지명 가까이에 부표를 놓아 보세요.`;
+        ensureAudio();
+        tone(690, 0.42, 0.07);
+        tone(1380, 0.24, 0.018);
+        for (const e of list) voice(e.t, 0.34, Math.max(0.1, e.r / 990));
+        scanning = reduced.matches
+          ? null
+          : { b, from, start: performance.now() };
+        flash = null;
+        save();
+        update();
+        render();
+      }
+      function markAt(p) {
+        const tolerance = clamp(
+          (12 * W) / chart.getBoundingClientRect().width,
+          12,
+          25,
+        );
+        const near = liveTargets()
+          .map((t) => ({ t, d: dist(p, t) }))
+          .sort((a, b) => a.d - b.d)[0];
+        const good = near && near.d <= tolerance;
+        if (good) {
+          const t = near.t;
+          survey.found.push(t.id);
+          isolated = null;
+          ensureAudio();
+          voice(t, 0.88);
+          lastReport = `${t.name} — ${t.story}`;
+          flash = { x: t.x, y: t.y, good: true };
+        } else if (
+          targets.some(
+            (t) => survey.found.includes(t.id) && dist(p, t) <= tolerance,
+          )
+        ) {
+          lastReport = "이미 기록부에 올린 종이에요.";
+          update();
+          return;
+        } else {
+          survey.misses++;
+          ensureAudio();
+          tone(95, 0.2, 0.055);
+          lastReport =
+            "이곳에서는 종이 울리지 않아요. 서로 다른 부표의 원이 한데 모이는 점을 찾아보세요.";
+          flash = { ...p, good: false };
+        }
+        flash.start = performance.now();
+        flash.duration = reduced.matches ? 180 : 780;
+        save();
+        update();
+        render();
+        if (isDone()) $("#nextBtn").focus({ preventScroll: true });
+      }
+      function act(p) {
+        if (isDone()) return;
+        if (p.x < 10 || p.x > W - 10 || p.y < 10 || p.y > H - 10) {
+          lastReport = "해도의 테두리 안쪽을 누르세요.";
+          update();
+          return;
+        }
+        if (height(p.x, p.y) > 0) {
+          lastReport =
+            tool === "listen"
+              ? "여기는 땅이에요. 바다에 부표를 놓아 주세요."
+              : "찾으려는 종은 물속에 있어요. 바다 위에 위치를 표시해 주세요.";
+          update();
+          return;
+        }
+        if (tool === "listen") soundAt(p);
+        else markAt(p);
+      }
+      function pointFor(e) {
+        const r = chart.getBoundingClientRect();
+        return {
+          x: clamp(((e.clientX - r.left) * W) / r.width, 0, W),
+          y: clamp(((e.clientY - r.top) * H) / r.height, 0, H),
+        };
+      }
+      function move(p) {
+        cursor = p;
+        keyboardPoint = p;
+        $("#coord").textContent = chartCoord(p);
+        render();
+      }
+      let downId = null;
+      chart.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0 || downId !== null) return;
+        e.preventDefault();
+        chart.focus({ preventScroll: true });
+        downId = e.pointerId;
+        chart.setPointerCapture(e.pointerId);
+        touchDown = e.pointerType !== "mouse";
+        move(pointFor(e));
+      });
+      chart.addEventListener("pointermove", (e) => {
+        if (downId !== null && downId !== e.pointerId) return;
+        move(pointFor(e));
+      });
+      chart.addEventListener("pointerup", (e) => {
+        if (e.pointerId !== downId) return;
+        const r = chart.getBoundingClientRect(),
+          p = pointFor(e);
+        downId = null;
+        touchDown = false;
+        if (chart.hasPointerCapture(e.pointerId))
+          chart.releasePointerCapture(e.pointerId);
+        if (
+          e.clientX >= r.left &&
+          e.clientX <= r.right &&
+          e.clientY >= r.top &&
+          e.clientY <= r.bottom
+        )
+          act(p);
+        if (e.pointerType !== "mouse") cursor = null;
+        render();
+      });
+      chart.addEventListener("pointercancel", () => {
+        downId = null;
+        touchDown = false;
+        cursor = null;
+        render();
+      });
+      chart.addEventListener("pointerleave", () => {
+        if (downId === null) {
+          cursor = null;
+          $("#coord").textContent = chartCoord(ship);
+          render();
+        }
+      });
+      chart.addEventListener("focus", () => {
+        if (downId === null) {
+          cursor = keyboardPoint;
+          render();
+        }
+      });
+      chart.addEventListener("blur", () => {
+        cursor = null;
+        render();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (
+          document.querySelector("dialog[open]") ||
+          e.ctrlKey ||
+          e.metaKey ||
+          e.altKey
+        )
+          return;
+        if (e.key === "1" || e.key === "2") {
+          e.preventDefault();
+          choose(e.key === "1" ? "listen" : "mark");
+          chart.focus({ preventScroll: true });
+          return;
+        }
+        if (document.activeElement !== chart) return;
+        const delta = {
+          ArrowLeft: [-1, 0],
+          ArrowRight: [1, 0],
+          ArrowUp: [0, -1],
+          ArrowDown: [0, 1],
+        }[e.key];
+        if (delta) {
+          e.preventDefault();
+          const step = e.shiftKey ? 22 : 3;
+          move({
+            x: clamp(keyboardPoint.x + delta[0] * step, 10, W - 10),
+            y: clamp(keyboardPoint.y + delta[1] * step, 10, H - 10),
+          });
+        }
+        if ((e.key === "Enter" || e.key === " ") && !e.repeat) {
+          e.preventDefault();
+          act(keyboardPoint);
+        }
+      });
+      $("#listenBtn").onclick = () => choose("listen");
+      $("#markBtn").onclick = () => choose("mark");
+      $("#soundBtn").onclick = () => setAudio(!audible);
+      function manualPicture() {
+        const canvas = $("#manualFig"),
+          { w, h } = sizeCanvas(canvas),
+          g = canvas.getContext("2d");
+        g.setTransform(w / 400, 0, 0, h / 105, 0, 0);
+        g.fillStyle = "#ccd4b7";
+        g.fillRect(0, 0, 400, 105);
+        for (let x = 10; x < 400; x += 20)
+          line(
+            g,
+            [
+              [x, 0],
+              [x, 105],
+            ],
+            "#58745b38",
+            0.7,
+          );
+        for (let y = 10; y < 105; y += 20)
+          line(
+            g,
+            [
+              [0, y],
+              [400, y],
+            ],
+            "#58745b38",
+            0.7,
+          );
+        const goal = { x: 211, y: 56 };
+        for (const b of [
+          { x: 102, y: 78, slot: 0 },
+          { x: 302, y: 68, slot: 1 },
+          { x: 187, y: 24, slot: 2 },
+        ]) {
+          g.save();
+          g.setLineDash(dashes[b.slot]);
+          circle(g, b.x, b.y, dist(b, goal), ink[b.slot], null, 1.5);
+          g.restore();
+          drawBuoy(g, b, false);
+        }
+        drawPin(g, goal);
+      }
+      $("#manualBtn").onclick = () => {
+        $("#manual").showModal();
+        manualPicture();
+      };
+      $("#manual .close").onclick = $("#manual .close-manual").onclick = () =>
+        $("#manual").close();
+      function showArchive() {
+        const ul = $("#archiveList");
+        ul.replaceChildren();
+        for (const s of sheets) {
+          const li = document.createElement("li"),
+            a = document.createElement("span"),
+            b = document.createElement("em");
+          a.textContent = s.name;
+          b.textContent =
+            `종 ${s.bells.length}개`;
+          li.append(a, b);
+          ul.append(li);
+        }
+        const sum = (k) => state.surveys.reduce((n, s) => n + s[k], 0);
+        $("#finalStats").textContent =
+          `탐지 ${sum("drops")}회 만에 종 여덟 개를 모두 찾았습니다. 빗나간 표시는 ${sum("misses")}회였습니다.`;
+        $("#archive").showModal();
+      }
+      $("#nextBtn").onclick = () => {
+        if (!isDone()) return;
+        if (state.sheet === 3) {
+          showArchive();
+          return;
+        }
+        state.sheet++;
+        initSheet();
+        chart.scrollIntoView({ block: "nearest", behavior: "instant" });
+        chart.focus({ preventScroll: true });
+      };
+      $("#archive .close").onclick = () => $("#archive").close();
+      $("#archive").addEventListener("close", stopChoir);
+      $("#replayBtn").onclick = () => {
+        $("#archive").close();
+        state = freshGame();
+        initSheet();
+        window.scrollTo(0, 0);
+      };
+      $("#choirBtn").onclick = () => {
+        if (choirTimers.length) {
+          stopChoir();
+          return;
+        }
+        if (!audible) setAudio(true);
+        ensureAudio();
+        $("#choirBtn").textContent = "합창 멈추기 ■";
+        let beat = 0;
+        for (const [i, s] of sheets.entries()) {
+          for (const b of s.bells) {
+            const delay = beat * 0.62;
+            voice(b, 0.65, delay, true);
+            choirTimers.push(
+              setTimeout(() => {
+                const rows = $("#archiveList").children;
+                for (const row of rows) row.style.background = "";
+                rows[i].style.background = "#345044";
+              }, delay * 1000),
+            );
+            beat++;
+          }
+        }
+        for (const b of [
+          sheets[0].bells[0],
+          sheets[1].bells[0],
+          sheets[3].bells[1],
+          sheets[3].bells[2],
+        ])
+          bellTone(b.note, 0.26, 5.6, true);
+        choirTimers.push(setTimeout(stopChoir, 8700));
+      };
+      for (const dialog of document.querySelectorAll("dialog"))
+        dialog.addEventListener("click", (e) => {
+          if (e.target === dialog) {
+            const r = dialog.getBoundingClientRect();
+            if (
+              e.clientX < r.left ||
+              e.clientX > r.right ||
+              e.clientY < r.top ||
+              e.clientY > r.bottom
+            )
+              dialog.close();
+          }
+        });
+      document
+        .querySelectorAll("canvas[data-icon]")
+        .forEach((c) => paintIcon(c, c.dataset.icon));
+      paintSoundButton();
+      initSheet();
+      new ResizeObserver(() => {
+        render();
+        if ($("#manual").open) manualPicture();
+      }).observe(chart);
+    </script>
+  </body>
+</html>

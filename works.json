@@ -4,6 +4,18 @@
  "ogImage": "thumbs/_og.jpg",
  "works": [
   {
+   "slug": "the-drowned-choir",
+   "title": "물밑의 합창",
+   "en": "The Drowned Choir",
+   "kind": "game",
+   "orientation": "any",
+   "desc": "물에 잠긴 마을의 종 여덟 개를 찾는 해도 퍼즐. 부표가 들려주는 메아리로 종의 위치를 짚어 보세요.",
+   "mobile": "바다를 탭해 부표 놓기 · ‘종 표시’를 누르고 원이 만나는 지점 탭",
+   "desktop": "클릭으로 부표 놓기 · 1/2 도구 전환 · 방향키로 이동 후 Enter로 표시",
+   "url": "play/the-drowned-choir/",
+   "thumb": "thumbs/the-drowned-choir.jpg"
+  },
+  {
    "slug": "neon-onslaught",
    "title": "네온 온슬로트",
    "en": "Neon Onslaught",
