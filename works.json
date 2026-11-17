@@ -1,8 +1,20 @@
 {
- "updated": "2026-10-04",
+ "updated": "2026-11-18",
  "description": "코드로 만든 게임과 작은 작품들. 휴대폰과 PC 모두에서 바로 해 볼 수 있어요.",
  "ogImage": "thumbs/_og.jpg",
  "works": [
+  {
+   "slug": "neon-onslaught",
+   "title": "네온 온슬로트",
+   "en": "Neon Onslaught",
+   "kind": "game",
+   "orientation": "any",
+   "desc": "첫 발은 연쇄 레이저. 적기 일곱 대를 격추해 오버드라이브를 켜고 탄막을 스치며 최고점에 도전하세요.",
+   "mobile": "누르고 있으면 연사 · 손가락을 끌어 좌우 이동",
+   "desktop": "Space 발사 · ← → 또는 A D 이동 · P 일시정지",
+   "url": "play/neon-onslaught/",
+   "thumb": "thumbs/neon-onslaught.jpg"
+  },
   {
    "slug": "zero-heart",
    "title": "제로 하트",
